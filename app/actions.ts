@@ -175,7 +175,8 @@ export async function getPortfolioData(): Promise<PortfolioSummary> {
                 const unrealizedPL = currentValue - totalCostForHolding;
                 
                 const sector = await getSector(ticker);
-                
+                const assetClass = getAssetClass(ticker);
+
                 return {
                     ticker,
                     quantity,
@@ -187,7 +188,7 @@ export async function getPortfolioData(): Promise<PortfolioSummary> {
                     unrealizedPLPercent: totalCostForHolding > 0 ? (unrealizedPL / totalCostForHolding) * 100 : 0,
                     allocation: 0,
                     sector: sector,
-                    assetClass: getAssetClass(ticker)
+                    assetClass: assetClass
                 };
              })()
           );
@@ -331,27 +332,29 @@ export async function getMoneyManagerData(): Promise<MoneyManagerData> {
     const { googleSheets } = await getSheetClient();
     
     // 1. Fetch Accounts
+    // NOTE: We now fetch column E (Index 4) which should contain the calculated formula balance from the Sheet.
     const accResponse = await googleSheets.spreadsheets.values.get({
       spreadsheetId: SPREADSHEET_ID,
-      range: `${MM_ACCOUNTS_SHEET}!A:D`, // Adjusted range: A=Name, B=Category, C=Logo, D=InitialBalance. We will CALC current.
+      range: `${MM_ACCOUNTS_SHEET}!A:E`, 
     });
 
     const accRows = accResponse.data.values || [];
     const accounts: MoneyAccount[] = [];
-    const accountBalances: Record<string, number> = {};
 
     for (let i = 1; i < accRows.length; i++) {
       const row = accRows[i];
       if (row[0]) {
         const initialBal = parseMoney(row[3]);
+        // Read "Current Balance" directly from Sheet (Column E)
+        const currentBalFromSheet = parseMoney(row[4]);
+
         accounts.push({
           name: row[0],
           category: row[1] || 'General',
           logoUrl: row[2] || '',
           initialBalance: initialBal,
-          currentBalance: initialBal, // Will be updated by transactions
+          currentBalance: currentBalFromSheet, 
         });
-        accountBalances[row[0]] = initialBal;
       }
     }
 
@@ -396,15 +399,7 @@ export async function getMoneyManagerData(): Promise<MoneyManagerData> {
              uniqueCategories.add(category);
          }
 
-         // --- Balance Calculation Logic ---
-         if (type === 'Income' && toAcc && accountBalances[toAcc] !== undefined) {
-            accountBalances[toAcc] += amount;
-         } else if (type === 'Expense' && fromAcc && accountBalances[fromAcc] !== undefined) {
-            accountBalances[fromAcc] -= amount;
-         } else if (type === 'Transfer' && fromAcc && toAcc) {
-            if (accountBalances[fromAcc] !== undefined) accountBalances[fromAcc] -= amount;
-            if (accountBalances[toAcc] !== undefined) accountBalances[toAcc] += amount;
-         }
+         // NOTE: We DO NOT calculate balances here anymore. We rely on the Sheet.
 
          transactions.push({
             id: `mtx-${i}`,
@@ -453,14 +448,7 @@ export async function getMoneyManagerData(): Promise<MoneyManagerData> {
        }
     }
 
-    // Update accounts array with calculated balances
-    accounts.forEach(acc => {
-        if (accountBalances[acc.name] !== undefined) {
-            acc.currentBalance = accountBalances[acc.name];
-        }
-    });
     accounts.sort((a, b) => b.currentBalance - a.currentBalance);
-
     transactions.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
     upcomingBills.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
 
