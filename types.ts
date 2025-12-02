@@ -81,6 +81,7 @@ export interface MoneyAccount {
 
 export interface MoneyTransaction {
   id: string;
+  rowIndex?: number; // Added for Edit/Delete operations
   date: string;
   type: MoneyTransactionType;
   category: string;

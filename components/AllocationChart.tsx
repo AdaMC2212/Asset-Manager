@@ -1,32 +1,53 @@
 'use client';
 
 import React from 'react';
-import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend } from 'recharts';
+import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts';
 import { PortfolioSummary } from '../types';
 
 interface AllocationChartProps {
   data: PortfolioSummary | null;
 }
 
-const COLORS = ['#6366f1', '#3b82f6', '#10b981', '#f59e0b', '#ec4899', '#8b5cf6', '#06b6d4'];
+const COLORS = {
+  Stocks: '#6366f1', // Indigo
+  ETF: '#10b981',    // Emerald
+  Crypto: '#f59e0b', // Amber
+  Cash: '#3b82f6',   // Blue
+  Other: '#64748b'   // Slate
+};
 
 export const AllocationChart: React.FC<AllocationChartProps> = ({ data }) => {
   const chartData = React.useMemo(() => {
     if (!data) return [];
-    const sectorMap: Record<string, number> = {};
+    
+    // Group by Asset Class
+    const assetMap: Record<string, number> = {
+      Stocks: 0,
+      ETF: 0,
+      Crypto: 0,
+      Cash: data.cashBalance || 0
+    };
     
     data.holdings.forEach(h => {
-      sectorMap[h.sector] = (sectorMap[h.sector] || 0) + h.currentValue;
+      let key = 'Other';
+      if (h.assetClass === 'Equity') key = 'Stocks';
+      else if (h.assetClass === 'ETF') key = 'ETF';
+      else if (h.assetClass === 'Crypto') key = 'Crypto';
+      
+      assetMap[key] = (assetMap[key] || 0) + h.currentValue;
     });
 
-    return Object.entries(sectorMap)
+    return Object.entries(assetMap)
+      .filter(([_, value]) => value > 0) // Remove empty categories
       .map(([name, value]) => ({ name, value }))
       .sort((a, b) => b.value - a.value);
   }, [data]);
 
+  const totalValue = chartData.reduce((acc, curr) => acc + curr.value, 0);
+
   return (
     <div className="bg-slate-900 border border-slate-800 rounded-xl p-6 shadow-sm flex flex-col h-full">
-      <h2 className="text-lg font-semibold text-white mb-6">Sector Allocation</h2>
+      <h2 className="text-lg font-semibold text-white mb-2">Asset Allocation</h2>
       <div className="flex-grow min-h-[300px]">
         {chartData.length > 0 ? (
           <ResponsiveContainer width="100%" height="100%">
@@ -36,25 +57,25 @@ export const AllocationChart: React.FC<AllocationChartProps> = ({ data }) => {
                 cx="50%"
                 cy="50%"
                 innerRadius={60}
-                outerRadius={100}
+                outerRadius={80}
                 paddingAngle={5}
                 dataKey="value"
                 stroke="none"
               >
                 {chartData.map((entry, index) => (
-                  <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                  <Cell 
+                    key={`cell-${index}`} 
+                    fill={COLORS[entry.name as keyof typeof COLORS] || COLORS.Other} 
+                  />
                 ))}
               </Pie>
               <Tooltip 
-                formatter={(value: number) => `$${value.toLocaleString()}`}
-                contentStyle={{ backgroundColor: '#1e293b', borderColor: '#334155', color: '#f8fafc' }}
+                formatter={(value: number) => [
+                  `$${value.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
+                  `${((value / totalValue) * 100).toFixed(1)}%`
+                ]}
+                contentStyle={{ backgroundColor: '#1e293b', borderColor: '#334155', color: '#f8fafc', borderRadius: '0.5rem' }}
                 itemStyle={{ color: '#e2e8f0' }}
-              />
-              <Legend 
-                layout="horizontal" 
-                verticalAlign="bottom" 
-                align="center"
-                wrapperStyle={{ color: '#94a3b8', fontSize: '12px', paddingTop: '20px' }}
               />
             </PieChart>
           </ResponsiveContainer>

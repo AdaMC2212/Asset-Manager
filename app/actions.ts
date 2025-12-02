@@ -88,18 +88,21 @@ const parseMoney = (value: any): number => {
 };
 
 // Helper: Parse dates flexibly (DD/MM/YYYY or YYYY-MM-DD)
+// FIXED: Uses Noon time to avoid Timezone offsets rolling dates back/forward
 const parseDate = (dateStr: string): Date => {
   if (!dateStr) return new Date();
   
   // Check for DD/MM/YYYY
   if (dateStr.match(/^\d{1,2}\/\d{1,2}\/\d{4}/)) {
     const [day, month, year] = dateStr.split('/').map(Number);
-    return new Date(year, month - 1, day);
+    // Use 12:00:00 to be safe from timezone shifts
+    return new Date(year, month - 1, day, 12, 0, 0);
   }
   
   // Check for YYYY-MM-DD
   if (dateStr.match(/^\d{4}-\d{2}-\d{2}/)) {
-     return new Date(dateStr);
+     const [year, month, day] = dateStr.split('-').map(Number);
+     return new Date(year, month - 1, day, 12, 0, 0);
   }
   
   return new Date(dateStr);
@@ -391,6 +394,7 @@ export async function getMoneyManagerData(): Promise<MoneyManagerData> {
 
          transactions.push({
             id: `mtx-${i}`,
+            rowIndex: i + 1, // Store 1-based index for edits
             date: formattedDate,
             type: type as any,
             category,
@@ -536,6 +540,62 @@ export async function addMoneyTransaction(data: MoneyTransaction) {
   } catch (error) {
     console.error("Failed to add money transaction:", error);
     return { success: false, error: 'Failed to write to Google Sheets' };
+  }
+}
+
+export async function updateMoneyTransaction(rowIndex: number, data: MoneyTransaction) {
+  if (typeof window !== 'undefined') {
+    throw new Error("Server Actions cannot run in the browser.");
+  }
+  
+  try {
+    const { googleSheets } = await getSheetClient();
+    
+    const values = [
+      [
+        data.date,
+        data.type,
+        data.category,
+        data.amount,
+        data.fromAccount || '',
+        data.toAccount || '',
+        data.note || ''
+      ]
+    ];
+
+    await googleSheets.spreadsheets.values.update({
+      spreadsheetId: SPREADSHEET_ID,
+      range: `${MM_TRANSACTIONS_SHEET}!A${rowIndex}:G${rowIndex}`,
+      valueInputOption: 'USER_ENTERED',
+      requestBody: { values },
+    });
+
+    return { success: true };
+  } catch (error) {
+    console.error("Failed to update money transaction:", error);
+    return { success: false, error: 'Failed to update Google Sheets' };
+  }
+}
+
+export async function deleteMoneyTransaction(rowIndex: number) {
+  if (typeof window !== 'undefined') {
+    throw new Error("Server Actions cannot run in the browser.");
+  }
+  
+  try {
+    const { googleSheets } = await getSheetClient();
+    
+    // We clear the row content. getMoneyManagerData skips empty rows so this effectively deletes it
+    // without messing up indices for other concurrent users (relative to shifting)
+    await googleSheets.spreadsheets.values.clear({
+      spreadsheetId: SPREADSHEET_ID,
+      range: `${MM_TRANSACTIONS_SHEET}!A${rowIndex}:G${rowIndex}`,
+    });
+
+    return { success: true };
+  } catch (error) {
+    console.error("Failed to delete money transaction:", error);
+    return { success: false, error: 'Failed to delete from Google Sheets' };
   }
 }
 

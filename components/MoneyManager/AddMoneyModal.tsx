@@ -1,9 +1,9 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { X, Loader2, ArrowRight } from 'lucide-react';
 import { MoneyTransaction, MoneyAccount, MoneyTransactionType } from '../../types';
-import { addMoneyTransaction } from '../../app/actions';
+import { addMoneyTransaction, updateMoneyTransaction } from '../../app/actions';
 
 interface AddMoneyModalProps {
   isOpen: boolean;
@@ -11,6 +11,7 @@ interface AddMoneyModalProps {
   onSuccess: () => void;
   accounts: MoneyAccount[];
   existingCategories?: string[];
+  initialData?: MoneyTransaction | null;
 }
 
 const INCOME_CATEGORIES = [
@@ -21,17 +22,45 @@ const EXPENSE_CATEGORIES = [
     'Food', 'Transport', 'Bills', 'Fashion', 'Entertainment', 'Healthcare', 'Electronics', 'Side Hustle', 'Debt', 'Family'
 ];
 
-export const AddMoneyModal: React.FC<AddMoneyModalProps> = ({ isOpen, onClose, onSuccess, accounts, existingCategories = [] }) => {
+export const AddMoneyModal: React.FC<AddMoneyModalProps> = ({ isOpen, onClose, onSuccess, accounts, existingCategories = [], initialData }) => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [formData, setFormData] = useState<Partial<MoneyTransaction>>({
     date: new Date().toISOString().split('T')[0],
     type: 'Expense',
     category: '', // Start empty to force choice or type
     amount: 0,
-    fromAccount: accounts[0]?.name || '',
+    fromAccount: '',
     toAccount: '',
     note: ''
   });
+
+  // Filter accounts: Only Bank/E-Wallet and > 0 balance
+  const filteredAccounts = accounts.filter(a => {
+      const cat = a.category.toLowerCase();
+      return (cat.includes('bank') || cat.includes('wallet') || cat.includes('pay')) && a.currentBalance > 0;
+  });
+
+  // Ensure we have a default account if filtered list changes, but respecting editing data
+  useEffect(() => {
+    if (initialData) {
+      setFormData({
+        ...initialData,
+        // Ensure amount is number
+        amount: Number(initialData.amount)
+      });
+    } else {
+        // Reset to default new transaction state
+        setFormData({
+            date: new Date().toISOString().split('T')[0],
+            type: 'Expense',
+            category: '',
+            amount: 0,
+            fromAccount: filteredAccounts[0]?.name || '',
+            toAccount: '',
+            note: ''
+        });
+    }
+  }, [initialData, isOpen, accounts]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -39,23 +68,32 @@ export const AddMoneyModal: React.FC<AddMoneyModalProps> = ({ isOpen, onClose, o
     
     // Default category if empty
     const finalCategory = formData.category || 'Uncategorized';
+    const payload = {
+        ...formData,
+        category: finalCategory
+    } as MoneyTransaction;
 
     setIsSubmitting(true);
     try {
-      const result = await addMoneyTransaction({
-          ...formData,
-          category: finalCategory
-      } as MoneyTransaction);
+      let result;
+      if (initialData && initialData.rowIndex) {
+        // Update existing
+        result = await updateMoneyTransaction(initialData.rowIndex, payload);
+      } else {
+        // Create new
+        result = await addMoneyTransaction(payload);
+      }
       
       if (result.success) {
         onSuccess();
         onClose();
+        // Reset form
         setFormData({
             date: new Date().toISOString().split('T')[0],
             type: 'Expense',
             category: '',
             amount: 0,
-            fromAccount: accounts[0]?.name || '',
+            fromAccount: filteredAccounts[0]?.name || '',
             toAccount: '',
             note: ''
         });
@@ -78,7 +116,9 @@ export const AddMoneyModal: React.FC<AddMoneyModalProps> = ({ isOpen, onClose, o
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
       <div className="bg-slate-900 border border-slate-800 rounded-xl w-full max-w-lg shadow-2xl">
         <div className="flex justify-between items-center p-6 border-b border-slate-800">
-          <h2 className="text-xl font-bold text-white">New Transaction</h2>
+          <h2 className="text-xl font-bold text-white">
+            {initialData ? 'Edit Transaction' : 'New Transaction'}
+          </h2>
           <button onClick={onClose} className="text-slate-400 hover:text-white transition-colors">
             <X className="w-6 h-6" />
           </button>
@@ -133,6 +173,12 @@ export const AddMoneyModal: React.FC<AddMoneyModalProps> = ({ isOpen, onClose, o
                             onChange={e => setFormData({...formData, fromAccount: e.target.value})}
                         >
                             <option value="">Select Account</option>
+                            {/* For Transfers, we probably want all accounts available, but prioritizing the filtered ones? 
+                                Or strictly filtered? User asked for filtering on "add transaction". 
+                                Typically transfers need all accounts. Sticking to filtered for consistency 
+                                with the request, but adding all accounts for Transfer might be better. 
+                                Let's use 'accounts' (all) for transfer to be safe, but filtered for Inc/Exp.
+                            */}
                             {accounts.map(a => <option key={a.name} value={a.name}>{a.name}</option>)}
                         </select>
                     </div>
@@ -163,7 +209,16 @@ export const AddMoneyModal: React.FC<AddMoneyModalProps> = ({ isOpen, onClose, o
                                 else setFormData({...formData, toAccount: e.target.value});
                             }}
                         >
-                            {accounts.map(a => <option key={a.name} value={a.name}>{a.name}</option>)}
+                            {/* User Request: Only allow bank and Ewallet to show on the account on add transaction (hide all accounts with 0 too) */}
+                            {filteredAccounts.map(a => <option key={a.name} value={a.name}>{a.name}</option>)}
+                            
+                            {/* Fallback: If editing and the saved account isn't in filtered list, show it */}
+                            {initialData && (formData.fromAccount || formData.toAccount) && 
+                             !filteredAccounts.find(a => a.name === (formData.type === 'Expense' ? formData.fromAccount : formData.toAccount)) && (
+                                <option value={formData.type === 'Expense' ? formData.fromAccount : formData.toAccount}>
+                                    {formData.type === 'Expense' ? formData.fromAccount : formData.toAccount}
+                                </option>
+                            )}
                         </select>
                     </div>
                     <div>
@@ -204,7 +259,7 @@ export const AddMoneyModal: React.FC<AddMoneyModalProps> = ({ isOpen, onClose, o
                   formData.type === 'Income' ? 'bg-emerald-600 hover:bg-emerald-700' : 
                   'bg-blue-600 hover:bg-blue-700'}`}
           >
-            {isSubmitting ? <Loader2 className="w-5 h-5 animate-spin" /> : 'Confirm Transaction'}
+            {isSubmitting ? <Loader2 className="w-5 h-5 animate-spin" /> : (initialData ? 'Update Transaction' : 'Confirm Transaction')}
           </button>
         </form>
       </div>

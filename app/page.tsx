@@ -12,7 +12,7 @@ import { getPortfolioData, getCashFlowData, getMoneyManagerData } from './action
 import { PortfolioSummary, CashFlowSummary, MoneyManagerData } from '../types';
 
 type AppModule = 'manager' | 'investment';
-type InvestmentTab = 'dashboard' | 'funding' | 'allocation';
+type InvestmentTab = 'dashboard' | 'funding';
 
 const LockScreen = ({ onUnlock }: { onUnlock: () => void }) => {
   const [pin, setPin] = useState('');
@@ -43,7 +43,7 @@ const LockScreen = ({ onUnlock }: { onUnlock: () => void }) => {
             <div className="bg-slate-800 p-4 rounded-full mb-4 border border-slate-700 shadow-inner">
                 <ShieldCheck className="w-10 h-10 text-indigo-500" />
             </div>
-            <h1 className="text-2xl font-bold text-white tracking-tight">Nova<span className="text-indigo-500">Track</span></h1>
+            <h1 className="text-2xl font-bold text-white tracking-tight">Asset<span className="text-indigo-500">Manager</span></h1>
             <p className="text-slate-500 text-sm mt-1">Secure Portfolio Access</p>
         </div>
 
@@ -94,11 +94,13 @@ const LockScreen = ({ onUnlock }: { onUnlock: () => void }) => {
           <div className="mt-8 max-w-md bg-slate-900/50 border border-slate-800 rounded-xl p-6 text-sm text-slate-400 backdrop-blur-sm animate-in fade-in slide-in-from-bottom-4">
               <h3 className="text-white font-semibold mb-2">How to Deploy Securely</h3>
               <ul className="space-y-2 list-disc pl-4">
-                  <li>Deploy this project to <strong>Vercel</strong> or <strong>Netlify</strong>.</li>
-                  <li>In the project settings, add your Environment Variables:</li>
-                  <li><code>GOOGLE_SERVICE_ACCOUNT_KEY</code>: Paste the full JSON content of your service account key file.</li>
-                  <li><code>NEXT_PUBLIC_APP_PASSWORD</code>: Set your desired PIN (Default: 'admin').</li>
-                  <li><code>API_KEY</code>: (Optional) Your Gemini API Key for AI features.</li>
+                  <li className="text-rose-400 font-bold">⚠️ Do NOT commit .env.local to GitHub!</li>
+                  <li>Push code to GitHub (secrets are ignored).</li>
+                  <li>Import project in <strong>Vercel</strong> or <strong>Netlify</strong>.</li>
+                  <li>In <strong>Settings &rarr; Environment Variables</strong>, add:</li>
+                  <li><code>GOOGLE_SERVICE_ACCOUNT_KEY</code>: Paste entire JSON file content.</li>
+                  <li><code>NEXT_PUBLIC_APP_PASSWORD</code>: Set your PIN (Default: 'admin').</li>
+                  <li><code>API_KEY</code>: (Optional) Gemini API Key.</li>
               </ul>
           </div>
       )}
@@ -271,13 +273,6 @@ export default function Home() {
                  <ArrowRightLeft className="w-4 h-4" />
                  Cash Flow
                </button>
-               <button 
-                  onClick={() => setActiveInvTab('allocation')}
-                  className={`flex items-center gap-2 px-4 py-1.5 rounded-md text-sm font-medium transition-all whitespace-nowrap ${activeInvTab === 'allocation' ? 'bg-slate-800 text-white shadow-sm' : 'text-slate-400 hover:text-slate-200'}`}
-               >
-                 <PieChartIcon className="w-4 h-4" />
-                 Allocation
-               </button>
             </div>
           </div>
         )}
@@ -327,30 +322,15 @@ export default function Home() {
                 <SummaryCards data={data} loading={loading} hideValues={hideValues} />
 
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                  {/* Main List / Chart Area */}
+                  {/* Main List Area */}
                   <div className="lg:col-span-2 space-y-6">
-                      {activeInvTab === 'dashboard' ? (
-                          <HoldingsTable data={data} hideValues={hideValues} />
-                      ) : (
-                          <div className="h-[500px]">
-                              <AllocationChart data={data} />
-                          </div>
-                      )}
+                      <HoldingsTable data={data} hideValues={hideValues} />
                   </div>
 
                   {/* Sidebar Area */}
                   <div className="space-y-6">
                       <div className="h-[300px]">
                           <AllocationChart data={data} />
-                      </div>
-                      
-                      <div className="bg-slate-900 border border-slate-800 rounded-xl p-6 shadow-sm">
-                          <h3 className="text-white font-medium mb-2">Data Sources</h3>
-                          <p className="text-slate-400 text-sm">
-                              • <strong>Transactions:</strong> 'Transaction' Tab<br/>
-                              • <strong>Portfolio:</strong> 'Portfolio' Tab (Source of Truth)<br/>
-                              • <strong>Cash Flow:</strong> 'Cash Flow' Tab
-                          </p>
                       </div>
                   </div>
                 </div>

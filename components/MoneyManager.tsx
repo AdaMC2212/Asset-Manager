@@ -1,10 +1,11 @@
 'use client';
 
 import React, { useState } from 'react';
-import { Plus, Wallet, ArrowUpRight, ArrowDownRight, CreditCard, Banknote, ShoppingBag, Car, Shirt, Coffee, Utensils, Music, Zap, Wifi, CalendarClock, Landmark, Smartphone, PiggyBank } from 'lucide-react';
+import { Plus, Wallet, ArrowUpRight, ArrowDownRight, CreditCard, Banknote, ShoppingBag, Car, Shirt, Coffee, Utensils, Music, Zap, Wifi, CalendarClock, Landmark, Smartphone, PiggyBank, Pencil, Trash2 } from 'lucide-react';
 import { AreaChart, Area, ResponsiveContainer, Tooltip, XAxis, CartesianGrid, PieChart, Pie, Cell, Legend } from 'recharts';
-import { MoneyManagerData } from '../types';
+import { MoneyManagerData, MoneyTransaction } from '../types';
 import { AddMoneyModal } from './MoneyManager/AddMoneyModal';
+import { deleteMoneyTransaction } from '../app/actions';
 
 interface MoneyManagerProps {
   data: MoneyManagerData | null;
@@ -41,6 +42,7 @@ const PIE_COLORS = ['#f43f5e', '#ec4899', '#d946ef', '#a855f7', '#8b5cf6', '#636
 
 export const MoneyManager: React.FC<MoneyManagerProps> = ({ data, loading, onRefresh, hideValues }) => {
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [editingTransaction, setEditingTransaction] = useState<MoneyTransaction | null>(null);
 
   if (loading || !data) {
     return (
@@ -75,6 +77,28 @@ export const MoneyManager: React.FC<MoneyManagerProps> = ({ data, loading, onRef
       value: cat.spent
   })).filter(d => d.value > 0);
 
+  const handleDelete = async (tx: MoneyTransaction) => {
+    if (!tx.rowIndex) return;
+    if (confirm(`Are you sure you want to delete this transaction?\n${tx.date} - ${tx.category} (RM ${tx.amount})`)) {
+        const res = await deleteMoneyTransaction(tx.rowIndex);
+        if (res.success) {
+            onRefresh();
+        } else {
+            alert("Failed to delete.");
+        }
+    }
+  };
+
+  const handleEdit = (tx: MoneyTransaction) => {
+    setEditingTransaction(tx);
+    setIsModalOpen(true);
+  };
+
+  const handleAddNew = () => {
+      setEditingTransaction(null);
+      setIsModalOpen(true);
+  };
+
   return (
     <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
       
@@ -87,7 +111,7 @@ export const MoneyManager: React.FC<MoneyManagerProps> = ({ data, loading, onRef
                 <div className="flex justify-between items-start mb-2">
                     <span className="text-slate-400 font-medium text-sm">Total Wallet Balance</span>
                     <button 
-                        onClick={() => setIsModalOpen(true)}
+                        onClick={handleAddNew}
                         className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-1.5 rounded-lg text-xs font-bold flex items-center gap-2 transition-colors shadow-lg shadow-indigo-500/20"
                     >
                         <Plus className="w-3 h-3" />
@@ -196,7 +220,7 @@ export const MoneyManager: React.FC<MoneyManagerProps> = ({ data, loading, onRef
             <div className="overflow-x-auto">
                 <table className="w-full text-left">
                     <tbody className="divide-y divide-slate-800">
-                        {data.transactions.slice(0, 5).map((tx) => (
+                        {data.transactions.slice(0, 10).map((tx) => (
                             <tr key={tx.id} className="group hover:bg-slate-800/30 transition-colors">
                                 <td className="py-4">
                                     <div className="flex items-center gap-4">
@@ -215,6 +239,24 @@ export const MoneyManager: React.FC<MoneyManagerProps> = ({ data, loading, onRef
                                 <td className={`text-right font-medium ${tx.type === 'Income' ? 'text-emerald-400' : tx.type === 'Transfer' ? 'text-blue-400' : 'text-rose-400'}`}>
                                     {tx.type === 'Income' ? '+' : tx.type === 'Transfer' ? '' : '-'} {displayValue(tx.amount)}
                                 </td>
+                                <td className="px-4 text-right">
+                                    <div className="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                        <button 
+                                            onClick={() => handleEdit(tx)}
+                                            className="p-2 text-slate-500 hover:text-indigo-400 bg-slate-800 hover:bg-slate-700 rounded-lg transition-colors"
+                                            title="Edit"
+                                        >
+                                            <Pencil className="w-3.5 h-3.5" />
+                                        </button>
+                                        <button 
+                                            onClick={() => handleDelete(tx)}
+                                            className="p-2 text-slate-500 hover:text-rose-400 bg-slate-800 hover:bg-slate-700 rounded-lg transition-colors"
+                                            title="Delete"
+                                        >
+                                            <Trash2 className="w-3.5 h-3.5" />
+                                        </button>
+                                    </div>
+                                </td>
                             </tr>
                         ))}
                          {data.transactions.length === 0 && (
@@ -222,7 +264,7 @@ export const MoneyManager: React.FC<MoneyManagerProps> = ({ data, loading, onRef
                          )}
                     </tbody>
                 </table>
-                {data.transactions.length > 5 && (
+                {data.transactions.length > 10 && (
                     <div className="mt-4 text-center">
                         <button className="text-sm text-indigo-400 hover:text-indigo-300 transition-colors">View All Transactions</button>
                     </div>
@@ -360,6 +402,7 @@ export const MoneyManager: React.FC<MoneyManagerProps> = ({ data, loading, onRef
         onSuccess={onRefresh}
         accounts={data.accounts}
         existingCategories={data.categories}
+        initialData={editingTransaction}
       />
     </div>
   );
