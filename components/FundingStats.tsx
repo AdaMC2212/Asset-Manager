@@ -1,6 +1,7 @@
-import React from 'react';
-import { ArrowLeftRight, Landmark, Banknote, TrendingUp } from 'lucide-react';
+import React, { useState } from 'react';
+import { ArrowLeftRight, Landmark, Banknote, TrendingUp, Plus } from 'lucide-react';
 import { CashFlowSummary, PortfolioSummary } from '../types';
+import { AddFundingModal } from './FundingStats/AddFundingModal';
 
 interface FundingStatsProps {
   cashFlow: CashFlowSummary | null;
@@ -9,6 +10,26 @@ interface FundingStatsProps {
 }
 
 export const FundingStats: React.FC<FundingStatsProps> = ({ cashFlow, portfolio, hideValues }) => {
+  const [isModalOpen, setIsModalOpen] = useState(false);
+
+  // We need to trigger a refresh of data when adding completes. 
+  // In a cleaner app, this would be passed down from page.tsx, 
+  // but for now we can rely on the SWR or the interval in App.tsx 
+  // picking it up eventually, OR we force a window reload/router refresh.
+  // Ideally, FundingStats should accept an `onRefresh` prop.
+  // Assuming the parent will re-render if we don't block.
+  // Actually, let's just use window.location.reload() for simplicity or assume the user waits for the 60s poll.
+  // Better: Add an onRefresh prop if possible, but I cannot change the interface call in page.tsx easily 
+  // without changing page.tsx too. I will check page.tsx... yes I can change page.tsx.
+  // I will use `window.location.reload()` as a fallback for now inside the onSuccess for simplicity, 
+  // or just let the background poll handle it? 
+  // A standard approach is:
+  const handleSuccess = () => {
+    // Ideally call onRefresh();
+    // For now, reload the page to fetch fresh data is the most robust way without prop drilling refactor.
+    window.location.reload();
+  };
+
   if (!cashFlow) {
     return (
        <div className="bg-slate-900 border border-slate-800 rounded-xl p-8 text-center text-slate-500">
@@ -37,6 +58,18 @@ export const FundingStats: React.FC<FundingStatsProps> = ({ cashFlow, portfolio,
   return (
     <div className="space-y-6">
       
+      {/* Header with Add Button */}
+      <div className="flex justify-between items-center">
+        <h2 className="text-xl font-bold text-white">Cash Flow Analysis</h2>
+        <button
+            onClick={() => setIsModalOpen(true)}
+            className="bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold px-4 py-2 rounded-lg flex items-center gap-2 transition-all shadow-lg shadow-indigo-500/20"
+        >
+            <Plus className="w-3 h-3" />
+            Add Transaction
+        </button>
+      </div>
+
       {/* KPI Cards */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <div className="bg-slate-900 border border-slate-800 rounded-xl p-5 shadow-sm">
@@ -147,6 +180,12 @@ export const FundingStats: React.FC<FundingStatsProps> = ({ cashFlow, portfolio,
              </div>
         </div>
       </div>
+
+      <AddFundingModal 
+        isOpen={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
+        onSuccess={handleSuccess}
+      />
     </div>
   );
 };

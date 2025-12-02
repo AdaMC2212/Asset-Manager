@@ -333,25 +333,27 @@ export async function getMoneyManagerData(): Promise<MoneyManagerData> {
     // 1. Fetch Accounts
     const accResponse = await googleSheets.spreadsheets.values.get({
       spreadsheetId: SPREADSHEET_ID,
-      range: `${MM_ACCOUNTS_SHEET}!A:E`, 
+      range: `${MM_ACCOUNTS_SHEET}!A:D`, // Adjusted range: A=Name, B=Category, C=Logo, D=InitialBalance. We will CALC current.
     });
 
     const accRows = accResponse.data.values || [];
     const accounts: MoneyAccount[] = [];
+    const accountBalances: Record<string, number> = {};
 
     for (let i = 1; i < accRows.length; i++) {
       const row = accRows[i];
       if (row[0]) {
+        const initialBal = parseMoney(row[3]);
         accounts.push({
           name: row[0],
           category: row[1] || 'General',
           logoUrl: row[2] || '',
-          initialBalance: parseMoney(row[3]),
-          currentBalance: parseMoney(row[4]),
+          initialBalance: initialBal,
+          currentBalance: initialBal, // Will be updated by transactions
         });
+        accountBalances[row[0]] = initialBal;
       }
     }
-    accounts.sort((a, b) => b.currentBalance - a.currentBalance);
 
     // 2. Fetch All Transactions
     const txResponse = await googleSheets.spreadsheets.values.get({
@@ -386,10 +388,22 @@ export async function getMoneyManagerData(): Promise<MoneyManagerData> {
          const amount = parseMoney(row[3]);
          const type = row[1];
          const category = row[2] || 'Uncategorized';
+         const fromAcc = row[4];
+         const toAcc = row[5];
          const formattedDate = formatDateDisplay(dateObj);
 
          if (category && category !== 'Uncategorized') {
              uniqueCategories.add(category);
+         }
+
+         // --- Balance Calculation Logic ---
+         if (type === 'Income' && toAcc && accountBalances[toAcc] !== undefined) {
+            accountBalances[toAcc] += amount;
+         } else if (type === 'Expense' && fromAcc && accountBalances[fromAcc] !== undefined) {
+            accountBalances[fromAcc] -= amount;
+         } else if (type === 'Transfer' && fromAcc && toAcc) {
+            if (accountBalances[fromAcc] !== undefined) accountBalances[fromAcc] -= amount;
+            if (accountBalances[toAcc] !== undefined) accountBalances[toAcc] += amount;
          }
 
          transactions.push({
@@ -399,8 +413,8 @@ export async function getMoneyManagerData(): Promise<MoneyManagerData> {
             type: type as any,
             category,
             amount,
-            fromAccount: row[4],
-            toAccount: row[5],
+            fromAccount: fromAcc,
+            toAccount: toAcc,
             note: row[6]
          });
 
@@ -438,6 +452,14 @@ export async function getMoneyManagerData(): Promise<MoneyManagerData> {
          }
        }
     }
+
+    // Update accounts array with calculated balances
+    accounts.forEach(acc => {
+        if (accountBalances[acc.name] !== undefined) {
+            acc.currentBalance = accountBalances[acc.name];
+        }
+    });
+    accounts.sort((a, b) => b.currentBalance - a.currentBalance);
 
     transactions.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
     upcomingBills.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
@@ -586,7 +608,6 @@ export async function deleteMoneyTransaction(rowIndex: number) {
     const { googleSheets } = await getSheetClient();
     
     // We clear the row content. getMoneyManagerData skips empty rows so this effectively deletes it
-    // without messing up indices for other concurrent users (relative to shifting)
     await googleSheets.spreadsheets.values.clear({
       spreadsheetId: SPREADSHEET_ID,
       range: `${MM_TRANSACTIONS_SHEET}!A${rowIndex}:G${rowIndex}`,
@@ -637,6 +658,60 @@ export async function addTrade(data: any) {
     return { success: true };
   } catch (error) {
     console.error("Failed to add trade:", error);
+    return { success: false, error: 'Failed to write to Google Sheets' };
+  }
+}
+
+export async function addDeposit(data: { date: string, amount: number, reason: string }) {
+  if (typeof window !== 'undefined') {
+    throw new Error("Server Actions cannot run in the browser.");
+  }
+  
+  if (!process.env.GOOGLE_SERVICE_ACCOUNT_KEY) {
+     return { success: false, error: 'Setup Required.' };
+  }
+
+  try {
+    const { googleSheets } = await getSheetClient();
+    const values = [[data.date, data.amount, data.reason]];
+
+    await googleSheets.spreadsheets.values.append({
+      spreadsheetId: SPREADSHEET_ID,
+      range: `${CASH_FLOW_SHEET_NAME}!A:C`, // Append to cols A-C
+      valueInputOption: 'USER_ENTERED',
+      requestBody: { values },
+    });
+
+    return { success: true };
+  } catch (error) {
+    console.error("Failed to add deposit:", error);
+    return { success: false, error: 'Failed to write to Google Sheets' };
+  }
+}
+
+export async function addConversion(data: { date: string, myr: number, usd: number, rate: number }) {
+  if (typeof window !== 'undefined') {
+    throw new Error("Server Actions cannot run in the browser.");
+  }
+  
+  if (!process.env.GOOGLE_SERVICE_ACCOUNT_KEY) {
+     return { success: false, error: 'Setup Required.' };
+  }
+
+  try {
+    const { googleSheets } = await getSheetClient();
+    const values = [[data.date, data.myr, data.usd, data.rate]];
+
+    await googleSheets.spreadsheets.values.append({
+      spreadsheetId: SPREADSHEET_ID,
+      range: `${CASH_FLOW_SHEET_NAME}!E:H`, // Append to cols E-H
+      valueInputOption: 'USER_ENTERED',
+      requestBody: { values },
+    });
+
+    return { success: true };
+  } catch (error) {
+    console.error("Failed to add conversion:", error);
     return { success: false, error: 'Failed to write to Google Sheets' };
   }
 }

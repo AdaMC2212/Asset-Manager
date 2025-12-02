@@ -48,7 +48,9 @@ export const AllocationChart: React.FC<AllocationChartProps> = ({ data }) => {
   return (
     <div className="bg-slate-900 border border-slate-800 rounded-xl p-6 shadow-sm flex flex-col h-full">
       <h2 className="text-lg font-semibold text-white mb-2">Asset Allocation</h2>
-      <div className="flex-grow min-h-[300px]">
+      
+      {/* Chart Section */}
+      <div className="flex-grow min-h-[220px]">
         {chartData.length > 0 ? (
           <ResponsiveContainer width="100%" height="100%">
             <PieChart>
@@ -84,6 +86,29 @@ export const AllocationChart: React.FC<AllocationChartProps> = ({ data }) => {
             No data available
           </div>
         )}
+      </div>
+
+      {/* Breakdown List Section */}
+      <div className="mt-4 space-y-3 border-t border-slate-800 pt-4">
+        {chartData.map((item) => (
+          <div key={item.name} className="flex items-center justify-between text-sm">
+             <div className="flex items-center gap-2">
+                <div 
+                  className="w-3 h-3 rounded-full" 
+                  style={{ backgroundColor: COLORS[item.name as keyof typeof COLORS] || COLORS.Other }}
+                ></div>
+                <span className="text-slate-300">{item.name}</span>
+             </div>
+             <div className="text-right">
+                <div className="text-white font-medium">
+                   ${item.value.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                </div>
+                <div className="text-xs text-slate-500">
+                   {((item.value / totalValue) * 100).toFixed(1)}%
+                </div>
+             </div>
+          </div>
+        ))}
       </div>
     </div>
   );
