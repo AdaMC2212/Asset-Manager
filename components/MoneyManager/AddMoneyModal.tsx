@@ -34,11 +34,17 @@ export const AddMoneyModal: React.FC<AddMoneyModalProps> = ({ isOpen, onClose, o
     note: ''
   });
 
-  // Filter accounts: Only Bank/E-Wallet and > 0 balance
-  const filteredAccounts = accounts.filter(a => {
+  // 1. Identify "Relevant" accounts (Bank, Wallet, Pay)
+  const relevantAccounts = accounts.filter(a => {
       const cat = a.category.toLowerCase();
-      return (cat.includes('bank') || cat.includes('wallet') || cat.includes('pay')) && a.currentBalance > 0;
+      return (cat.includes('bank') || cat.includes('wallet') || cat.includes('pay'));
   });
+
+  // 2. Source Accounts (For Expenses/Transfer Out): Must have balance > 0
+  const sourceAccounts = relevantAccounts.filter(a => a.currentBalance > 0);
+
+  // 3. Destination Accounts (For Income/Transfer In): Can be any relevant account (even 0 balance)
+  const destAccounts = relevantAccounts;
 
   // Ensure we have a default account if filtered list changes, but respecting editing data
   useEffect(() => {
@@ -55,7 +61,7 @@ export const AddMoneyModal: React.FC<AddMoneyModalProps> = ({ isOpen, onClose, o
             type: 'Expense',
             category: '',
             amount: 0,
-            fromAccount: filteredAccounts[0]?.name || '',
+            fromAccount: sourceAccounts[0]?.name || '',
             toAccount: '',
             note: ''
         });
@@ -93,7 +99,7 @@ export const AddMoneyModal: React.FC<AddMoneyModalProps> = ({ isOpen, onClose, o
             type: 'Expense',
             category: '',
             amount: 0,
-            fromAccount: filteredAccounts[0]?.name || '',
+            fromAccount: sourceAccounts[0]?.name || '',
             toAccount: '',
             note: ''
         });
@@ -109,6 +115,9 @@ export const AddMoneyModal: React.FC<AddMoneyModalProps> = ({ isOpen, onClose, o
   };
 
   const currentCategories = formData.type === 'Income' ? INCOME_CATEGORIES : EXPENSE_CATEGORIES;
+
+  // Determine which list of accounts to use for the dropdowns
+  const availableAccounts = formData.type === 'Income' ? destAccounts : sourceAccounts;
 
   if (!isOpen) return null;
 
@@ -173,13 +182,7 @@ export const AddMoneyModal: React.FC<AddMoneyModalProps> = ({ isOpen, onClose, o
                             onChange={e => setFormData({...formData, fromAccount: e.target.value})}
                         >
                             <option value="">Select Account</option>
-                            {/* For Transfers, we probably want all accounts available, but prioritizing the filtered ones? 
-                                Or strictly filtered? User asked for filtering on "add transaction". 
-                                Typically transfers need all accounts. Sticking to filtered for consistency 
-                                with the request, but adding all accounts for Transfer might be better. 
-                                Let's use 'accounts' (all) for transfer to be safe, but filtered for Inc/Exp.
-                            */}
-                            {accounts.map(a => <option key={a.name} value={a.name}>{a.name}</option>)}
+                            {sourceAccounts.map(a => <option key={a.name} value={a.name}>{a.name}</option>)}
                         </select>
                     </div>
                     <div className="pt-6 text-slate-500"><ArrowRight className="w-5 h-5"/></div>
@@ -191,7 +194,7 @@ export const AddMoneyModal: React.FC<AddMoneyModalProps> = ({ isOpen, onClose, o
                             onChange={e => setFormData({...formData, toAccount: e.target.value})}
                         >
                              <option value="">Select Account</option>
-                            {accounts.map(a => <option key={a.name} value={a.name}>{a.name}</option>)}
+                            {destAccounts.map(a => <option key={a.name} value={a.name}>{a.name}</option>)}
                         </select>
                     </div>
                 </div>
@@ -209,12 +212,11 @@ export const AddMoneyModal: React.FC<AddMoneyModalProps> = ({ isOpen, onClose, o
                                 else setFormData({...formData, toAccount: e.target.value});
                             }}
                         >
-                            {/* User Request: Only allow bank and Ewallet to show on the account on add transaction (hide all accounts with 0 too) */}
-                            {filteredAccounts.map(a => <option key={a.name} value={a.name}>{a.name}</option>)}
+                            {availableAccounts.map(a => <option key={a.name} value={a.name}>{a.name}</option>)}
                             
                             {/* Fallback: If editing and the saved account isn't in filtered list, show it */}
                             {initialData && (formData.fromAccount || formData.toAccount) && 
-                             !filteredAccounts.find(a => a.name === (formData.type === 'Expense' ? formData.fromAccount : formData.toAccount)) && (
+                             !availableAccounts.find(a => a.name === (formData.type === 'Expense' ? formData.fromAccount : formData.toAccount)) && (
                                 <option value={formData.type === 'Expense' ? formData.fromAccount : formData.toAccount}>
                                     {formData.type === 'Expense' ? formData.fromAccount : formData.toAccount}
                                 </option>
