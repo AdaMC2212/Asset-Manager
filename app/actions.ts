@@ -417,9 +417,15 @@ export async function getMoneyManagerData(): Promise<MoneyManagerData> {
             const txMonthKey = `${dateObj.getFullYear()}-${dateObj.getMonth()}`;
             
             if (txMonthKey === currentMonthKey) {
-                if (type === 'Income') currentMonthIncome += amount;
+                if (type === 'Income') {
+                    currentMonthIncome += amount;
+                    // For Net Spending Logic: Subtract income from category
+                    // e.g. Food Expense 500, Food Income 100 -> Net 400
+                    categoryTotals[category] = (categoryTotals[category] || 0) - amount;
+                }
                 else {
                     currentMonthExpense += amount;
+                    // Add expense to category
                     categoryTotals[category] = (categoryTotals[category] || 0) + amount;
                 }
             } 
@@ -479,16 +485,19 @@ export async function getMoneyManagerData(): Promise<MoneyManagerData> {
 
     const totalBalance = accounts.reduce((sum, acc) => sum + acc.currentBalance, 0);
 
-    const categorySpending: CategorySpending[] = Object.keys(categoryTotals).map(cat => {
-        const spent = categoryTotals[cat];
-        const limit = Math.max(spent * 1.2, 500); 
-        return {
-            category: cat,
-            spent,
-            limit,
-            percentage: (spent / limit) * 100
-        };
-    }).sort((a, b) => b.spent - a.spent);
+    const categorySpending: CategorySpending[] = Object.keys(categoryTotals)
+        .filter(cat => categoryTotals[cat] > 0) // Only show categories with Positive Net Expense
+        .map(cat => {
+            const spent = categoryTotals[cat];
+            const limit = Math.max(spent * 1.2, 500); 
+            return {
+                category: cat,
+                spent,
+                limit,
+                percentage: (spent / limit) * 100
+            };
+        })
+        .sort((a, b) => b.spent - a.spent);
 
     // Convert Set to Array and Sort
     const sortedCategories = Array.from(uniqueCategories).sort();

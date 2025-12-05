@@ -30,8 +30,8 @@ export const AllocationChart: React.FC<AllocationChartProps> = ({ data }) => {
     
     data.holdings.forEach(h => {
       let key = 'Other';
-      if (h.assetClass === 'Equity') key = 'Stocks';
-      else if (h.assetClass === 'ETF') key = 'ETF';
+      if (h.assetClass === 'Equity' || h.assetClass === 'Stocks') key = 'Stocks';
+      else if (h.assetClass === 'ETF' || h.assetClass === 'Index ETF') key = 'ETF';
       else if (h.assetClass === 'Crypto') key = 'Crypto';
       
       assetMap[key] = (assetMap[key] || 0) + h.currentValue;
@@ -46,11 +46,11 @@ export const AllocationChart: React.FC<AllocationChartProps> = ({ data }) => {
   const totalValue = chartData.reduce((acc, curr) => acc + curr.value, 0);
 
   return (
-    <div className="bg-slate-900 border border-slate-800 rounded-xl p-6 shadow-sm flex flex-col h-full">
-      <h2 className="text-lg font-semibold text-white mb-2">Asset Allocation</h2>
+    <div className="bg-slate-900 border border-slate-800 rounded-xl p-6 shadow-sm flex flex-col h-full overflow-hidden">
+      <h2 className="text-lg font-semibold text-white mb-2 flex-shrink-0">Portfolio Allocation</h2>
       
       {/* Chart Section */}
-      <div className="flex-grow min-h-[220px]">
+      <div className="flex-shrink-0 h-[200px] min-h-[200px]">
         {chartData.length > 0 ? (
           <ResponsiveContainer width="100%" height="100%">
             <PieChart>
@@ -88,27 +88,29 @@ export const AllocationChart: React.FC<AllocationChartProps> = ({ data }) => {
         )}
       </div>
 
-      {/* Breakdown List Section */}
-      <div className="mt-4 space-y-3 border-t border-slate-800 pt-4">
-        {chartData.map((item) => (
-          <div key={item.name} className="flex items-center justify-between text-sm">
-             <div className="flex items-center gap-2">
-                <div 
-                  className="w-3 h-3 rounded-full" 
-                  style={{ backgroundColor: COLORS[item.name as keyof typeof COLORS] || COLORS.Other }}
-                ></div>
-                <span className="text-slate-300">{item.name}</span>
-             </div>
-             <div className="text-right">
-                <div className="text-white font-medium">
-                   ${item.value.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                </div>
-                <div className="text-xs text-slate-500">
-                   {((item.value / totalValue) * 100).toFixed(1)}%
-                </div>
-             </div>
-          </div>
-        ))}
+      {/* Breakdown List Section - Scrollable */}
+      <div className="mt-4 border-t border-slate-800 pt-4 flex-1 overflow-y-auto min-h-0 pr-2 custom-scrollbar">
+        <div className="space-y-3">
+          {chartData.map((item) => (
+            <div key={item.name} className="flex items-center justify-between text-sm hover:bg-slate-800/30 p-1.5 rounded-lg transition-colors">
+              <div className="flex items-center gap-2">
+                  <div 
+                    className="w-3 h-3 rounded-full flex-shrink-0" 
+                    style={{ backgroundColor: COLORS[item.name as keyof typeof COLORS] || COLORS.Other }}
+                  ></div>
+                  <span className="text-slate-300 font-medium truncate">{item.name}</span>
+              </div>
+              <div className="text-right">
+                  <div className="text-white font-medium">
+                    ${item.value.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  </div>
+                  <div className="text-xs text-slate-500">
+                    {((item.value / totalValue) * 100).toFixed(1)}%
+                  </div>
+              </div>
+            </div>
+          ))}
+        </div>
       </div>
     </div>
   );
