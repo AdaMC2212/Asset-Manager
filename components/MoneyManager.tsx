@@ -426,6 +426,8 @@ export const MoneyManager: React.FC<MoneyManagerProps> = ({ data, loading, onRef
         onSuccess={onRefresh}
         accounts={data.accounts}
         initialData={editingTransaction}
+        incomeCategories={data.incomeCategories || []}
+        expenseCategories={data.expenseCategories || []}
       />
     </div>
   );
