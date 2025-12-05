@@ -6,6 +6,8 @@ import { AreaChart, Area, ResponsiveContainer, Tooltip, XAxis, CartesianGrid, Pi
 import { MoneyManagerData, MoneyTransaction } from '../types';
 import { AddMoneyModal } from './MoneyManager/AddMoneyModal';
 import { deleteMoneyTransaction } from '../app/actions';
+import { SpotlightCard } from './ui/SpotlightCard';
+import { CountUp } from './ui/CountUp';
 
 interface MoneyManagerProps {
   data: MoneyManagerData | null;
@@ -105,21 +107,21 @@ export const MoneyManager: React.FC<MoneyManagerProps> = ({ data, loading, onRef
       {/* LEFT COLUMN (Main Content) */}
       <div className="xl:col-span-2 space-y-6">
         
-        {/* My Balance Section */}
-        <div className="bg-slate-900 border border-slate-800 rounded-2xl p-8 flex flex-col md:flex-row justify-between items-center gap-8 shadow-sm">
+        {/* My Balance Section - Wrapped in SpotlightCard */}
+        <SpotlightCard className="p-8 flex flex-col md:flex-row justify-between items-center gap-8 shadow-sm" spotlightColor="rgba(99, 102, 241, 0.15)">
             <div className="flex-1 w-full">
                 <div className="flex justify-between items-start mb-2">
                     <span className="text-slate-400 font-medium text-sm">Total Wallet Balance</span>
                     <button 
                         onClick={handleAddNew}
-                        className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-1.5 rounded-lg text-xs font-bold flex items-center gap-2 transition-colors shadow-lg shadow-indigo-500/20"
+                        className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-1.5 rounded-lg text-xs font-bold flex items-center gap-2 transition-colors shadow-lg shadow-indigo-500/20 z-10 relative"
                     >
                         <Plus className="w-3 h-3" />
                         New Transaction
                     </button>
                 </div>
                 <h1 className="text-4xl md:text-5xl font-bold text-white mb-2">
-                    {displayValue(data.totalBalance)}
+                     {hideValues ? 'RM ****' : <CountUp end={data.totalBalance} prefix="RM " decimals={2} />}
                 </h1>
                 <div className="flex items-center gap-4 mb-6">
                     <div className={`${isPositiveTrend ? 'text-emerald-500' : 'text-rose-500'} text-sm font-medium flex items-center gap-1`}>
@@ -129,7 +131,7 @@ export const MoneyManager: React.FC<MoneyManagerProps> = ({ data, loading, onRef
                     <span className="text-slate-500 text-sm">this month</span>
                 </div>
 
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-2 gap-4 relative z-10">
                     <div className="bg-slate-950/50 rounded-xl p-4 border border-slate-800 group hover:border-emerald-500/30 transition-colors">
                         <div className="flex items-center justify-between mb-2">
                             <div className="flex items-center gap-2">
@@ -144,7 +146,9 @@ export const MoneyManager: React.FC<MoneyManagerProps> = ({ data, loading, onRef
                                 </span>
                             )}
                         </div>
-                        <div className="text-xl font-bold text-white">{displayValue(data.monthlyStats.income)}</div>
+                        <div className="text-xl font-bold text-white">
+                             {hideValues ? 'RM ****' : <CountUp end={data.monthlyStats.income} prefix="RM " />}
+                        </div>
                     </div>
                     <div className="bg-slate-950/50 rounded-xl p-4 border border-slate-800 group hover:border-rose-500/30 transition-colors">
                         <div className="flex items-center justify-between mb-2">
@@ -160,11 +164,13 @@ export const MoneyManager: React.FC<MoneyManagerProps> = ({ data, loading, onRef
                                 </span>
                             )}
                         </div>
-                        <div className="text-xl font-bold text-white">{displayValue(data.monthlyStats.expense)}</div>
+                        <div className="text-xl font-bold text-white">
+                             {hideValues ? 'RM ****' : <CountUp end={data.monthlyStats.expense} prefix="RM " />}
+                        </div>
                     </div>
                 </div>
             </div>
-        </div>
+        </SpotlightCard>
 
         {/* Overview Chart */}
         <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-sm">

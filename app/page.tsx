@@ -10,6 +10,7 @@ import { MoneyManager } from '../components/MoneyManager';
 import { AddTradeModal } from '../components/AddTradeModal';
 import { getPortfolioData, getCashFlowData, getMoneyManagerData } from './actions';
 import { PortfolioSummary, CashFlowSummary, MoneyManagerData } from '../types';
+import { DecryptedText } from '../components/ui/DecryptedText';
 
 type AppModule = 'manager' | 'investment';
 type InvestmentTab = 'dashboard' | 'funding';
@@ -34,8 +35,16 @@ const LockScreen = ({ onUnlock }: { onUnlock: () => void }) => {
   };
 
   return (
-    <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center p-4">
-      <div className="w-full max-w-sm bg-slate-900 border border-slate-800 rounded-2xl p-8 shadow-2xl relative overflow-hidden">
+    <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center p-4 relative overflow-hidden">
+      {/* Subtle Background Grid Effect using CSS */}
+      <div className="absolute inset-0 z-0 opacity-20 pointer-events-none" 
+           style={{ 
+             backgroundImage: 'linear-gradient(#334155 1px, transparent 1px), linear-gradient(90deg, #334155 1px, transparent 1px)', 
+             backgroundSize: '40px 40px' 
+           }}>
+      </div>
+      
+      <div className="w-full max-w-sm bg-slate-900/80 backdrop-blur-md border border-slate-800 rounded-2xl p-8 shadow-2xl relative z-10 overflow-hidden">
         {/* Decorative elements */}
         <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500"></div>
         
@@ -43,7 +52,9 @@ const LockScreen = ({ onUnlock }: { onUnlock: () => void }) => {
             <div className="bg-slate-800 p-4 rounded-full mb-4 border border-slate-700 shadow-inner">
                 <ShieldCheck className="w-10 h-10 text-indigo-500" />
             </div>
-            <h1 className="text-2xl font-bold text-white tracking-tight">Asset<span className="text-indigo-500">Manager</span></h1>
+            <h1 className="text-2xl font-bold text-white tracking-tight flex items-center gap-1">
+              <DecryptedText text="AssetManager" speed={50} className="text-white" />
+            </h1>
             <p className="text-slate-500 text-sm mt-1">Secure Portfolio Access</p>
         </div>
 
@@ -91,7 +102,7 @@ const LockScreen = ({ onUnlock }: { onUnlock: () => void }) => {
       </div>
 
       {showHelp && (
-          <div className="mt-8 max-w-md bg-slate-900/50 border border-slate-800 rounded-xl p-6 text-sm text-slate-400 backdrop-blur-sm animate-in fade-in slide-in-from-bottom-4">
+          <div className="mt-8 max-w-md bg-slate-900/50 border border-slate-800 rounded-xl p-6 text-sm text-slate-400 backdrop-blur-sm animate-in fade-in slide-in-from-bottom-4 z-10">
               <h3 className="text-white font-semibold mb-2">How to Deploy Securely</h3>
               <ul className="space-y-2 list-disc pl-4">
                   <li className="text-rose-400 font-bold">⚠️ Do NOT commit .env.local to GitHub!</li>
@@ -174,7 +185,9 @@ export default function Home() {
               <div className="bg-indigo-600 p-2 rounded-lg">
                  <LineChart className="w-5 h-5 text-white" />
               </div>
-              <span className="font-bold text-xl text-white tracking-tight">Asset<span className="text-indigo-500">Manager</span></span>
+              <span className="font-bold text-xl text-white tracking-tight">
+                <DecryptedText text="AssetManager" speed={60} revealDirection="center" />
+              </span>
             </div>
 
             {/* Module Switcher (Center - Desktop) */}
@@ -329,7 +342,7 @@ export default function Home() {
 
                   {/* Sidebar Area */}
                   <div className="space-y-6">
-                      <div className="h-[300px]">
+                      <div className="h-[350px]">
                           <AllocationChart data={data} />
                       </div>
                   </div>
