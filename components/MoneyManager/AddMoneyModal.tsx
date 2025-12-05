@@ -1,3 +1,4 @@
+
 'use client';
 
 import React, { useState, useEffect } from 'react';
@@ -10,31 +11,27 @@ interface AddMoneyModalProps {
   onClose: () => void;
   onSuccess: () => void;
   accounts: MoneyAccount[];
-  existingCategories?: string[];
   initialData?: MoneyTransaction | null;
 }
 
-const INCOME_CATEGORIES = [
-    'Salary', 'Bonus', 'Allowance', 'Dividend', 'Food', 'Transport', 'Entertainment', 'Side Hustle'
-];
+const DEFAULT_INCOME_CATS = ['Salary', 'Bonus', 'Allowance', 'Dividend', 'Side Hustle', 'Other'];
+const DEFAULT_EXPENSE_CATS = ['Food', 'Transport', 'Bills', 'Fashion', 'Entertainment', 'Healthcare', 'Electronics', 'Debt', 'Family', 'Other'];
 
-const EXPENSE_CATEGORIES = [
-    'Food', 'Transport', 'Bills', 'Fashion', 'Entertainment', 'Healthcare', 'Electronics', 'Side Hustle', 'Debt', 'Family'
-];
-
-export const AddMoneyModal: React.FC<AddMoneyModalProps> = ({ isOpen, onClose, onSuccess, accounts, existingCategories = [], initialData }) => {
+export const AddMoneyModal: React.FC<AddMoneyModalProps> = ({ 
+    isOpen, onClose, onSuccess, accounts, initialData 
+}) => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [formData, setFormData] = useState<Partial<MoneyTransaction>>({
     date: new Date().toISOString().split('T')[0],
     type: 'Expense',
-    category: '', // Start empty to force choice or type
+    category: '', 
     amount: 0,
     fromAccount: '',
     toAccount: '',
     note: ''
   });
 
-  // 1. Identify "Relevant" accounts (Bank, Wallet, Pay)
+  // 1. Identify "Relevant" accounts
   const relevantAccounts = accounts.filter(a => {
       const cat = a.category.toLowerCase();
       return (cat.includes('bank') || cat.includes('wallet') || cat.includes('pay'));
@@ -43,19 +40,16 @@ export const AddMoneyModal: React.FC<AddMoneyModalProps> = ({ isOpen, onClose, o
   // 2. Source Accounts (For Expenses/Transfer Out): Must have balance > 0
   const sourceAccounts = relevantAccounts.filter(a => a.currentBalance > 0);
 
-  // 3. Destination Accounts (For Income/Transfer In): Can be any relevant account (even 0 balance)
+  // 3. Destination Accounts (For Income/Transfer In)
   const destAccounts = relevantAccounts;
 
-  // Ensure we have a default account if filtered list changes, but respecting editing data
   useEffect(() => {
     if (initialData) {
       setFormData({
         ...initialData,
-        // Ensure amount is number
         amount: Number(initialData.amount)
       });
     } else {
-        // Reset to default new transaction state
         setFormData({
             date: new Date().toISOString().split('T')[0],
             type: 'Expense',
@@ -72,7 +66,6 @@ export const AddMoneyModal: React.FC<AddMoneyModalProps> = ({ isOpen, onClose, o
     e.preventDefault();
     if (!formData.amount) return;
     
-    // Default category if empty
     const finalCategory = formData.category || 'Uncategorized';
     const payload = {
         ...formData,
@@ -83,17 +76,14 @@ export const AddMoneyModal: React.FC<AddMoneyModalProps> = ({ isOpen, onClose, o
     try {
       let result;
       if (initialData && initialData.rowIndex) {
-        // Update existing
         result = await updateMoneyTransaction(initialData.rowIndex, payload);
       } else {
-        // Create new
         result = await addMoneyTransaction(payload);
       }
       
       if (result.success) {
         onSuccess();
         onClose();
-        // Reset form
         setFormData({
             date: new Date().toISOString().split('T')[0],
             type: 'Expense',
@@ -114,9 +104,7 @@ export const AddMoneyModal: React.FC<AddMoneyModalProps> = ({ isOpen, onClose, o
     }
   };
 
-  const currentCategories = formData.type === 'Income' ? INCOME_CATEGORIES : EXPENSE_CATEGORIES;
-
-  // Determine which list of accounts to use for the dropdowns
+  const currentCategories = formData.type === 'Income' ? DEFAULT_INCOME_CATS : DEFAULT_EXPENSE_CATS;
   const availableAccounts = formData.type === 'Income' ? destAccounts : sourceAccounts;
 
   if (!isOpen) return null;
@@ -214,7 +202,6 @@ export const AddMoneyModal: React.FC<AddMoneyModalProps> = ({ isOpen, onClose, o
                         >
                             {availableAccounts.map(a => <option key={a.name} value={a.name}>{a.name}</option>)}
                             
-                            {/* Fallback: If editing and the saved account isn't in filtered list, show it */}
                             {initialData && (formData.fromAccount || formData.toAccount) && 
                              !availableAccounts.find(a => a.name === (formData.type === 'Expense' ? formData.fromAccount : formData.toAccount)) && (
                                 <option value={formData.type === 'Expense' ? formData.fromAccount : formData.toAccount}>

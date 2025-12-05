@@ -1,7 +1,8 @@
+
 'use client';
 
 import React, { useState } from 'react';
-import { Plus, Wallet, ArrowUpRight, ArrowDownRight, CreditCard, Banknote, ShoppingBag, Car, Shirt, Coffee, Utensils, Music, Zap, Wifi, CalendarClock, Landmark, Smartphone, PiggyBank, Pencil, Trash2 } from 'lucide-react';
+import { Plus, Wallet, ArrowUpRight, ArrowDownRight, CreditCard, Banknote, ShoppingBag, Car, Shirt, Coffee, Utensils, Music, Zap, Wifi, CalendarClock, Landmark, Smartphone, PiggyBank, Pencil, Trash2, Settings2 } from 'lucide-react';
 import { AreaChart, Area, ResponsiveContainer, Tooltip, XAxis, CartesianGrid, PieChart, Pie, Cell, Legend } from 'recharts';
 import { MoneyManagerData, MoneyTransaction } from '../types';
 import { AddMoneyModal } from './MoneyManager/AddMoneyModal';
@@ -108,67 +109,81 @@ export const MoneyManager: React.FC<MoneyManagerProps> = ({ data, loading, onRef
       <div className="xl:col-span-2 space-y-6">
         
         {/* My Balance Section - Wrapped in SpotlightCard */}
-        <SpotlightCard className="p-8 flex flex-col gap-8 shadow-sm" spotlightColor="rgba(99, 102, 241, 0.15)">
+        <SpotlightCard className="p-5 sm:p-8 flex flex-col gap-6 sm:gap-8 shadow-sm" spotlightColor="rgba(99, 102, 241, 0.15)">
             <div className="flex-1 w-full">
-                <div className="flex justify-between items-start mb-2">
-                    <span className="text-slate-400 font-medium text-sm">Total Wallet Balance</span>
-                    <button 
-                        onClick={handleAddNew}
-                        className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-xs font-bold flex items-center gap-2 transition-colors shadow-lg shadow-indigo-500/20"
-                    >
-                        <Plus className="w-3 h-3" />
-                        New Transaction
-                    </button>
-                </div>
-                <h1 className="text-4xl md:text-5xl font-bold text-white mb-2">
-                     {hideValues ? 'RM ****' : <CountUp end={data.totalBalance} prefix="RM " decimals={2} />}
-                </h1>
-                <div className="flex items-center gap-4 mb-6">
-                    <div className={`${isPositiveTrend ? 'text-emerald-500' : 'text-rose-500'} text-sm font-medium flex items-center gap-1`}>
-                        {isPositiveTrend ? <ArrowUpRight className="w-4 h-4" /> : <ArrowDownRight className="w-4 h-4" />}
-                        <span className="text-slate-200">Net {isPositiveTrend ? 'Savings' : 'Spend'}</span>
+                {/* Header with Actions */}
+                <div className="flex flex-col sm:flex-row justify-between items-start mb-6 gap-4 sm:gap-0">
+                    <div className="flex flex-col">
+                        <span className="text-slate-400 font-medium text-sm">Total Wallet Balance</span>
                     </div>
-                    <span className="text-slate-500 text-sm">this month</span>
+                    
+                    <div className="flex gap-2 w-full sm:w-auto justify-end">
+                        <button 
+                            onClick={handleAddNew}
+                            className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-xs sm:text-sm font-bold flex items-center gap-2 transition-colors shadow-lg shadow-indigo-500/20 whitespace-nowrap flex-1 sm:flex-initial justify-center"
+                        >
+                            <Plus className="w-4 h-4" />
+                            New Transaction
+                        </button>
+                    </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-4 relative z-10">
-                    {/* Income Card */}
-                    <div className="bg-slate-950/50 rounded-xl p-5 border border-slate-800 group hover:border-emerald-500/30 transition-colors flex flex-col justify-between min-h-[100px] relative">
-                        <div className="flex items-start justify-between mb-2">
-                            <div className="flex items-center gap-2">
-                                <div className="bg-emerald-500/10 p-1.5 rounded-md">
-                                    <Banknote className="w-4 h-4 text-emerald-500" />
-                                </div>
-                                <span className="text-slate-300 text-sm font-medium truncate">{currentMonthName} Income</span>
-                            </div>
+                <div className="mb-6">
+                    <h1 className="text-3xl sm:text-5xl font-bold text-white mb-2 break-words tracking-tight">
+                        {hideValues ? 'RM ****' : <CountUp end={data.totalBalance} prefix="RM " decimals={2} />}
+                    </h1>
+                    
+                    <div className="flex items-center gap-3">
+                        <div className={`px-2 py-0.5 rounded-md ${isPositiveTrend ? 'bg-emerald-500/10 text-emerald-500' : 'bg-rose-500/10 text-rose-500'} text-sm font-medium flex items-center gap-1`}>
+                            {isPositiveTrend ? <ArrowUpRight className="w-3.5 h-3.5" /> : <ArrowDownRight className="w-3.5 h-3.5" />}
+                            <span>Net {isPositiveTrend ? 'Savings' : 'Spend'}</span>
                         </div>
-                        {data.monthlyStats.incomeGrowth !== 0 && (
-                            <span className={`absolute top-5 right-5 text-xs font-bold px-2 py-0.5 rounded-full ${data.monthlyStats.incomeGrowth >= 0 ? 'bg-emerald-500/10 text-emerald-400' : 'bg-rose-500/10 text-rose-400'}`}>
-                                {data.monthlyStats.incomeGrowth > 0 ? '+' : ''}{Math.round(data.monthlyStats.incomeGrowth)}%
+                        <span className="text-slate-500 text-xs sm:text-sm">this month</span>
+                    </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3 sm:gap-4 relative z-10">
+                    {/* Income Card */}
+                    <div className="bg-slate-950/50 rounded-xl p-3 sm:p-5 border border-slate-800 group hover:border-emerald-500/30 transition-colors flex flex-col h-full relative overflow-hidden">
+                        <div className="flex justify-between items-start mb-3 z-10">
+                            <div className="bg-emerald-500/10 p-1.5 sm:p-2 rounded-lg shrink-0">
+                                <Banknote className="w-4 h-4 sm:w-5 sm:h-5 text-emerald-500" />
+                            </div>
+                            {data.monthlyStats.incomeGrowth !== 0 && (
+                                <span className={`text-[10px] sm:text-xs font-bold px-1.5 py-0.5 rounded-full ${data.monthlyStats.incomeGrowth >= 0 ? 'bg-emerald-500/10 text-emerald-400' : 'bg-rose-500/10 text-rose-400'}`}>
+                                    {data.monthlyStats.incomeGrowth > 0 ? '+' : ''}{Math.round(data.monthlyStats.incomeGrowth)}%
+                                </span>
+                            )}
+                        </div>
+                        <div className="mt-auto z-10">
+                            <span className="text-slate-400 text-xs font-medium block mb-0.5 truncate pr-2">
+                                {currentMonthName} Income
                             </span>
-                        )}
-                        <div className="text-xl lg:text-2xl font-bold text-white leading-none mt-auto">
-                             {hideValues ? 'RM ****' : <CountUp end={data.monthlyStats.income} prefix="RM " />}
+                            <div className="text-lg sm:text-2xl font-bold text-white leading-tight break-all">
+                                {hideValues ? 'RM ****' : <CountUp end={data.monthlyStats.income} prefix="RM " />}
+                            </div>
                         </div>
                     </div>
 
                     {/* Expense Card */}
-                    <div className="bg-slate-950/50 rounded-xl p-5 border border-slate-800 group hover:border-rose-500/30 transition-colors flex flex-col justify-between min-h-[100px] relative">
-                         <div className="flex items-start justify-between mb-2">
-                            <div className="flex items-center gap-2">
-                                <div className="bg-rose-500/10 p-1.5 rounded-md">
-                                    <ArrowDownRight className="w-4 h-4 text-rose-500" />
-                                </div>
-                                <span className="text-slate-300 text-sm font-medium truncate">{currentMonthName} Expense</span>
+                    <div className="bg-slate-950/50 rounded-xl p-3 sm:p-5 border border-slate-800 group hover:border-rose-500/30 transition-colors flex flex-col h-full relative overflow-hidden">
+                         <div className="flex justify-between items-start mb-3 z-10">
+                            <div className="bg-rose-500/10 p-1.5 sm:p-2 rounded-lg shrink-0">
+                                <ArrowDownRight className="w-4 h-4 sm:w-5 sm:h-5 text-rose-500" />
                             </div>
+                            {data.monthlyStats.expenseGrowth !== 0 && (
+                                <span className={`text-[10px] sm:text-xs font-bold px-1.5 py-0.5 rounded-full ${data.monthlyStats.expenseGrowth <= 0 ? 'bg-emerald-500/10 text-emerald-400' : 'bg-rose-500/10 text-rose-400'}`}>
+                                    {data.monthlyStats.expenseGrowth > 0 ? '+' : ''}{Math.round(data.monthlyStats.expenseGrowth)}%
+                                </span>
+                            )}
                         </div>
-                        {data.monthlyStats.expenseGrowth !== 0 && (
-                            <span className={`absolute top-5 right-5 text-xs font-bold px-2 py-0.5 rounded-full ${data.monthlyStats.expenseGrowth <= 0 ? 'bg-emerald-500/10 text-emerald-400' : 'bg-rose-500/10 text-rose-400'}`}>
-                                {data.monthlyStats.expenseGrowth > 0 ? '+' : ''}{Math.round(data.monthlyStats.expenseGrowth)}%
+                        <div className="mt-auto z-10">
+                            <span className="text-slate-400 text-xs font-medium block mb-0.5 truncate pr-2">
+                                {currentMonthName} Expense
                             </span>
-                        )}
-                        <div className="text-xl lg:text-2xl font-bold text-white leading-none mt-auto">
-                                 {hideValues ? 'RM ****' : <CountUp end={data.monthlyStats.expense} prefix="RM " />}
+                            <div className="text-lg sm:text-2xl font-bold text-white leading-tight break-all">
+                                {hideValues ? 'RM ****' : <CountUp end={data.monthlyStats.expense} prefix="RM " />}
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -176,7 +191,7 @@ export const MoneyManager: React.FC<MoneyManagerProps> = ({ data, loading, onRef
         </SpotlightCard>
 
         {/* Overview Chart */}
-        <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-sm">
+        <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-sm hidden sm:block">
             <div className="flex justify-between items-center mb-6">
                 <h3 className="font-bold text-lg text-white">Cash Flow Overview</h3>
                 <div className="flex gap-4">
@@ -222,7 +237,7 @@ export const MoneyManager: React.FC<MoneyManagerProps> = ({ data, loading, onRef
         </div>
 
         {/* Transactions Table */}
-        <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-sm">
+        <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 sm:p-6 shadow-sm">
             <div className="flex justify-between items-center mb-4">
                 <h3 className="font-bold text-lg text-white">Recent Transactions</h3>
             </div>
@@ -231,35 +246,35 @@ export const MoneyManager: React.FC<MoneyManagerProps> = ({ data, loading, onRef
                     <tbody className="divide-y divide-slate-800">
                         {data.transactions.slice(0, 10).map((tx) => (
                             <tr key={tx.id} className="group hover:bg-slate-800/30 transition-colors">
-                                <td className="py-4">
-                                    <div className="flex items-center gap-4">
-                                        <div className="w-10 h-10 rounded-full bg-slate-800 flex items-center justify-center text-slate-400 group-hover:bg-slate-700 group-hover:text-white transition-colors border border-slate-700">
+                                <td className="py-3 pr-2 sm:pr-4">
+                                    <div className="flex items-center gap-3">
+                                        <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-slate-800 flex items-center justify-center text-slate-400 group-hover:bg-slate-700 group-hover:text-white transition-colors border border-slate-700 shrink-0">
                                             {getTransactionCategoryIcon(tx.category)}
                                         </div>
-                                        <div>
-                                            <div className="font-medium text-white">{tx.note || tx.category}</div>
-                                            <div className="text-xs text-slate-500">{tx.date} • {tx.category}</div>
+                                        <div className="min-w-0 flex-1">
+                                            <div className="font-medium text-white truncate text-sm sm:text-base leading-snug">{tx.note || tx.category}</div>
+                                            <div className="text-xs text-slate-500 truncate mt-0.5">{tx.date} • {tx.category}</div>
                                         </div>
                                     </div>
                                 </td>
-                                <td className="px-4 text-xs text-slate-400 text-right hidden sm:table-cell">
+                                <td className="px-2 sm:px-4 text-xs text-slate-400 text-right hidden sm:table-cell whitespace-nowrap">
                                     {tx.fromAccount} {tx.toAccount ? `→ ${tx.toAccount}` : ''}
                                 </td>
-                                <td className={`text-right font-medium ${tx.type === 'Income' ? 'text-emerald-400' : tx.type === 'Transfer' ? 'text-blue-400' : 'text-rose-400'}`}>
-                                    {tx.type === 'Income' ? '+' : tx.type === 'Transfer' ? '' : '-'} {displayValue(tx.amount)}
+                                <td className={`text-right font-bold whitespace-nowrap text-sm sm:text-base ${tx.type === 'Income' ? 'text-emerald-400' : tx.type === 'Transfer' ? 'text-blue-400' : 'text-rose-400'}`}>
+                                    {tx.type === 'Income' ? '+' : tx.type === 'Transfer' ? '' : '-'} {displayValue(tx.amount, 'RM ')}
                                 </td>
-                                <td className="px-4 text-right">
-                                    <div className="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                <td className="pl-2 sm:pl-4 text-right w-10">
+                                    <div className="flex items-center justify-end gap-1 sm:gap-2 sm:opacity-0 group-hover:opacity-100 transition-opacity">
                                         <button 
                                             onClick={() => handleEdit(tx)}
-                                            className="p-2 text-slate-500 hover:text-indigo-400 bg-slate-800 hover:bg-slate-700 rounded-lg transition-colors"
+                                            className="p-1.5 sm:p-2 text-slate-500 hover:text-indigo-400 bg-slate-800 hover:bg-slate-700 rounded-lg transition-colors"
                                             title="Edit"
                                         >
                                             <Pencil className="w-3.5 h-3.5" />
                                         </button>
                                         <button 
                                             onClick={() => handleDelete(tx)}
-                                            className="p-2 text-slate-500 hover:text-rose-400 bg-slate-800 hover:bg-slate-700 rounded-lg transition-colors"
+                                            className="p-1.5 sm:p-2 text-slate-500 hover:text-rose-400 bg-slate-800 hover:bg-slate-700 rounded-lg transition-colors"
                                             title="Delete"
                                         >
                                             <Trash2 className="w-3.5 h-3.5" />
@@ -286,7 +301,7 @@ export const MoneyManager: React.FC<MoneyManagerProps> = ({ data, loading, onRef
       <div className="space-y-6">
         
         {/* My Cards / Accounts Section */}
-        <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-sm">
+        <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 sm:p-6 shadow-sm">
             <div className="flex justify-between items-center mb-6">
                 <h3 className="font-bold text-lg text-white">My Accounts</h3>
                 <span className="text-xs text-slate-500">{activeAccounts.length} Active</span>
@@ -298,7 +313,7 @@ export const MoneyManager: React.FC<MoneyManagerProps> = ({ data, loading, onRef
                     return (
                         <div 
                             key={acc.name}
-                            className="snap-center flex-shrink-0 w-72 relative rounded-xl p-5 overflow-hidden transition-all cursor-pointer shadow-lg bg-gradient-to-br from-slate-800 to-slate-950 text-white border border-slate-700"
+                            className="snap-center flex-shrink-0 w-64 sm:w-72 relative rounded-xl p-5 overflow-hidden transition-all cursor-pointer shadow-lg bg-gradient-to-br from-slate-800 to-slate-950 text-white border border-slate-700"
                         >
                             <div className="flex justify-between items-start mb-6">
                                 <div className="flex items-center gap-3">
@@ -410,7 +425,6 @@ export const MoneyManager: React.FC<MoneyManagerProps> = ({ data, loading, onRef
         onClose={() => setIsModalOpen(false)}
         onSuccess={onRefresh}
         accounts={data.accounts}
-        existingCategories={data.categories}
         initialData={editingTransaction}
       />
     </div>

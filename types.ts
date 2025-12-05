@@ -1,4 +1,5 @@
 
+
 export enum TradeAction {
   BUY = 'BUY',
   SELL = 'SELL',
@@ -127,5 +128,7 @@ export interface MoneyManagerData {
   categorySpending: CategorySpending[];
   graphData: GraphDataPoint[];
   upcomingBills: Bill[];
-  categories: string[];
+  categories: string[]; // Legacy/Derived combined
+  incomeCategories?: string[];
+  expenseCategories?: string[];
 }

@@ -1,6 +1,7 @@
+
 'use server';
 
-import { getSheetClient, SPREADSHEET_ID, SHEET_NAME, CASH_FLOW_SHEET_NAME, PORTFOLIO_SHEET_NAME, MM_ACCOUNTS_SHEET, MM_TRANSACTIONS_SHEET } from '../lib/googleSheets';
+import { getSheetClient, SPREADSHEET_ID, SHEET_NAME, CASH_FLOW_SHEET_NAME, PORTFOLIO_SHEET_NAME, MM_ACCOUNTS_SHEET, MM_TRANSACTIONS_SHEET, MM_CATEGORIES_SHEET } from '../lib/googleSheets';
 import { PortfolioSummary, Holding, TradeAction, CashFlowSummary, Deposit, Conversion, MoneyManagerData, MoneyAccount, MoneyTransaction, CategorySpending, GraphDataPoint, Bill, MonthlyStats } from '../types';
 import yahooFinance from 'yahoo-finance2';
 
@@ -40,6 +41,9 @@ const SECTOR_MAP: Record<string, string> = {
     // Crypto
     IBIT: 'Crypto', BTC: 'Crypto', ETH: 'Crypto', COIN: 'Crypto', MSTR: 'Crypto Proxy'
 };
+
+const DEFAULT_INCOME_CATS = ['Salary', 'Bonus', 'Allowance', 'Dividend', 'Side Hustle', 'Other'];
+const DEFAULT_EXPENSE_CATS = ['Food', 'Transport', 'Bills', 'Fashion', 'Entertainment', 'Healthcare', 'Electronics', 'Debt', 'Family', 'Other'];
 
 const getAssetClass = (ticker: string) => {
   const t = ticker.toUpperCase();
@@ -315,8 +319,7 @@ export async function getMoneyManagerData(): Promise<MoneyManagerData> {
     throw new Error("Server Actions cannot run in the browser.");
   }
   
-  if (!process.env.GOOGLE_SERVICE_ACCOUNT_KEY) {
-     return { 
+  const defaultData: MoneyManagerData = { 
        accounts: [], 
        transactions: [], 
        totalBalance: 0,
@@ -324,20 +327,53 @@ export async function getMoneyManagerData(): Promise<MoneyManagerData> {
        categorySpending: [],
        graphData: [],
        upcomingBills: [],
-       categories: ['Food', 'Transport', 'Utilities']
-     };
+       categories: [...DEFAULT_EXPENSE_CATS, ...DEFAULT_INCOME_CATS],
+       incomeCategories: DEFAULT_INCOME_CATS,
+       expenseCategories: DEFAULT_EXPENSE_CATS
+    };
+
+  if (!process.env.GOOGLE_SERVICE_ACCOUNT_KEY) {
+     return defaultData;
   }
 
   try {
     const { googleSheets } = await getSheetClient();
     
-    // 1. Fetch Accounts
-    // NOTE: We now fetch column E (Index 4) which should contain the calculated formula balance from the Sheet.
-    const accResponse = await googleSheets.spreadsheets.values.get({
-      spreadsheetId: SPREADSHEET_ID,
-      range: `${MM_ACCOUNTS_SHEET}!A:E`, 
-    });
+    // Fetch all required data in parallel
+    const [accResponse, txResponse, catResponse] = await Promise.all([
+        googleSheets.spreadsheets.values.get({
+            spreadsheetId: SPREADSHEET_ID,
+            range: `${MM_ACCOUNTS_SHEET}!A:E`, 
+        }),
+        googleSheets.spreadsheets.values.get({
+            spreadsheetId: SPREADSHEET_ID,
+            range: `${MM_TRANSACTIONS_SHEET}!A:G`, 
+        }),
+        googleSheets.spreadsheets.values.get({
+            spreadsheetId: SPREADSHEET_ID,
+            range: `${MM_CATEGORIES_SHEET}!A:B`, 
+        })
+    ]);
 
+    // --- Process Categories ---
+    const catRows = catResponse.data.values || [];
+    const fetchedIncomeCats: string[] = [];
+    const fetchedExpenseCats: string[] = [];
+
+    // Skip header
+    for(let i = 1; i < catRows.length; i++) {
+        const row = catRows[i];
+        if (row[0] && row[1]) {
+            if (row[1] === 'Income') fetchedIncomeCats.push(row[0]);
+            else if (row[1] === 'Expense') fetchedExpenseCats.push(row[0]);
+        }
+    }
+    
+    const incomeCats = fetchedIncomeCats.length > 0 ? fetchedIncomeCats : DEFAULT_INCOME_CATS;
+    const expenseCats = fetchedExpenseCats.length > 0 ? fetchedExpenseCats : DEFAULT_EXPENSE_CATS;
+    const allCategories = [...expenseCats, ...incomeCats];
+
+    // --- Process Accounts ---
     const accRows = accResponse.data.values || [];
     const accounts: MoneyAccount[] = [];
 
@@ -345,7 +381,6 @@ export async function getMoneyManagerData(): Promise<MoneyManagerData> {
       const row = accRows[i];
       if (row[0]) {
         const initialBal = parseMoney(row[3]);
-        // Read "Current Balance" directly from Sheet (Column E)
         const currentBalFromSheet = parseMoney(row[4]);
 
         accounts.push({
@@ -358,12 +393,7 @@ export async function getMoneyManagerData(): Promise<MoneyManagerData> {
       }
     }
 
-    // 2. Fetch All Transactions
-    const txResponse = await googleSheets.spreadsheets.values.get({
-      spreadsheetId: SPREADSHEET_ID,
-      range: `${MM_TRANSACTIONS_SHEET}!A:G`, 
-    });
-
+    // --- Process Transactions ---
     const txRows = txResponse.data.values || [];
     const transactions: MoneyTransaction[] = [];
     const categoryTotals: Record<string, number> = {};
@@ -399,8 +429,6 @@ export async function getMoneyManagerData(): Promise<MoneyManagerData> {
              uniqueCategories.add(category);
          }
 
-         // NOTE: We DO NOT calculate balances here anymore. We rely on the Sheet.
-
          transactions.push({
             id: `mtx-${i}`,
             rowIndex: i + 1, // Store 1-based index for edits
@@ -420,7 +448,6 @@ export async function getMoneyManagerData(): Promise<MoneyManagerData> {
                 if (type === 'Income') {
                     currentMonthIncome += amount;
                     // For Net Spending Logic: Subtract income from category
-                    // e.g. Food Expense 500, Food Income 100 -> Net 400
                     categoryTotals[category] = (categoryTotals[category] || 0) - amount;
                 }
                 else {
@@ -499,7 +526,6 @@ export async function getMoneyManagerData(): Promise<MoneyManagerData> {
         })
         .sort((a, b) => b.spent - a.spent);
 
-    // Convert Set to Array and Sort
     const sortedCategories = Array.from(uniqueCategories).sort();
 
     return { 
@@ -510,23 +536,18 @@ export async function getMoneyManagerData(): Promise<MoneyManagerData> {
         categorySpending,
         graphData,
         upcomingBills,
-        categories: sortedCategories.length > 0 ? sortedCategories : ['Food', 'Transport', 'Utilities', 'Shopping', 'Entertainment']
+        categories: sortedCategories.length > 0 ? sortedCategories : expenseCats, // Prefer tx derived cats or default
+        incomeCategories: incomeCats,
+        expenseCategories: expenseCats
     };
 
   } catch (error: any) {
     console.error("Money Manager Fetch Error:", error);
-    return { 
-       accounts: [], 
-       transactions: [], 
-       totalBalance: 0,
-       monthlyStats: { income: 0, expense: 0, incomeGrowth: 0, expenseGrowth: 0 },
-       categorySpending: [],
-       graphData: [],
-       upcomingBills: [],
-       categories: ['Food', 'Transport', 'Utilities']
-    };
+    return defaultData;
   }
 }
+
+// ... existing Transaction functions ...
 
 export async function addMoneyTransaction(data: MoneyTransaction) {
   if (typeof window !== 'undefined') {
@@ -604,7 +625,6 @@ export async function deleteMoneyTransaction(rowIndex: number) {
   try {
     const { googleSheets } = await getSheetClient();
     
-    // We clear the row content. getMoneyManagerData skips empty rows so this effectively deletes it
     await googleSheets.spreadsheets.values.clear({
       spreadsheetId: SPREADSHEET_ID,
       range: `${MM_TRANSACTIONS_SHEET}!A${rowIndex}:G${rowIndex}`,
@@ -614,6 +634,139 @@ export async function deleteMoneyTransaction(rowIndex: number) {
   } catch (error) {
     console.error("Failed to delete money transaction:", error);
     return { success: false, error: 'Failed to delete from Google Sheets' };
+  }
+}
+
+// --- Category Management Actions ---
+
+export async function addCategory(category: string, type: 'Income' | 'Expense') {
+  if (typeof window !== 'undefined') {
+    throw new Error("Server Actions cannot run in the browser.");
+  }
+  
+  if (!category) return { success: false, error: 'Category name required' };
+
+  try {
+    const { googleSheets } = await getSheetClient();
+    const values = [[category, type]];
+
+    await googleSheets.spreadsheets.values.append({
+      spreadsheetId: SPREADSHEET_ID,
+      range: `${MM_CATEGORIES_SHEET}!A:B`,
+      valueInputOption: 'USER_ENTERED',
+      requestBody: { values },
+    });
+
+    return { success: true };
+  } catch (error) {
+    console.error("Failed to add category:", error);
+    return { success: false, error: 'Failed to write to Google Sheets' };
+  }
+}
+
+export async function deleteCategory(category: string, type: 'Income' | 'Expense') {
+  if (typeof window !== 'undefined') {
+    throw new Error("Server Actions cannot run in the browser.");
+  }
+  
+  try {
+    const { googleSheets } = await getSheetClient();
+    // 1. Fetch current categories to find index
+    const response = await googleSheets.spreadsheets.values.get({
+        spreadsheetId: SPREADSHEET_ID,
+        range: `${MM_CATEGORIES_SHEET}!A:B`, 
+    });
+    
+    const rows = response.data.values || [];
+    let rowIndex = -1;
+
+    // Assuming row 0 is Header
+    for(let i=1; i < rows.length; i++) {
+        if(rows[i][0] === category && rows[i][1] === type) {
+            rowIndex = i;
+            break;
+        }
+    }
+
+    if(rowIndex === -1) {
+        return { success: false, error: 'Category not found' };
+    }
+
+    // 2. Delete the row
+    // sheetId for MM_CATEGORIES_SHEET needs to be known or fetched. 
+    // For simplicity, we'll try to just clear the content, but better to delete row.
+    // To delete row, we need the sheetId (integer), not just sheet name.
+    
+    const spreadsheet = await googleSheets.spreadsheets.get({ spreadsheetId: SPREADSHEET_ID });
+    const sheet = spreadsheet.data.sheets?.find(s => s.properties?.title === MM_CATEGORIES_SHEET);
+    
+    if(!sheet?.properties?.sheetId) {
+        return { success: false, error: 'Could not find sheet ID' };
+    }
+
+    await googleSheets.spreadsheets.batchUpdate({
+        spreadsheetId: SPREADSHEET_ID,
+        requestBody: {
+            requests: [{
+                deleteDimension: {
+                    range: {
+                        sheetId: sheet.properties.sheetId,
+                        dimension: 'ROWS',
+                        startIndex: rowIndex,
+                        endIndex: rowIndex + 1
+                    }
+                }
+            }]
+        }
+    });
+
+    return { success: true };
+  } catch (error) {
+    console.error("Failed to delete category:", error);
+    return { success: false, error: 'Failed to update Google Sheets' };
+  }
+}
+
+export async function updateCategory(oldName: string, newName: string, type: 'Income' | 'Expense') {
+  if (typeof window !== 'undefined') {
+    throw new Error("Server Actions cannot run in the browser.");
+  }
+  
+  try {
+    const { googleSheets } = await getSheetClient();
+    
+    const response = await googleSheets.spreadsheets.values.get({
+        spreadsheetId: SPREADSHEET_ID,
+        range: `${MM_CATEGORIES_SHEET}!A:B`, 
+    });
+    
+    const rows = response.data.values || [];
+    let rowIndex = -1;
+
+    for(let i=1; i < rows.length; i++) {
+        if(rows[i][0] === oldName && rows[i][1] === type) {
+            rowIndex = i + 1; // 1-based index for A1 notation
+            break;
+        }
+    }
+
+    if(rowIndex === -1) {
+        return { success: false, error: 'Category not found' };
+    }
+
+    const values = [[newName]]; // Only update name column A
+
+    await googleSheets.spreadsheets.values.update({
+        spreadsheetId: SPREADSHEET_ID,
+        range: `${MM_CATEGORIES_SHEET}!A${rowIndex}`,
+        valueInputOption: 'USER_ENTERED',
+        requestBody: { values },
+    });
+
+    return { success: true };
+  } catch (error) {
+    console.error("Failed to update category:", error);
+    return { success: false, error: 'Failed to update Google Sheets' };
   }
 }
 

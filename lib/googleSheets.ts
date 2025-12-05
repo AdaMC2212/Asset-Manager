@@ -41,3 +41,4 @@ export const CASH_FLOW_SHEET_NAME = 'Cash Flow';
 export const PORTFOLIO_SHEET_NAME = 'Portfolio';
 export const MM_ACCOUNTS_SHEET = 'MM_Accounts';
 export const MM_TRANSACTIONS_SHEET = 'MM_Transactions';
+export const MM_CATEGORIES_SHEET = 'MM_Categories';
