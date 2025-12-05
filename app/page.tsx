@@ -342,7 +342,7 @@ export default function Home() {
 
                   {/* Sidebar Area */}
                   <div className="space-y-6">
-                      <div className="h-[350px]">
+                      <div>
                           <AllocationChart data={data} />
                       </div>
                   </div>

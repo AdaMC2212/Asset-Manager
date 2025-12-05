@@ -108,13 +108,13 @@ export const MoneyManager: React.FC<MoneyManagerProps> = ({ data, loading, onRef
       <div className="xl:col-span-2 space-y-6">
         
         {/* My Balance Section - Wrapped in SpotlightCard */}
-        <SpotlightCard className="p-8 flex flex-col md:flex-row justify-between items-start md:items-center gap-8 shadow-sm" spotlightColor="rgba(99, 102, 241, 0.15)">
+        <SpotlightCard className="p-8 flex flex-col gap-8 shadow-sm" spotlightColor="rgba(99, 102, 241, 0.15)">
             <div className="flex-1 w-full">
                 <div className="flex justify-between items-start mb-2">
                     <span className="text-slate-400 font-medium text-sm">Total Wallet Balance</span>
                     <button 
                         onClick={handleAddNew}
-                        className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-1.5 rounded-lg text-xs font-bold flex items-center gap-2 transition-colors shadow-lg shadow-indigo-500/20 z-10 relative"
+                        className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-xs font-bold flex items-center gap-2 transition-colors shadow-lg shadow-indigo-500/20"
                     >
                         <Plus className="w-3 h-3" />
                         New Transaction
@@ -132,40 +132,43 @@ export const MoneyManager: React.FC<MoneyManagerProps> = ({ data, loading, onRef
                 </div>
 
                 <div className="grid grid-cols-2 gap-4 relative z-10">
-                    <div className="bg-slate-950/50 rounded-xl p-5 border border-slate-800 group hover:border-emerald-500/30 transition-colors flex flex-col justify-between min-h-[100px]">
-                        <div className="flex items-center gap-2 mb-3">
-                            <div className="bg-emerald-500/10 p-1.5 rounded-md">
-                                <Banknote className="w-4 h-4 text-emerald-500" />
+                    {/* Income Card */}
+                    <div className="bg-slate-950/50 rounded-xl p-5 border border-slate-800 group hover:border-emerald-500/30 transition-colors flex flex-col justify-between min-h-[100px] relative">
+                        <div className="flex items-start justify-between mb-2">
+                            <div className="flex items-center gap-2">
+                                <div className="bg-emerald-500/10 p-1.5 rounded-md">
+                                    <Banknote className="w-4 h-4 text-emerald-500" />
+                                </div>
+                                <span className="text-slate-300 text-sm font-medium truncate">{currentMonthName} Income</span>
                             </div>
-                            <span className="text-slate-300 text-sm font-medium truncate">{currentMonthName} Income</span>
                         </div>
-                        <div className="flex items-end justify-between">
-                            <div className="text-xl lg:text-2xl font-bold text-white leading-none">
-                                 {hideValues ? 'RM ****' : <CountUp end={data.monthlyStats.income} prefix="RM " />}
-                            </div>
-                            {data.monthlyStats.incomeGrowth !== 0 && (
-                                <span className={`text-xs font-medium px-1.5 py-0.5 rounded ${data.monthlyStats.incomeGrowth >= 0 ? 'bg-emerald-500/10 text-emerald-500' : 'bg-rose-500/10 text-rose-500'}`}>
-                                    {data.monthlyStats.incomeGrowth > 0 ? '+' : ''}{Math.round(data.monthlyStats.incomeGrowth)}%
-                                </span>
-                            )}
+                        {data.monthlyStats.incomeGrowth !== 0 && (
+                            <span className={`absolute top-5 right-5 text-xs font-bold px-2 py-0.5 rounded-full ${data.monthlyStats.incomeGrowth >= 0 ? 'bg-emerald-500/10 text-emerald-400' : 'bg-rose-500/10 text-rose-400'}`}>
+                                {data.monthlyStats.incomeGrowth > 0 ? '+' : ''}{Math.round(data.monthlyStats.incomeGrowth)}%
+                            </span>
+                        )}
+                        <div className="text-xl lg:text-2xl font-bold text-white leading-none mt-auto">
+                             {hideValues ? 'RM ****' : <CountUp end={data.monthlyStats.income} prefix="RM " />}
                         </div>
                     </div>
-                    <div className="bg-slate-950/50 rounded-xl p-5 border border-slate-800 group hover:border-rose-500/30 transition-colors flex flex-col justify-between min-h-[100px]">
-                        <div className="flex items-center gap-2 mb-3">
-                            <div className="bg-rose-500/10 p-1.5 rounded-md">
-                                <ArrowDownRight className="w-4 h-4 text-rose-500" />
+
+                    {/* Expense Card */}
+                    <div className="bg-slate-950/50 rounded-xl p-5 border border-slate-800 group hover:border-rose-500/30 transition-colors flex flex-col justify-between min-h-[100px] relative">
+                         <div className="flex items-start justify-between mb-2">
+                            <div className="flex items-center gap-2">
+                                <div className="bg-rose-500/10 p-1.5 rounded-md">
+                                    <ArrowDownRight className="w-4 h-4 text-rose-500" />
+                                </div>
+                                <span className="text-slate-300 text-sm font-medium truncate">{currentMonthName} Expense</span>
                             </div>
-                            <span className="text-slate-300 text-sm font-medium truncate">{currentMonthName} Expense</span>
                         </div>
-                        <div className="flex items-end justify-between">
-                             <div className="text-xl lg:text-2xl font-bold text-white leading-none">
+                        {data.monthlyStats.expenseGrowth !== 0 && (
+                            <span className={`absolute top-5 right-5 text-xs font-bold px-2 py-0.5 rounded-full ${data.monthlyStats.expenseGrowth <= 0 ? 'bg-emerald-500/10 text-emerald-400' : 'bg-rose-500/10 text-rose-400'}`}>
+                                {data.monthlyStats.expenseGrowth > 0 ? '+' : ''}{Math.round(data.monthlyStats.expenseGrowth)}%
+                            </span>
+                        )}
+                        <div className="text-xl lg:text-2xl font-bold text-white leading-none mt-auto">
                                  {hideValues ? 'RM ****' : <CountUp end={data.monthlyStats.expense} prefix="RM " />}
-                            </div>
-                            {data.monthlyStats.expenseGrowth !== 0 && (
-                                <span className={`text-xs font-medium px-1.5 py-0.5 rounded ${data.monthlyStats.expenseGrowth <= 0 ? 'bg-emerald-500/10 text-emerald-500' : 'bg-rose-500/10 text-rose-500'}`}>
-                                    {data.monthlyStats.expenseGrowth > 0 ? '+' : ''}{Math.round(data.monthlyStats.expenseGrowth)}%
-                                </span>
-                            )}
                         </div>
                     </div>
                 </div>
@@ -290,7 +293,7 @@ export const MoneyManager: React.FC<MoneyManagerProps> = ({ data, loading, onRef
             </div>
             
             {/* Scrollable Container for many accounts */}
-            <div className="flex overflow-x-auto gap-4 pb-4 snap-x">
+            <div className="flex overflow-x-auto gap-4 pb-4 snap-x custom-scrollbar">
                 {activeAccounts.map((acc, idx) => {
                     return (
                         <div 
