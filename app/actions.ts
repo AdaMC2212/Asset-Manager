@@ -118,6 +118,118 @@ const formatDateDisplay = (date: Date): string => {
 };
 
 /**
+ * Server Action: Checks if the DB is connected and initialized
+ */
+export async function checkDatabaseStatus() {
+    if (typeof window !== 'undefined') throw new Error("Server Action");
+    
+    const isConfigured = !!process.env.GOOGLE_SERVICE_ACCOUNT_KEY;
+    if (!isConfigured) {
+        return { configured: false, initialized: false };
+    }
+
+    try {
+        const { googleSheets } = await getSheetClient();
+        // Try to fetch just the header of the Accounts sheet
+        await googleSheets.spreadsheets.values.get({
+            spreadsheetId: SPREADSHEET_ID,
+            range: `${MM_ACCOUNTS_SHEET}!A1:A1`, 
+        });
+        return { configured: true, initialized: true };
+    } catch (error: any) {
+        // If error is "Unable to parse range", it means sheet is missing
+        if (error.message?.includes("Unable to parse range")) {
+            return { configured: true, initialized: false };
+        }
+        // Other errors might be permissions or connectivity, treat as configured but failing
+        console.error("DB Check Error", error);
+        return { configured: true, initialized: false, error: error.message };
+    }
+}
+
+/**
+ * Server Action: Creates missing tabs for Money Manager
+ */
+export async function initializeDatabase() {
+    if (typeof window !== 'undefined') throw new Error("Server Action");
+    if (!process.env.GOOGLE_SERVICE_ACCOUNT_KEY) return { success: false, error: "No API Key" };
+
+    try {
+        const { googleSheets } = await getSheetClient();
+
+        const requests = [];
+
+        // We can't easily check if sheet exists in a batchUpdate addSheet without fetching metadata first.
+        // So we blindly try to add sheets. If they exist, it might error, but we can swallow that or fetch first.
+        // Safer: Fetch metadata.
+        const meta = await googleSheets.spreadsheets.get({ spreadsheetId: SPREADSHEET_ID });
+        const existingSheets = meta.data.sheets?.map(s => s.properties?.title) || [];
+
+        // 1. MM_Accounts
+        if (!existingSheets.includes(MM_ACCOUNTS_SHEET)) {
+            requests.push({ addSheet: { properties: { title: MM_ACCOUNTS_SHEET } } });
+        }
+        // 2. MM_Transactions
+        if (!existingSheets.includes(MM_TRANSACTIONS_SHEET)) {
+            requests.push({ addSheet: { properties: { title: MM_TRANSACTIONS_SHEET } } });
+        }
+        // 3. MM_Categories
+        if (!existingSheets.includes(MM_CATEGORIES_SHEET)) {
+            requests.push({ addSheet: { properties: { title: MM_CATEGORIES_SHEET } } });
+        }
+
+        if (requests.length > 0) {
+            await googleSheets.spreadsheets.batchUpdate({
+                spreadsheetId: SPREADSHEET_ID,
+                requestBody: { requests }
+            });
+        }
+
+        // Now populate headers
+        // Accounts Header
+        if (!existingSheets.includes(MM_ACCOUNTS_SHEET)) {
+             await googleSheets.spreadsheets.values.update({
+                spreadsheetId: SPREADSHEET_ID,
+                range: `${MM_ACCOUNTS_SHEET}!A1:E1`,
+                valueInputOption: 'USER_ENTERED',
+                requestBody: { values: [['Account Name', 'Category', 'Logo URL', 'Initial Balance', 'Current Balance (Calc)']] }
+            });
+        }
+
+        // Transactions Header
+        if (!existingSheets.includes(MM_TRANSACTIONS_SHEET)) {
+             await googleSheets.spreadsheets.values.update({
+                spreadsheetId: SPREADSHEET_ID,
+                range: `${MM_TRANSACTIONS_SHEET}!A1:G1`,
+                valueInputOption: 'USER_ENTERED',
+                requestBody: { values: [['Date', 'Type', 'Category', 'Amount', 'From Account', 'To Account', 'Note']] }
+            });
+        }
+
+         // Categories Header & Defaults
+        if (!existingSheets.includes(MM_CATEGORIES_SHEET)) {
+             const defaultCats = [
+                 ['Category Name', 'Type'],
+                 ...DEFAULT_INCOME_CATS.map(c => [c, 'Income']),
+                 ...DEFAULT_EXPENSE_CATS.map(c => [c, 'Expense'])
+             ];
+             await googleSheets.spreadsheets.values.update({
+                spreadsheetId: SPREADSHEET_ID,
+                range: `${MM_CATEGORIES_SHEET}!A1:B${defaultCats.length}`,
+                valueInputOption: 'USER_ENTERED',
+                requestBody: { values: defaultCats }
+            });
+        }
+
+        return { success: true };
+
+    } catch (e: any) {
+        console.error("Init Error", e);
+        return { success: false, error: e.message };
+    }
+}
+
+/**
  * Server Action: Fetches portfolio data from Google Sheets
  */
 export async function getPortfolioData(): Promise<PortfolioSummary> {
@@ -231,7 +343,8 @@ export async function getPortfolioData(): Promise<PortfolioSummary> {
   } catch (error: any) {
     console.error("Portfolio Fetch Error:", error);
     if (error.message?.includes("Unable to parse range")) {
-        throw new Error(`Sheet Not Found: Could not find tab named '${PORTFOLIO_SHEET_NAME}'. Please rename your Google Sheet tab to exactly '${PORTFOLIO_SHEET_NAME}'.`);
+        // Return empty instead of crashing if Portfolio sheet missing, but normally we'd want to warn
+        return { netWorth: 0, totalCost: 0, totalPL: 0, totalPLPercent: 0, cashBalance: 0, holdings: [] };
     }
     throw error;
   }
@@ -360,17 +473,31 @@ export async function getMoneyManagerData(): Promise<MoneyManagerData> {
     const fetchedIncomeCats: string[] = [];
     const fetchedExpenseCats: string[] = [];
 
-    // Skip header
+    // Skip header (Row 0)
     for(let i = 1; i < catRows.length; i++) {
         const row = catRows[i];
-        if (row[0] && row[1]) {
-            if (row[1] === 'Income') fetchedIncomeCats.push(row[0]);
-            else if (row[1] === 'Expense') fetchedExpenseCats.push(row[0]);
+        if (row[0]) {
+            const catName = row[0].toString().trim();
+            const catType = row[1]?.toString().trim().toLowerCase(); // Normalize case
+
+            if (catName) {
+                if (catType === 'income') {
+                    fetchedIncomeCats.push(catName);
+                } else if (catType === 'expense') {
+                    fetchedExpenseCats.push(catName);
+                } else {
+                    // Fallback: If type is missing/unknown, try to guess or just add to expense if valid?
+                    // Better to just ignore malformed rows or assume expense if it looks like one.
+                    // For now, let's just stick to strict-ish matching but case insensitive.
+                }
+            }
         }
     }
     
+    // Only use defaults if NOTHING was found in sheet for that type
     const incomeCats = fetchedIncomeCats.length > 0 ? fetchedIncomeCats : DEFAULT_INCOME_CATS;
     const expenseCats = fetchedExpenseCats.length > 0 ? fetchedExpenseCats : DEFAULT_EXPENSE_CATS;
+    
     const allCategories = [...expenseCats, ...incomeCats];
 
     // --- Process Accounts ---
@@ -543,7 +670,8 @@ export async function getMoneyManagerData(): Promise<MoneyManagerData> {
 
   } catch (error: any) {
     console.error("Money Manager Fetch Error:", error);
-    return defaultData;
+    // Return empty if connected, so page knows it's connected but failed
+    return defaultData; 
   }
 }
 

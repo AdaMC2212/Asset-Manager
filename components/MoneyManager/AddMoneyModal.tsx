@@ -32,17 +32,9 @@ export const AddMoneyModal: React.FC<AddMoneyModalProps> = ({
   
   const [customCategory, setCustomCategory] = useState('');
 
-  // 1. Identify "Relevant" accounts
-  const relevantAccounts = accounts.filter(a => {
-      const cat = a.category.toLowerCase();
-      return (cat.includes('bank') || cat.includes('wallet') || cat.includes('pay'));
-  });
-
-  // 2. Source Accounts (For Expenses/Transfer Out): Must have balance > 0
-  const sourceAccounts = relevantAccounts.filter(a => a.currentBalance > 0);
-
-  // 3. Destination Accounts (For Income/Transfer In)
-  const destAccounts = relevantAccounts;
+  // 1. Filter accounts loosely to allow "Cash" or other custom accounts to appear
+  const sourceAccounts = accounts; // Allow paying from any account
+  const destAccounts = accounts;   // Allow depositing to any account
 
   const currentCategories = formData.type === 'Income' ? incomeCategories : expenseCategories;
 
@@ -53,10 +45,11 @@ export const AddMoneyModal: React.FC<AddMoneyModalProps> = ({
         amount: Number(initialData.amount)
       });
       
-      // If the initial category is NOT in the list (and not empty), assume it's custom/Other
-      if (initialData.category && !currentCategories.includes(initialData.category)) {
-          // If it's a known category but not in the *current* list (e.g. switching types), don't force Other yet
-          // But if it's truly unknown, set to Other and fill custom
+      // Check if the category exists in the list for the current type
+      const relevantCats = initialData.type === 'Income' ? incomeCategories : expenseCategories;
+      
+      if (initialData.category && !relevantCats.includes(initialData.category)) {
+          // If category is not in the list, treat as "Other"
           setFormData(prev => ({ ...prev, category: 'Other' }));
           setCustomCategory(initialData.category);
       } else {
@@ -64,6 +57,7 @@ export const AddMoneyModal: React.FC<AddMoneyModalProps> = ({
       }
 
     } else {
+        // Reset for new transaction
         setFormData({
             date: new Date().toISOString().split('T')[0],
             type: 'Expense',
@@ -75,7 +69,7 @@ export const AddMoneyModal: React.FC<AddMoneyModalProps> = ({
         });
         setCustomCategory('');
     }
-  }, [initialData, isOpen, accounts, currentCategories]);
+  }, [initialData, isOpen]); 
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -84,13 +78,16 @@ export const AddMoneyModal: React.FC<AddMoneyModalProps> = ({
     let finalCategory = formData.category;
     if (finalCategory === 'Other') {
         if (!customCategory.trim()) {
-            alert("Please specify the category.");
+            alert("Please specify the category name.");
             return;
         }
         finalCategory = customCategory.trim();
     }
     
-    if (!finalCategory) finalCategory = 'Uncategorized';
+    if (!finalCategory) {
+        alert("Please select a category.");
+        return;
+    }
 
     const payload = {
         ...formData,
@@ -109,6 +106,7 @@ export const AddMoneyModal: React.FC<AddMoneyModalProps> = ({
       if (result.success) {
         onSuccess();
         onClose();
+        // Reset form
         setFormData({
             date: new Date().toISOString().split('T')[0],
             type: 'Expense',
@@ -228,14 +226,8 @@ export const AddMoneyModal: React.FC<AddMoneyModalProps> = ({
                                 else setFormData({...formData, toAccount: e.target.value});
                             }}
                         >
+                            <option value="">Select Account</option>
                             {availableAccounts.map(a => <option key={a.name} value={a.name}>{a.name}</option>)}
-                            
-                            {initialData && (formData.fromAccount || formData.toAccount) && 
-                             !availableAccounts.find(a => a.name === (formData.type === 'Expense' ? formData.fromAccount : formData.toAccount)) && (
-                                <option value={formData.type === 'Expense' ? formData.fromAccount : formData.toAccount}>
-                                    {formData.type === 'Expense' ? formData.fromAccount : formData.toAccount}
-                                </option>
-                            )}
                         </select>
                     </div>
                     <div>
@@ -246,8 +238,10 @@ export const AddMoneyModal: React.FC<AddMoneyModalProps> = ({
                             onChange={e => setFormData({...formData, category: e.target.value})}
                         >
                             <option value="">Select Category</option>
-                            {currentCategories.map(cat => (
-                                <option key={cat} value={cat}>{cat}</option>
+                            {currentCategories
+                                .filter(c => c && c.toLowerCase() !== 'other')
+                                .map(cat => (
+                                    <option key={cat} value={cat}>{cat}</option>
                             ))}
                             <option value="Other">Other...</option>
                         </select>
@@ -258,12 +252,12 @@ export const AddMoneyModal: React.FC<AddMoneyModalProps> = ({
              {/* Custom Category Input if "Other" is selected */}
              {formData.type !== 'Transfer' && formData.category === 'Other' && (
                  <div className="animate-in fade-in slide-in-from-top-1 duration-200">
-                    <label className="block text-sm font-medium text-indigo-400 mb-1">Specify Category</label>
+                    <label className="block text-sm font-medium text-indigo-400 mb-1">Specify Category Name</label>
                     <input
                         type="text"
                         required
                         autoFocus
-                        placeholder="Enter category name..."
+                        placeholder="Enter custom category..."
                         className="w-full bg-slate-900 border border-indigo-500/50 rounded-lg px-3 py-2 text-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
                         value={customCategory}
                         onChange={e => setCustomCategory(e.target.value)}
