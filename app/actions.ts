@@ -207,16 +207,23 @@ export async function initializeDatabase() {
 
          // Categories Header & Defaults
         if (!existingSheets.includes(MM_CATEGORIES_SHEET)) {
-             const defaultCats = [
-                 ['Category Name', 'Type'],
-                 ...DEFAULT_INCOME_CATS.map(c => [c, 'Income']),
-                 ...DEFAULT_EXPENSE_CATS.map(c => [c, 'Expense'])
-             ];
+             // New Structure: Col A = Expense, Col B = Income
+             // We need to zip them together or just list them.
+             // Find max length
+             const maxLen = Math.max(DEFAULT_EXPENSE_CATS.length, DEFAULT_INCOME_CATS.length);
+             const values = [['Expense Categories', 'Income Categories']]; // Header
+             
+             for(let i=0; i<maxLen; i++) {
+                 const exp = DEFAULT_EXPENSE_CATS[i] || '';
+                 const inc = DEFAULT_INCOME_CATS[i] || '';
+                 values.push([exp, inc]);
+             }
+
              await googleSheets.spreadsheets.values.update({
                 spreadsheetId: SPREADSHEET_ID,
-                range: `${MM_CATEGORIES_SHEET}!A1:B${defaultCats.length}`,
+                range: `${MM_CATEGORIES_SHEET}!A1:B${values.length}`,
                 valueInputOption: 'USER_ENTERED',
-                requestBody: { values: defaultCats }
+                requestBody: { values }
             });
         }
 
@@ -472,33 +479,20 @@ export async function getMoneyManagerData(): Promise<MoneyManagerData> {
     const fetchedIncomeCats: string[] = [];
     const fetchedExpenseCats: string[] = [];
     
-    // Loose keyword matching for Income, everything else is Expense
-    const INCOME_KEYWORDS = ['income', 'salary', 'bonus', 'allowance', 'dividend', 'profit', 'gift', 'side hustle'];
-
+    // Structure: Col A = Expense, Col B = Income
     // Skip header (Row 0)
     for(let i = 1; i < catRows.length; i++) {
         const row = catRows[i];
         if (row[0]) {
-            const catName = row[0].toString().trim();
-            // Col B might be Type. If missing, or if it matches Name (User error), treat as Expense?
-            const rawType = row[1]?.toString().trim().toLowerCase() || '';
-
-            if (catName) {
-                // Check if explicitly income or contains income keywords
-                const isIncome = INCOME_KEYWORDS.some(k => rawType.includes(k));
-                
-                if (isIncome) {
-                    fetchedIncomeCats.push(catName);
-                } else {
-                     // Default to expense for everything else (Food, Transport, etc)
-                     // or if type is 'expense'
-                    fetchedExpenseCats.push(catName);
-                }
-            }
+            const exp = row[0].toString().trim();
+            if (exp) fetchedExpenseCats.push(exp);
+        }
+        if (row[1]) {
+            const inc = row[1].toString().trim();
+            if (inc) fetchedIncomeCats.push(inc);
         }
     }
     
-    // Only use defaults if NOTHING was found in sheet for that type
     const incomeCats = fetchedIncomeCats.length > 0 ? fetchedIncomeCats : DEFAULT_INCOME_CATS;
     const expenseCats = fetchedExpenseCats.length > 0 ? fetchedExpenseCats : DEFAULT_EXPENSE_CATS;
     
@@ -778,13 +772,27 @@ export async function addCategory(category: string, type: 'Income' | 'Expense') 
 
   try {
     const { googleSheets } = await getSheetClient();
-    const values = [[category, type]];
-
-    await googleSheets.spreadsheets.values.append({
+    
+    // New Structure: Expense in A, Income in B. 
+    // We can't just append a row easily if columns have different lengths.
+    // We should fetch, find first empty cell in column, and update.
+    
+    const range = type === 'Expense' ? `${MM_CATEGORIES_SHEET}!A:A` : `${MM_CATEGORIES_SHEET}!B:B`;
+    const response = await googleSheets.spreadsheets.values.get({
+        spreadsheetId: SPREADSHEET_ID,
+        range, 
+    });
+    
+    const rows = response.data.values || [];
+    const nextRow = rows.length + 1;
+    
+    const colLetter = type === 'Expense' ? 'A' : 'B';
+    
+    await googleSheets.spreadsheets.values.update({
       spreadsheetId: SPREADSHEET_ID,
-      range: `${MM_CATEGORIES_SHEET}!A:B`,
+      range: `${MM_CATEGORIES_SHEET}!${colLetter}${nextRow}`,
       valueInputOption: 'USER_ENTERED',
-      requestBody: { values },
+      requestBody: { values: [[category]] },
     });
 
     return { success: true };
@@ -801,19 +809,22 @@ export async function deleteCategory(category: string, type: 'Income' | 'Expense
   
   try {
     const { googleSheets } = await getSheetClient();
-    // 1. Fetch current categories to find index
+    
+    // Structure: Expense in A, Income in B
+    const colIndex = type === 'Expense' ? 0 : 1;
+    const range = type === 'Expense' ? `${MM_CATEGORIES_SHEET}!A:A` : `${MM_CATEGORIES_SHEET}!B:B`;
+
     const response = await googleSheets.spreadsheets.values.get({
         spreadsheetId: SPREADSHEET_ID,
-        range: `${MM_CATEGORIES_SHEET}!A:B`, 
+        range, 
     });
     
     const rows = response.data.values || [];
     let rowIndex = -1;
 
-    // Assuming row 0 is Header
     for(let i=1; i < rows.length; i++) {
-        if(rows[i][0] === category && rows[i][1] === type) {
-            rowIndex = i;
+        if(rows[i][0] === category) {
+            rowIndex = i + 1; 
             break;
         }
     }
@@ -822,33 +833,16 @@ export async function deleteCategory(category: string, type: 'Income' | 'Expense
         return { success: false, error: 'Category not found' };
     }
 
-    // 2. Delete the row
-    // sheetId for MM_CATEGORIES_SHEET needs to be known or fetched. 
-    // For simplicity, we'll try to just clear the content, but better to delete row.
-    // To delete row, we need the sheetId (integer), not just sheet name.
+    // Instead of deleting the whole row (which might delete data in the other column),
+    // we should just clear the cell.
+    const colLetter = type === 'Expense' ? 'A' : 'B';
     
-    const spreadsheet = await googleSheets.spreadsheets.get({ spreadsheetId: SPREADSHEET_ID });
-    const sheet = spreadsheet.data.sheets?.find(s => s.properties?.title === MM_CATEGORIES_SHEET);
-    
-    if(!sheet?.properties?.sheetId) {
-        return { success: false, error: 'Could not find sheet ID' };
-    }
-
-    await googleSheets.spreadsheets.batchUpdate({
-        spreadsheetId: SPREADSHEET_ID,
-        requestBody: {
-            requests: [{
-                deleteDimension: {
-                    range: {
-                        sheetId: sheet.properties.sheetId,
-                        dimension: 'ROWS',
-                        startIndex: rowIndex,
-                        endIndex: rowIndex + 1
-                    }
-                }
-            }]
-        }
+    await googleSheets.spreadsheets.values.clear({
+      spreadsheetId: SPREADSHEET_ID,
+      range: `${MM_CATEGORIES_SHEET}!${colLetter}${rowIndex}`,
     });
+    
+    // Optional: Shift up? Too complex for now without risk. Clearing is safer.
 
     return { success: true };
   } catch (error) {
@@ -864,18 +858,20 @@ export async function updateCategory(oldName: string, newName: string, type: 'In
   
   try {
     const { googleSheets } = await getSheetClient();
-    
+    const colLetter = type === 'Expense' ? 'A' : 'B';
+    const range = `${MM_CATEGORIES_SHEET}!${colLetter}:${colLetter}`;
+
     const response = await googleSheets.spreadsheets.values.get({
         spreadsheetId: SPREADSHEET_ID,
-        range: `${MM_CATEGORIES_SHEET}!A:B`, 
+        range, 
     });
     
     const rows = response.data.values || [];
     let rowIndex = -1;
 
     for(let i=1; i < rows.length; i++) {
-        if(rows[i][0] === oldName && rows[i][1] === type) {
-            rowIndex = i + 1; // 1-based index for A1 notation
+        if(rows[i][0] === oldName) {
+            rowIndex = i + 1;
             break;
         }
     }
@@ -884,13 +880,11 @@ export async function updateCategory(oldName: string, newName: string, type: 'In
         return { success: false, error: 'Category not found' };
     }
 
-    const values = [[newName]]; // Only update name column A
-
     await googleSheets.spreadsheets.values.update({
         spreadsheetId: SPREADSHEET_ID,
-        range: `${MM_CATEGORIES_SHEET}!A${rowIndex}`,
+        range: `${MM_CATEGORIES_SHEET}!${colLetter}${rowIndex}`,
         valueInputOption: 'USER_ENTERED',
-        requestBody: { values },
+        requestBody: { values: [[newName]] },
     });
 
     return { success: true };

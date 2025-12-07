@@ -1,13 +1,11 @@
-
 'use client';
 
 import React, { useState, useMemo } from 'react';
-import { Plus, Wallet, ArrowUpRight, ArrowDownRight, CreditCard, Banknote, ShoppingBag, Car, Shirt, Zap, Wifi, Music, Utensils, Smartphone, PiggyBank, Pencil, Trash2, ChevronLeft, ChevronRight, X, Calendar } from 'lucide-react';
-import { AreaChart, Area, ResponsiveContainer, Tooltip, XAxis, CartesianGrid, PieChart, Pie, Cell, Legend } from 'recharts';
+import { Plus, Wallet, ShoppingBag, Car, Shirt, Zap, Wifi, Music, Utensils, Smartphone, Banknote, Calendar, ChevronLeft, ChevronRight, X, ArrowUpRight, ArrowDownRight, Pencil, Trash2, Filter, XCircle } from 'lucide-react';
+import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts';
 import { MoneyManagerData, MoneyTransaction } from '../types';
 import { AddMoneyModal } from './MoneyManager/AddMoneyModal';
 import { deleteMoneyTransaction } from '../app/actions';
-import { SpotlightCard } from './ui/SpotlightCard';
 import { CountUp } from './ui/CountUp';
 
 interface MoneyManagerProps {
@@ -19,40 +17,67 @@ interface MoneyManagerProps {
 
 const PIE_COLORS = ['#f43f5e', '#ec4899', '#d946ef', '#a855f7', '#8b5cf6', '#6366f1', '#3b82f6', '#0ea5e9'];
 
-// Helper for Icons
-const getTransactionCategoryIcon = (cat: string) => {
+// Helper for Icons with colors
+const getCategoryStyles = (cat: string) => {
   const c = cat.toLowerCase();
-  if (c.includes('food') || c.includes('dining') || c.includes('mamak')) return <Utensils className="w-4 h-4" />;
-  if (c.includes('transport') || c.includes('vehicle') || c.includes('fuel')) return <Car className="w-4 h-4" />;
-  if (c.includes('shop') || c.includes('clothing') || c.includes('fashion')) return <Shirt className="w-4 h-4" />;
-  if (c.includes('utility') || c.includes('bill')) return <Zap className="w-4 h-4" />;
-  if (c.includes('internet')) return <Wifi className="w-4 h-4" />;
-  if (c.includes('music') || c.includes('spotify')) return <Music className="w-4 h-4" />;
-  if (c.includes('salary') || c.includes('income')) return <Banknote className="w-4 h-4" />;
-  return <ShoppingBag className="w-4 h-4" />;
+  if (c.includes('food') || c.includes('dining')) return { icon: <Utensils className="w-5 h-5" />, color: 'bg-orange-500', text: 'text-orange-100' };
+  if (c.includes('transport') || c.includes('fuel')) return { icon: <Car className="w-5 h-5" />, color: 'bg-blue-500', text: 'text-blue-100' };
+  if (c.includes('shop') || c.includes('fashion')) return { icon: <ShoppingBag className="w-5 h-5" />, color: 'bg-pink-500', text: 'text-pink-100' };
+  if (c.includes('bill') || c.includes('utility')) return { icon: <Zap className="w-5 h-5" />, color: 'bg-yellow-500', text: 'text-yellow-100' };
+  if (c.includes('salary') || c.includes('income')) return { icon: <Banknote className="w-5 h-5" />, color: 'bg-emerald-500', text: 'text-emerald-100' };
+  if (c.includes('tech') || c.includes('gadget')) return { icon: <Smartphone className="w-5 h-5" />, color: 'bg-indigo-500', text: 'text-indigo-100' };
+  
+  return { icon: <Wallet className="w-5 h-5" />, color: 'bg-slate-600', text: 'text-slate-100' };
 };
 
 export const MoneyManager: React.FC<MoneyManagerProps> = ({ data, loading, onRefresh, hideValues }) => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isHistoryModalOpen, setIsHistoryModalOpen] = useState(false);
   const [editingTransaction, setEditingTransaction] = useState<MoneyTransaction | null>(null);
-  
-  // Month Navigation State
   const [selectedDate, setSelectedDate] = useState(new Date());
+  
+  // Filter States
+  const [showFilters, setShowFilters] = useState(false);
+  const [filters, setFilters] = useState({
+      type: 'All', // All, Income, Expense, Transfer
+      account: 'All',
+      startDate: '',
+      endDate: ''
+  });
 
-  // Filter Data based on selected Month
-  const { currentMonthTransactions, monthlyStats, pieData } = useMemo(() => {
-    if (!data) return { currentMonthTransactions: [], monthlyStats: { income: 0, expense: 0, balance: 0 }, pieData: [] };
+  const { filteredTransactions, monthlyStats, pieData, isCustomDateMode } = useMemo(() => {
+    if (!data) return { filteredTransactions: [], monthlyStats: { income: 0, expense: 0, balance: 0 }, pieData: [], isCustomDateMode: false };
 
-    const targetMonth = selectedDate.getMonth();
-    const targetYear = selectedDate.getFullYear();
+    // Determine Base List (Date Filter)
+    let filtered = [];
+    const useCustomDate = !!(filters.startDate && filters.endDate);
+    
+    if (useCustomDate) {
+        // Custom Range Filter
+        filtered = data.transactions.filter(tx => {
+            return tx.date >= filters.startDate && tx.date <= filters.endDate;
+        });
+    } else {
+        // Default Monthly Filter
+        const targetMonth = selectedDate.getMonth();
+        const targetYear = selectedDate.getFullYear();
+        filtered = data.transactions.filter(tx => {
+            const txDate = new Date(tx.date);
+            return txDate.getMonth() === targetMonth && txDate.getFullYear() === targetYear;
+        });
+    }
 
-    const filtered = data.transactions.filter(tx => {
-        // tx.date is YYYY-MM-DD
-        const txDate = new Date(tx.date);
-        return txDate.getMonth() === targetMonth && txDate.getFullYear() === targetYear;
-    });
+    // Apply Type Filter
+    if (filters.type !== 'All') {
+        filtered = filtered.filter(tx => tx.type === filters.type);
+    }
 
+    // Apply Account Filter
+    if (filters.account !== 'All') {
+        filtered = filtered.filter(tx => tx.fromAccount === filters.account || tx.toAccount === filters.account);
+    }
+
+    // Calculate Stats based on FILTERED view
     let income = 0;
     let expense = 0;
     const catTotals: Record<string, number> = {};
@@ -71,38 +96,31 @@ export const MoneyManager: React.FC<MoneyManagerProps> = ({ data, loading, onRef
         .sort((a, b) => b.value - a.value);
 
     return {
-        currentMonthTransactions: filtered,
+        filteredTransactions: filtered,
         monthlyStats: { income, expense, balance: income - expense },
-        pieData: pie
+        pieData: pie,
+        isCustomDateMode: useCustomDate
     };
-  }, [data, selectedDate]);
+  }, [data, selectedDate, filters]);
 
   if (loading || !data) {
     return (
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 animate-pulse">
-            <div className="bg-slate-900 rounded-xl h-64 md:col-span-2"></div>
-            <div className="bg-slate-900 rounded-xl h-64"></div>
+            <div className="bg-slate-900/50 rounded-3xl h-64 md:col-span-2"></div>
+            <div className="bg-slate-900/50 rounded-3xl h-64"></div>
         </div>
     );
   }
 
-  // Helper Display
   const displayValue = (val: number, prefix: string = 'RM ') => {
     if (hideValues) return `${prefix} ****`;
     return `${prefix}${val.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
   };
 
-  // Month Navigation Handlers
-  const prevMonth = () => {
-    setSelectedDate(prev => new Date(prev.getFullYear(), prev.getMonth() - 1, 1));
-  };
-  const nextMonth = () => {
-    setSelectedDate(prev => new Date(prev.getFullYear(), prev.getMonth() + 1, 1));
-  };
-
+  const prevMonth = () => setSelectedDate(prev => new Date(prev.getFullYear(), prev.getMonth() - 1, 1));
+  const nextMonth = () => setSelectedDate(prev => new Date(prev.getFullYear(), prev.getMonth() + 1, 1));
   const monthLabel = selectedDate.toLocaleString('default', { month: 'long', year: 'numeric' });
 
-  // CRUD
   const handleDelete = async (tx: MoneyTransaction) => {
     if (!tx.rowIndex) return;
     if (confirm(`Delete ${tx.category} (RM ${tx.amount})?`)) {
@@ -116,63 +134,89 @@ export const MoneyManager: React.FC<MoneyManagerProps> = ({ data, loading, onRef
     setIsModalOpen(true);
   };
 
-  return (
-    <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
-      
-      {/* LEFT COLUMN (Main Focus: Monthly Overview) */}
-      <div className="xl:col-span-2 space-y-6">
-        
-        {/* Monthly Focus Card */}
-        <SpotlightCard className="p-6 sm:p-8 flex flex-col gap-6 shadow-sm relative overflow-hidden" spotlightColor="rgba(16, 185, 129, 0.15)">
-             {/* Month Navigator */}
-             <div className="flex items-center justify-between z-10">
-                <div className="flex items-center gap-4 bg-slate-950/50 p-1.5 rounded-xl border border-slate-800">
-                    <button onClick={prevMonth} className="p-2 hover:bg-slate-800 rounded-lg text-slate-400 hover:text-white transition-colors">
-                        <ChevronLeft className="w-5 h-5" />
-                    </button>
-                    <div className="flex flex-col items-center min-w-[120px]">
-                        <span className="text-white font-bold text-lg leading-none">{monthLabel.split(' ')[0]}</span>
-                        <span className="text-slate-500 text-xs">{monthLabel.split(' ')[1]}</span>
-                    </div>
-                    <button onClick={nextMonth} className="p-2 hover:bg-slate-800 rounded-lg text-slate-400 hover:text-white transition-colors">
-                        <ChevronRight className="w-5 h-5" />
-                    </button>
-                </div>
+  const clearFilters = () => {
+      setFilters({
+          type: 'All',
+          account: 'All',
+          startDate: '',
+          endDate: ''
+      });
+  };
 
-                <button 
-                    onClick={() => { setEditingTransaction(null); setIsModalOpen(true); }}
-                    className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2.5 rounded-xl text-sm font-bold flex items-center gap-2 transition-all shadow-lg shadow-indigo-500/20"
-                >
-                    <Plus className="w-4 h-4" />
-                    <span className="hidden sm:inline">Add Transaction</span>
+  const hasActiveFilters = filters.type !== 'All' || filters.account !== 'All' || (filters.startDate && filters.endDate);
+
+  return (
+    <div className="grid grid-cols-1 xl:grid-cols-3 gap-8">
+      
+      {/* LEFT COLUMN (Main Focus) */}
+      <div className="xl:col-span-2 space-y-8">
+        
+        {/* Monthly Focus Header */}
+        <div className="flex flex-col md:flex-row justify-between items-center gap-6 p-1">
+             {/* Month Navigator - Disable if custom range active */}
+             <div className={`flex items-center gap-2 bg-slate-900/50 p-1.5 rounded-2xl border border-white/5 backdrop-blur-sm shadow-sm transition-opacity ${isCustomDateMode ? 'opacity-50 pointer-events-none grayscale' : ''}`}>
+                <button onClick={prevMonth} className="p-3 hover:bg-white/10 rounded-xl text-slate-400 hover:text-white transition-colors">
+                    <ChevronLeft className="w-5 h-5" />
+                </button>
+                <div className="flex flex-col items-center min-w-[140px] px-2">
+                    <span className="text-white font-bold text-xl tracking-tight">{monthLabel.split(' ')[0]}</span>
+                    <span className="text-slate-500 text-xs font-medium uppercase tracking-wider">{monthLabel.split(' ')[1]}</span>
+                </div>
+                <button onClick={nextMonth} className="p-3 hover:bg-white/10 rounded-xl text-slate-400 hover:text-white transition-colors">
+                    <ChevronRight className="w-5 h-5" />
                 </button>
              </div>
 
-             {/* Monthly Big Stats */}
-             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mt-2 z-10">
-                <div className="bg-slate-950/40 p-5 rounded-2xl border border-emerald-500/20">
-                    <span className="text-slate-400 text-xs font-semibold uppercase tracking-wider flex items-center gap-2">
-                        <div className="w-2 h-2 rounded-full bg-emerald-500"></div> Income
+             <button 
+                onClick={() => { setEditingTransaction(null); setIsModalOpen(true); }}
+                className="w-full md:w-auto bg-indigo-600 hover:bg-indigo-500 hover:scale-105 active:scale-95 text-white px-6 py-3 rounded-2xl text-sm font-bold flex items-center justify-center gap-2 transition-all shadow-xl shadow-indigo-500/20"
+            >
+                <Plus className="w-5 h-5" />
+                Add New
+            </button>
+        </div>
+
+        {/* BENTO GRID STATS */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+             {/* Income */}
+             <div className="bg-slate-900/50 backdrop-blur-md p-6 rounded-3xl border border-white/5 shadow-lg relative overflow-hidden group">
+                <div className="absolute top-0 right-0 p-8 opacity-5 group-hover:opacity-10 transition-opacity transform group-hover:scale-110 duration-500">
+                    <ArrowDownRight className="w-24 h-24 text-emerald-500" />
+                </div>
+                <div className="relative z-10">
+                    <span className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-500/10 text-emerald-400 text-xs font-bold uppercase tracking-wider mb-4">
+                        <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></div> 
+                        {isCustomDateMode ? 'Period Income' : 'Income'}
                     </span>
-                    <div className="text-2xl font-bold text-white mt-2">
+                    <div className="text-3xl font-bold text-white">
                         {hideValues ? 'RM ****' : <CountUp end={monthlyStats.income} prefix="RM " />}
                     </div>
                 </div>
+             </div>
 
-                <div className="bg-slate-950/40 p-5 rounded-2xl border border-rose-500/20">
-                    <span className="text-slate-400 text-xs font-semibold uppercase tracking-wider flex items-center gap-2">
-                         <div className="w-2 h-2 rounded-full bg-rose-500"></div> Expenses
+             {/* Expense */}
+             <div className="bg-slate-900/50 backdrop-blur-md p-6 rounded-3xl border border-white/5 shadow-lg relative overflow-hidden group">
+                <div className="absolute top-0 right-0 p-8 opacity-5 group-hover:opacity-10 transition-opacity transform group-hover:scale-110 duration-500">
+                    <ArrowUpRight className="w-24 h-24 text-rose-500" />
+                </div>
+                <div className="relative z-10">
+                    <span className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-rose-500/10 text-rose-400 text-xs font-bold uppercase tracking-wider mb-4">
+                        <div className="w-1.5 h-1.5 rounded-full bg-rose-500"></div> 
+                        {isCustomDateMode ? 'Period Expenses' : 'Expenses'}
                     </span>
-                    <div className="text-2xl font-bold text-white mt-2">
+                    <div className="text-3xl font-bold text-white">
                         {hideValues ? 'RM ****' : <CountUp end={monthlyStats.expense} prefix="RM " />}
                     </div>
                 </div>
+             </div>
 
-                <div className="bg-slate-950/40 p-5 rounded-2xl border border-indigo-500/20">
-                    <span className="text-slate-400 text-xs font-semibold uppercase tracking-wider flex items-center gap-2">
-                         <div className="w-2 h-2 rounded-full bg-indigo-500"></div> Net
+             {/* Net */}
+             <div className="bg-slate-900/50 backdrop-blur-md p-6 rounded-3xl border border-white/5 shadow-lg relative overflow-hidden">
+                <div className="relative z-10">
+                     <span className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-indigo-500/10 text-indigo-400 text-xs font-bold uppercase tracking-wider mb-4">
+                        <div className="w-1.5 h-1.5 rounded-full bg-indigo-500"></div> Net Flow
                     </span>
-                    <div className={`text-2xl font-bold mt-2 ${monthlyStats.balance >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
+                    <div className={`text-3xl font-bold ${monthlyStats.balance >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
                         {hideValues ? 'RM ****' : (
                             <>
                                 {monthlyStats.balance > 0 ? '+' : ''}
@@ -182,87 +226,170 @@ export const MoneyManager: React.FC<MoneyManagerProps> = ({ data, loading, onRef
                     </div>
                 </div>
              </div>
-        </SpotlightCard>
+        </div>
 
         {/* Transactions List */}
-        <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-sm">
-            <div className="flex justify-between items-center mb-4">
-                <h3 className="font-bold text-lg text-white flex items-center gap-2">
-                    <Calendar className="w-5 h-5 text-indigo-500" />
-                    Transactions
-                </h3>
-                <span className="text-xs text-slate-500">{currentMonthTransactions.length} records</span>
+        <div className="bg-slate-900/40 backdrop-blur-md border border-white/5 rounded-3xl p-6 shadow-xl">
+            <div className="flex justify-between items-center mb-6 px-2">
+                <div className="flex items-center gap-3">
+                    <h3 className="font-bold text-xl text-white flex items-center gap-2">
+                        Activity
+                    </h3>
+                    <span className="text-xs font-medium text-slate-500 bg-slate-800/50 px-3 py-1 rounded-full">{filteredTransactions.length} records</span>
+                </div>
+                
+                <button 
+                    onClick={() => setShowFilters(!showFilters)}
+                    className={`p-2 rounded-xl transition-all flex items-center gap-2 text-sm font-medium ${showFilters || hasActiveFilters ? 'bg-indigo-600 text-white' : 'bg-slate-800 text-slate-400 hover:text-white'}`}
+                >
+                    <Filter className="w-4 h-4" />
+                    <span className="hidden md:inline">Filters</span>
+                    {hasActiveFilters && <div className="w-2 h-2 rounded-full bg-white animate-pulse"></div>}
+                </button>
             </div>
             
-            <div className="overflow-x-auto">
-                <table className="w-full text-left">
-                    <tbody className="divide-y divide-slate-800">
-                        {currentMonthTransactions.slice(0, 8).map((tx) => (
-                            <tr key={tx.id} className="group hover:bg-slate-800/30 transition-colors">
-                                <td className="py-3 pr-4">
-                                    <div className="flex items-center gap-3">
-                                        <div className="w-10 h-10 rounded-full bg-slate-800 flex items-center justify-center text-slate-400 border border-slate-700">
-                                            {getTransactionCategoryIcon(tx.category)}
-                                        </div>
-                                        <div>
-                                            <div className="font-medium text-white text-sm">{tx.category}</div>
-                                            <div className="text-xs text-slate-500">{tx.date} • <span className="text-slate-400">{tx.note || '-'}</span></div>
-                                        </div>
+            {/* Filter Section */}
+            {(showFilters || hasActiveFilters) && (
+                <div className="mb-6 p-4 bg-slate-900/60 rounded-2xl border border-white/5 space-y-4 animate-in slide-in-from-top-2 fade-in">
+                    <div className="flex justify-between items-center">
+                        <h4 className="text-xs font-bold text-slate-500 uppercase tracking-widest">Filter Options</h4>
+                        {hasActiveFilters && (
+                            <button onClick={clearFilters} className="text-xs text-rose-400 flex items-center gap-1 hover:underline">
+                                <XCircle className="w-3 h-3" /> Clear All
+                            </button>
+                        )}
+                    </div>
+                    
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        {/* Date Range */}
+                        <div>
+                            <label className="block text-xs text-slate-400 mb-1.5">Date Range (Overrides Month)</label>
+                            <div className="flex gap-2">
+                                <input 
+                                    type="date" 
+                                    className="w-full bg-slate-950 border border-slate-700 rounded-lg px-2 py-1.5 text-xs text-white focus:outline-none focus:border-indigo-500"
+                                    value={filters.startDate}
+                                    onChange={(e) => setFilters({...filters, startDate: e.target.value})}
+                                />
+                                <span className="text-slate-600 self-center">-</span>
+                                <input 
+                                    type="date" 
+                                    className="w-full bg-slate-950 border border-slate-700 rounded-lg px-2 py-1.5 text-xs text-white focus:outline-none focus:border-indigo-500"
+                                    value={filters.endDate}
+                                    onChange={(e) => setFilters({...filters, endDate: e.target.value})}
+                                />
+                            </div>
+                        </div>
+
+                        {/* Type */}
+                        <div>
+                            <label className="block text-xs text-slate-400 mb-1.5">Transaction Type</label>
+                            <div className="flex bg-slate-950 p-1 rounded-lg border border-slate-800">
+                                {['All', 'Expense', 'Income', 'Transfer'].map(t => (
+                                    <button
+                                        key={t}
+                                        onClick={() => setFilters({...filters, type: t})}
+                                        className={`flex-1 text-[10px] font-bold py-1.5 rounded-md transition-all ${filters.type === t ? 'bg-indigo-600 text-white' : 'text-slate-500 hover:text-slate-300'}`}
+                                    >
+                                        {t}
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+
+                         {/* Account */}
+                         <div>
+                            <label className="block text-xs text-slate-400 mb-1.5">Account</label>
+                            <select
+                                className="w-full bg-slate-950 border border-slate-700 rounded-lg px-2 py-1.5 text-xs text-white focus:outline-none focus:border-indigo-500"
+                                value={filters.account}
+                                onChange={(e) => setFilters({...filters, account: e.target.value})}
+                            >
+                                <option value="All">All Accounts</option>
+                                {data.accounts.map(acc => (
+                                    <option key={acc.name} value={acc.name}>{acc.name}</option>
+                                ))}
+                            </select>
+                        </div>
+                    </div>
+                </div>
+            )}
+            
+            <div className="space-y-3">
+                {filteredTransactions.slice(0, 10).map((tx) => {
+                    const style = getCategoryStyles(tx.category);
+                    return (
+                        <div key={tx.id} className="group flex items-center justify-between p-3 rounded-2xl hover:bg-white/5 transition-all border border-transparent hover:border-white/5">
+                            <div className="flex items-center gap-4">
+                                <div className={`w-12 h-12 rounded-2xl flex items-center justify-center ${style.color} ${style.text} shadow-lg shadow-black/20`}>
+                                    {style.icon}
+                                </div>
+                                <div>
+                                    <div className="font-bold text-white text-sm">{tx.category}</div>
+                                    <div className="text-xs text-slate-400 mt-0.5">{tx.date} • {tx.note || 'No note'}</div>
+                                </div>
+                            </div>
+
+                            <div className="text-right flex items-center gap-4">
+                                <div>
+                                    <div className={`font-bold text-sm ${tx.type === 'Income' ? 'text-emerald-400' : tx.type === 'Transfer' ? 'text-blue-400' : 'text-white'}`}>
+                                        {tx.type === 'Income' ? '+' : tx.type === 'Transfer' ? '' : '-'} {displayValue(tx.amount, 'RM ')}
                                     </div>
-                                </td>
-                                <td className="px-4 text-xs text-slate-400 text-right hidden sm:table-cell">
-                                    {tx.fromAccount} {tx.toAccount ? `→ ${tx.toAccount}` : ''}
-                                </td>
-                                <td className={`text-right font-bold text-sm ${tx.type === 'Income' ? 'text-emerald-400' : tx.type === 'Transfer' ? 'text-blue-400' : 'text-rose-400'}`}>
-                                    {tx.type === 'Income' ? '+' : tx.type === 'Transfer' ? '' : '-'} {displayValue(tx.amount, 'RM ')}
-                                </td>
-                                <td className="pl-4 text-right w-10">
-                                    <div className="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                                        <button onClick={() => handleEdit(tx)} className="text-slate-500 hover:text-indigo-400"><Pencil className="w-3.5 h-3.5" /></button>
-                                        <button onClick={() => handleDelete(tx)} className="text-slate-500 hover:text-rose-400"><Trash2 className="w-3.5 h-3.5" /></button>
+                                    <div className="text-[10px] text-slate-500 font-medium uppercase tracking-wide">
+                                        {tx.fromAccount} {tx.toAccount ? '→' : ''}
                                     </div>
-                                </td>
-                            </tr>
-                        ))}
-                         {currentMonthTransactions.length === 0 && (
-                             <tr><td colSpan={4} className="py-12 text-center text-slate-500">No transactions found for {monthLabel}.</td></tr>
-                         )}
-                    </tbody>
-                </table>
+                                </div>
+                                
+                                {/* Hover Actions */}
+                                <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity translate-x-2 group-hover:translate-x-0">
+                                    <button onClick={() => handleEdit(tx)} className="p-2 text-slate-400 hover:text-indigo-400 hover:bg-slate-800 rounded-lg"><Pencil className="w-4 h-4" /></button>
+                                    <button onClick={() => handleDelete(tx)} className="p-2 text-slate-400 hover:text-rose-400 hover:bg-slate-800 rounded-lg"><Trash2 className="w-4 h-4" /></button>
+                                </div>
+                            </div>
+                        </div>
+                    );
+                })}
+
+                {filteredTransactions.length === 0 && (
+                     <div className="py-12 text-center text-slate-500 flex flex-col items-center">
+                        <Calendar className="w-12 h-12 text-slate-800 mb-2" />
+                        No transactions found for this period.
+                     </div>
+                )}
             </div>
-            {currentMonthTransactions.length > 8 && (
-                <div className="mt-4 text-center border-t border-slate-800 pt-4">
+
+            {filteredTransactions.length > 10 && (
+                <div className="mt-6 text-center">
                     <button 
                         onClick={() => setIsHistoryModalOpen(true)}
-                        className="text-sm text-indigo-400 hover:text-indigo-300 transition-colors font-medium flex items-center justify-center gap-1 w-full"
+                        className="text-sm text-indigo-400 hover:text-indigo-300 transition-colors font-medium flex items-center justify-center gap-1 w-full py-2 hover:bg-white/5 rounded-xl"
                     >
-                        View All Transactions <ArrowDownRight className="w-3 h-3" />
+                        View All {filteredTransactions.length} Records <ArrowDownRight className="w-4 h-4" />
                     </button>
                 </div>
             )}
         </div>
       </div>
 
-      {/* RIGHT COLUMN (Sidebar - Secondary Info) */}
+      {/* RIGHT COLUMN (Sidebar) */}
       <div className="space-y-6">
-        {/* Expense Breakdown for Selected Month */}
-        <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-sm min-h-[300px] flex flex-col">
-             <div className="flex justify-between items-center mb-4">
-                <h3 className="font-bold text-lg text-white">Monthly Expenses</h3>
-            </div>
-            <div className="flex-grow">
+        {/* Pie Chart Card */}
+        <div className="bg-slate-900/40 backdrop-blur-md border border-white/5 rounded-3xl p-6 shadow-xl flex flex-col min-h-[400px]">
+             <h3 className="font-bold text-xl text-white mb-6">Spending Breakdown</h3>
+            <div className="flex-grow relative">
                 {pieData.length > 0 && !hideValues ? (
-                    <ResponsiveContainer width="100%" height={220}>
+                    <ResponsiveContainer width="100%" height={250}>
                         <PieChart>
                             <Pie
                                 data={pieData}
                                 cx="50%"
                                 cy="50%"
-                                innerRadius={50}
+                                innerRadius={60}
                                 outerRadius={80}
-                                paddingAngle={2}
+                                paddingAngle={5}
                                 dataKey="value"
                                 stroke="none"
+                                cornerRadius={4}
                             >
                                 {pieData.map((entry, index) => (
                                     <Cell key={`cell-${index}`} fill={PIE_COLORS[index % PIE_COLORS.length]} />
@@ -270,32 +397,73 @@ export const MoneyManager: React.FC<MoneyManagerProps> = ({ data, loading, onRef
                             </Pie>
                             <Tooltip 
                                 formatter={(value: number) => `RM ${value.toLocaleString()}`}
-                                contentStyle={{ backgroundColor: '#1e293b', borderColor: '#334155', color: '#f8fafc' }}
+                                contentStyle={{ backgroundColor: '#0f172a', borderColor: 'rgba(255,255,255,0.1)', color: '#f8fafc', borderRadius: '12px' }}
                                 itemStyle={{ color: '#e2e8f0' }}
                             />
                         </PieChart>
                     </ResponsiveContainer>
                 ) : (
-                     <div className="h-full flex items-center justify-center text-slate-500 text-sm">
-                        {hideValues ? 'Hidden in privacy mode' : 'No expenses this month'}
+                     <div className="absolute inset-0 flex items-center justify-center text-slate-500 text-sm">
+                        {hideValues ? 'Hidden' : 'No Data'}
                      </div>
                 )}
+                {/* Center Label for Pie */}
+                {!hideValues && pieData.length > 0 && (
+                    <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                        <span className="text-xs font-bold text-slate-500 uppercase tracking-widest">EXPENSE</span>
+                    </div>
+                )}
             </div>
-            <div className="mt-4 space-y-2 max-h-[250px] overflow-y-auto pr-2 custom-scrollbar">
+            
+            <div className="mt-6 space-y-3 max-h-[300px] overflow-y-auto pr-2 custom-scrollbar">
                 {pieData.map((entry, index) => (
-                     <div key={entry.name} className="flex justify-between text-xs">
-                        <span className="flex items-center gap-2 text-slate-300">
-                             <span className="w-2 h-2 rounded-full" style={{ backgroundColor: PIE_COLORS[index % PIE_COLORS.length] }}></span>
-                             {entry.name}
-                        </span>
-                        <span className="text-slate-400">{displayValue(entry.value)}</span>
+                     <div key={entry.name} className="flex items-center justify-between p-2 hover:bg-white/5 rounded-lg transition-colors">
+                        <div className="flex items-center gap-3">
+                             <div className="w-3 h-3 rounded-full" style={{ backgroundColor: PIE_COLORS[index % PIE_COLORS.length] }}></div>
+                             <span className="text-slate-300 text-sm font-medium">{entry.name}</span>
+                        </div>
+                        <span className="text-white font-bold text-sm">{displayValue(entry.value)}</span>
                      </div>
                 ))}
             </div>
         </div>
       </div>
 
-      {/* MODALS */}
+      {/* History Modal */}
+      {isHistoryModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md p-4">
+            <div className="bg-slate-900 border border-slate-800 rounded-3xl w-full max-w-2xl shadow-2xl flex flex-col max-h-[85vh] overflow-hidden">
+                <div className="flex justify-between items-center p-6 border-b border-slate-800 bg-slate-900">
+                     <div>
+                        <h2 className="text-xl font-bold text-white">Full Transaction List</h2>
+                        <p className="text-sm text-slate-500">{isCustomDateMode ? 'Custom Range' : monthLabel}</p>
+                     </div>
+                     <button onClick={() => setIsHistoryModalOpen(false)} className="p-2 hover:bg-slate-800 rounded-full text-slate-400 hover:text-white"><X className="w-6 h-6" /></button>
+                </div>
+                <div className="overflow-y-auto p-4 flex-1 space-y-2">
+                    {filteredTransactions.map((tx) => (
+                         <div key={tx.id} className="flex items-center justify-between p-3 rounded-xl hover:bg-white/5 border border-transparent hover:border-white/5 group">
+                            <div className="flex flex-col">
+                                <span className="text-white font-medium">{tx.category}</span>
+                                <span className="text-xs text-slate-500">{tx.date} • {tx.note}</span>
+                            </div>
+                            <div className="text-right flex items-center gap-4">
+                                <span className={`font-bold ${tx.type === 'Income' ? 'text-emerald-400' : tx.type === 'Transfer' ? 'text-blue-400' : 'text-slate-200'}`}>
+                                    {tx.type === 'Income' ? '+' : tx.type === 'Transfer' ? '' : '-'} {displayValue(tx.amount, 'RM ')}
+                                </span>
+                                <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                    <button onClick={() => { setIsHistoryModalOpen(false); handleEdit(tx); }} className="p-2 text-slate-500 hover:text-indigo-400"><Pencil className="w-4 h-4" /></button>
+                                    <button onClick={() => handleDelete(tx)} className="p-2 text-slate-500 hover:text-rose-400"><Trash2 className="w-4 h-4" /></button>
+                                </div>
+                            </div>
+                        </div>
+                    ))}
+                </div>
+            </div>
+        </div>
+      )}
+
+      {/* Edit Modal Wrapper */}
       <AddMoneyModal 
         isOpen={isModalOpen} 
         onClose={() => setIsModalOpen(false)}
@@ -305,47 +473,6 @@ export const MoneyManager: React.FC<MoneyManagerProps> = ({ data, loading, onRef
         incomeCategories={data.incomeCategories || []}
         expenseCategories={data.expenseCategories || []}
       />
-
-      {/* History View Modal */}
-      {isHistoryModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
-            <div className="bg-slate-900 border border-slate-800 rounded-xl w-full max-w-2xl shadow-2xl flex flex-col max-h-[85vh]">
-                <div className="flex justify-between items-center p-6 border-b border-slate-800 bg-slate-900 rounded-t-xl z-10">
-                     <div>
-                        <h2 className="text-xl font-bold text-white">Transaction History</h2>
-                        <p className="text-sm text-slate-500">{monthLabel}</p>
-                     </div>
-                     <button onClick={() => setIsHistoryModalOpen(false)} className="text-slate-400 hover:text-white"><X className="w-6 h-6" /></button>
-                </div>
-                <div className="overflow-y-auto p-4 flex-1">
-                    <table className="w-full text-left">
-                        <tbody className="divide-y divide-slate-800">
-                            {currentMonthTransactions.map((tx) => (
-                                <tr key={tx.id} className="group hover:bg-slate-800/30">
-                                    <td className="py-3 px-2">
-                                        <div className="font-medium text-white text-sm">{tx.category}</div>
-                                        <div className="text-xs text-slate-500">{tx.date} • {tx.note || '-'}</div>
-                                    </td>
-                                    <td className="px-2 text-xs text-slate-400 text-right whitespace-nowrap">
-                                        {tx.fromAccount} {tx.toAccount ? `→` : ''} <br/> {tx.toAccount}
-                                    </td>
-                                    <td className={`text-right font-bold text-sm whitespace-nowrap px-2 ${tx.type === 'Income' ? 'text-emerald-400' : tx.type === 'Transfer' ? 'text-blue-400' : 'text-rose-400'}`}>
-                                        {tx.type === 'Income' ? '+' : tx.type === 'Transfer' ? '' : '-'} {displayValue(tx.amount, 'RM ')}
-                                    </td>
-                                    <td className="w-10 text-right px-2">
-                                        <div className="flex gap-2 justify-end">
-                                            <button onClick={() => { setIsHistoryModalOpen(false); handleEdit(tx); }} className="text-slate-500 hover:text-indigo-400"><Pencil className="w-4 h-4" /></button>
-                                            <button onClick={() => handleDelete(tx)} className="text-slate-500 hover:text-rose-400"><Trash2 className="w-4 h-4" /></button>
-                                        </div>
-                                    </td>
-                                </tr>
-                            ))}
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-        </div>
-      )}
     </div>
   );
 };

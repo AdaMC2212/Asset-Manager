@@ -46,11 +46,11 @@ export const AllocationChart: React.FC<AllocationChartProps> = ({ data }) => {
   const totalValue = chartData.reduce((acc, curr) => acc + curr.value, 0);
 
   return (
-    <div className="bg-slate-900 border border-slate-800 rounded-xl p-6 shadow-sm flex flex-col">
-      <h2 className="text-lg font-semibold text-white mb-2 flex-shrink-0">Portfolio Allocation</h2>
+    <div className="bg-slate-900/40 backdrop-blur-md border border-white/5 rounded-3xl p-6 shadow-xl flex flex-col">
+      <h2 className="text-xl font-bold text-white mb-6">Allocation</h2>
       
       {/* Chart Section */}
-      <div className="flex-shrink-0 h-[200px] min-h-[200px]">
+      <div className="flex-shrink-0 h-[220px]">
         {chartData.length > 0 ? (
           <ResponsiveContainer width="100%" height="100%">
             <PieChart>
@@ -58,11 +58,12 @@ export const AllocationChart: React.FC<AllocationChartProps> = ({ data }) => {
                 data={chartData}
                 cx="50%"
                 cy="50%"
-                innerRadius={60}
-                outerRadius={80}
+                innerRadius={65}
+                outerRadius={85}
                 paddingAngle={5}
                 dataKey="value"
                 stroke="none"
+                cornerRadius={4}
               >
                 {chartData.map((entry, index) => (
                   <Cell 
@@ -76,7 +77,7 @@ export const AllocationChart: React.FC<AllocationChartProps> = ({ data }) => {
                   `$${value.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
                   `${((value / totalValue) * 100).toFixed(1)}%`
                 ]}
-                contentStyle={{ backgroundColor: '#1e293b', borderColor: '#334155', color: '#f8fafc', borderRadius: '0.5rem' }}
+                contentStyle={{ backgroundColor: '#0f172a', borderColor: 'rgba(255,255,255,0.1)', color: '#f8fafc', borderRadius: '12px' }}
                 itemStyle={{ color: '#e2e8f0' }}
               />
             </PieChart>
@@ -89,22 +90,22 @@ export const AllocationChart: React.FC<AllocationChartProps> = ({ data }) => {
       </div>
 
       {/* Breakdown List Section - Expanded */}
-      <div className="mt-4 border-t border-slate-800 pt-4">
+      <div className="mt-6 border-t border-white/5 pt-4">
         <div className="space-y-3">
           {chartData.map((item) => (
-            <div key={item.name} className="flex items-center justify-between text-sm hover:bg-slate-800/30 p-1.5 rounded-lg transition-colors">
-              <div className="flex items-center gap-2 overflow-hidden">
+            <div key={item.name} className="flex items-center justify-between p-2 hover:bg-white/5 rounded-lg transition-colors">
+              <div className="flex items-center gap-3">
                   <div 
-                    className="w-3 h-3 rounded-full flex-shrink-0" 
+                    className="w-3 h-3 rounded-full flex-shrink-0 shadow-[0_0_10px_rgba(0,0,0,0.5)]" 
                     style={{ backgroundColor: COLORS[item.name as keyof typeof COLORS] || COLORS.Other }}
                   ></div>
-                  <span className="text-slate-300 font-medium truncate">{item.name}</span>
+                  <span className="text-slate-300 font-medium text-sm">{item.name}</span>
               </div>
-              <div className="text-right flex-shrink-0 ml-2">
-                  <div className="text-white font-medium">
-                    ${item.value.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              <div className="text-right flex-shrink-0">
+                  <div className="text-white font-bold text-sm">
+                    ${item.value.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
                   </div>
-                  <div className="text-xs text-slate-500">
+                  <div className="text-[10px] text-slate-500 font-medium">
                     {((item.value / totalValue) * 100).toFixed(1)}%
                   </div>
               </div>

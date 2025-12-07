@@ -15,7 +15,7 @@ export const SummaryCards: React.FC<SummaryCardsProps> = ({ data, loading, hideV
     return (
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
         {[1, 2, 3].map((i) => (
-          <div key={i} className="bg-slate-900 border border-slate-800 rounded-xl p-6 h-32 animate-pulse"></div>
+          <div key={i} className="bg-slate-900/50 rounded-2xl p-6 h-32 animate-pulse"></div>
         ))}
       </div>
     );
@@ -26,57 +26,56 @@ export const SummaryCards: React.FC<SummaryCardsProps> = ({ data, loading, hideV
   return (
     <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
       {/* Net Worth */}
-      <SpotlightCard className="p-6 shadow-sm" spotlightColor="rgba(99, 102, 241, 0.2)">
-        <div className="flex items-center justify-between mb-4">
-          <h3 className="text-slate-400 text-sm font-medium">Net Worth</h3>
-          <div className="p-2 bg-indigo-500/10 rounded-lg">
-            <Wallet className="w-5 h-5 text-indigo-500" />
+      <div className="bg-slate-900/40 backdrop-blur-md rounded-3xl p-6 border border-white/5 relative overflow-hidden group hover:border-indigo-500/30 transition-colors">
+        <div className="absolute top-0 right-0 p-6 opacity-5 group-hover:opacity-10 transition-opacity">
+            <Wallet className="w-16 h-16 text-indigo-400" />
+        </div>
+        <div className="relative z-10">
+          <h3 className="text-slate-400 text-xs font-bold uppercase tracking-widest mb-2">Net Worth</h3>
+          <div className="text-3xl font-bold text-white tracking-tight">
+            {hideValues ? '$ ****' : <CountUp end={data.netWorth} prefix="$" />}
           </div>
         </div>
-        <div className="flex items-baseline">
-          <span className="text-2xl font-bold text-white">
-            {hideValues ? '$ ****' : <CountUp end={data.netWorth} prefix="$" />}
-          </span>
-        </div>
-      </SpotlightCard>
+        <div className="absolute bottom-0 left-0 w-full h-1 bg-gradient-to-r from-indigo-500 to-transparent opacity-50"></div>
+      </div>
 
       {/* Total P/L */}
-      <SpotlightCard className="p-6 shadow-sm" spotlightColor={isPositive ? "rgba(16, 185, 129, 0.2)" : "rgba(244, 63, 94, 0.2)"}>
-        <div className="flex items-center justify-between mb-4">
-          <h3 className="text-slate-400 text-sm font-medium">Total Profit/Loss</h3>
-          <div className={`p-2 rounded-lg ${isPositive ? 'bg-emerald-500/10' : 'bg-rose-500/10'}`}>
-            <TrendingUp className={`w-5 h-5 ${isPositive ? 'text-emerald-500' : 'text-rose-500'}`} />
+      <div className="bg-slate-900/40 backdrop-blur-md rounded-3xl p-6 border border-white/5 relative overflow-hidden group hover:border-white/10 transition-colors">
+        <div className="absolute top-0 right-0 p-6 opacity-5 group-hover:opacity-10 transition-opacity">
+             <TrendingUp className={`w-16 h-16 ${isPositive ? 'text-emerald-500' : 'text-rose-500'}`} />
+        </div>
+        <div className="relative z-10">
+          <h3 className="text-slate-400 text-xs font-bold uppercase tracking-widest mb-2">Total Profit/Loss</h3>
+          <div className="flex items-baseline gap-3">
+             <span className={`text-3xl font-bold tracking-tight ${isPositive ? 'text-emerald-400' : 'text-rose-400'}`}>
+                {hideValues ? (isPositive ? '+ $ ****' : '- $ ****') : (
+                <>
+                    {isPositive ? '+' : ''}
+                    <CountUp end={data.totalPL} prefix="$" />
+                </>
+                )}
+            </span>
+            <span className={`text-sm font-bold px-2 py-0.5 rounded-full ${isPositive ? 'bg-emerald-500/10 text-emerald-400' : 'bg-rose-500/10 text-rose-400'}`}>
+                {hideValues ? '****' : (isPositive ? '+' : '') + data.totalPLPercent.toFixed(2) + '%'}
+            </span>
           </div>
         </div>
-        <div>
-          <span className={`text-2xl font-bold ${isPositive ? 'text-emerald-400' : 'text-rose-400'}`}>
-             {hideValues ? (isPositive ? '+ $ ****' : '- $ ****') : (
-               <>
-                 {isPositive ? '+' : ''}
-                 <CountUp end={data.totalPL} prefix="$" />
-               </>
-             )}
-          </span>
-          <span className={`ml-2 text-sm font-medium ${isPositive ? 'text-emerald-500' : 'text-rose-500'}`}>
-            {hideValues ? '****' : (isPositive ? '+' : '') + data.totalPLPercent.toFixed(2) + '%'}
-          </span>
-        </div>
-      </SpotlightCard>
+        <div className={`absolute bottom-0 left-0 w-full h-1 bg-gradient-to-r ${isPositive ? 'from-emerald-500' : 'from-rose-500'} to-transparent opacity-50`}></div>
+      </div>
 
       {/* Cash Balance */}
-      <SpotlightCard className="p-6 shadow-sm" spotlightColor="rgba(59, 130, 246, 0.2)">
-        <div className="flex items-center justify-between mb-4">
-          <h3 className="text-slate-400 text-sm font-medium">Available Cash</h3>
-          <div className="p-2 bg-blue-500/10 rounded-lg">
-            <DollarSign className="w-5 h-5 text-blue-500" />
+      <div className="bg-slate-900/40 backdrop-blur-md rounded-3xl p-6 border border-white/5 relative overflow-hidden group hover:border-blue-500/30 transition-colors">
+         <div className="absolute top-0 right-0 p-6 opacity-5 group-hover:opacity-10 transition-opacity">
+            <DollarSign className="w-16 h-16 text-blue-400" />
+        </div>
+        <div className="relative z-10">
+          <h3 className="text-slate-400 text-xs font-bold uppercase tracking-widest mb-2">Cash Available</h3>
+           <div className="text-3xl font-bold text-white tracking-tight">
+             {hideValues ? '$ ****' : <CountUp end={data.cashBalance} prefix="$" />}
           </div>
         </div>
-        <div className="flex items-baseline">
-          <span className="text-2xl font-bold text-white">
-             {hideValues ? '$ ****' : <CountUp end={data.cashBalance} prefix="$" />}
-          </span>
-        </div>
-      </SpotlightCard>
+        <div className="absolute bottom-0 left-0 w-full h-1 bg-gradient-to-r from-blue-500 to-transparent opacity-50"></div>
+      </div>
     </div>
   );
 };
