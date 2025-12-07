@@ -1,16 +1,25 @@
+
 'use client';
 
 import React, { useEffect, useState, useCallback } from 'react';
-import { Plus, LayoutDashboard, AlertCircle, RefreshCw, PieChart as PieChartIcon, ArrowRightLeft, Wallet, LineChart, Eye, EyeOff, Lock, ShieldCheck } from 'lucide-react';
+import { Plus, LayoutDashboard, AlertCircle, RefreshCw, PieChart as PieChartIcon, ArrowRightLeft, Wallet, LineChart, Eye, EyeOff, Lock, ShieldCheck, Database, Loader2 } from 'lucide-react';
 import { SummaryCards } from '../components/SummaryCards';
 import { HoldingsTable } from '../components/HoldingsTable';
 import { AllocationChart } from '../components/AllocationChart';
 import { FundingStats } from '../components/FundingStats';
 import { MoneyManager } from '../components/MoneyManager';
 import { AddTradeModal } from '../components/AddTradeModal';
-import { getPortfolioData, getCashFlowData, getMoneyManagerData } from './actions';
+import { TotalBalanceCard } from '../components/TotalBalanceCard';
+import { getPortfolioData, getCashFlowData, getMoneyManagerData, checkDatabaseStatus, initializeDatabase } from './actions';
 import { PortfolioSummary, CashFlowSummary, MoneyManagerData } from '../types';
 import { DecryptedText } from '../components/ui/DecryptedText';
+
+// Fallback Mock Data Imports
+import { 
+  getPortfolioData as getMockPortfolioData, 
+  getCashFlowData as getMockCashFlowData, 
+  getMoneyManagerData as getMockMoneyManagerData 
+} from '../services/mockBackend';
 
 type AppModule = 'manager' | 'investment';
 type InvestmentTab = 'dashboard' | 'funding';
@@ -23,7 +32,6 @@ const LockScreen = ({ onUnlock }: { onUnlock: () => void }) => {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     const envPin = process.env.NEXT_PUBLIC_APP_PASSWORD;
-    // Default to 'admin' if no env var is set, to ensure it works out of the box for the user before they deploy
     const targetPin = envPin || 'admin';
     
     if (pin === targetPin) {
@@ -36,7 +44,6 @@ const LockScreen = ({ onUnlock }: { onUnlock: () => void }) => {
 
   return (
     <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center p-4 relative overflow-hidden">
-      {/* Subtle Background Grid Effect using CSS */}
       <div className="absolute inset-0 z-0 opacity-20 pointer-events-none" 
            style={{ 
              backgroundImage: 'linear-gradient(#334155 1px, transparent 1px), linear-gradient(90deg, #334155 1px, transparent 1px)', 
@@ -45,7 +52,6 @@ const LockScreen = ({ onUnlock }: { onUnlock: () => void }) => {
       </div>
       
       <div className="w-full max-w-sm bg-slate-900/80 backdrop-blur-md border border-slate-800 rounded-2xl p-8 shadow-2xl relative z-10 overflow-hidden">
-        {/* Decorative elements */}
         <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500"></div>
         
         <div className="flex flex-col items-center mb-8">
@@ -100,21 +106,6 @@ const LockScreen = ({ onUnlock }: { onUnlock: () => void }) => {
             </button>
         </div>
       </div>
-
-      {showHelp && (
-          <div className="mt-8 max-w-md bg-slate-900/50 border border-slate-800 rounded-xl p-6 text-sm text-slate-400 backdrop-blur-sm animate-in fade-in slide-in-from-bottom-4 z-10">
-              <h3 className="text-white font-semibold mb-2">How to Deploy Securely</h3>
-              <ul className="space-y-2 list-disc pl-4">
-                  <li className="text-rose-400 font-bold">⚠️ Do NOT commit .env.local to GitHub!</li>
-                  <li>Push code to GitHub (secrets are ignored).</li>
-                  <li>Import project in <strong>Vercel</strong> or <strong>Netlify</strong>.</li>
-                  <li>In <strong>Settings &rarr; Environment Variables</strong>, add:</li>
-                  <li><code>GOOGLE_SERVICE_ACCOUNT_KEY</code>: Paste entire JSON file content.</li>
-                  <li><code>NEXT_PUBLIC_APP_PASSWORD</code>: Set your PIN (Default: 'admin').</li>
-                  <li><code>API_KEY</code>: (Optional) Gemini API Key.</li>
-              </ul>
-          </div>
-      )}
     </div>
   );
 }
@@ -127,39 +118,78 @@ export default function Home() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isUsingMock, setIsUsingMock] = useState(false);
+  
+  // Database Status for Money Manager
+  const [dbStatus, setDbStatus] = useState<{ configured: boolean, initialized: boolean } | null>(null);
+  const [isInitializing, setIsInitializing] = useState(false);
   
   // Navigation State
   const [activeModule, setActiveModule] = useState<AppModule>('manager');
   const [activeInvTab, setActiveInvTab] = useState<InvestmentTab>('dashboard');
   
-  // Privacy State
-  const [hideValues, setHideValues] = useState(false);
+  // Privacy State - Split
+  const [hideBalance, setHideBalance] = useState(false);
+  const [hideInvestments, setHideInvestments] = useState(false);
 
   const fetchData = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      // Parallel Fetch
-      const [portfolioResult, cashFlowResult, moneyResult] = await Promise.all([
-        getPortfolioData(),
-        getCashFlowData(),
-        getMoneyManagerData()
-      ]);
-      
-      setData(portfolioResult);
-      setCashFlowData(cashFlowResult);
-      setMoneyData(moneyResult);
-    } catch (err: any) {
-      console.error("Failed to load data", err);
-      let errorMessage = "Failed to load portfolio data.";
-      if (err.message?.includes("GOOGLE_SERVICE_ACCOUNT_KEY") || err.message?.includes("Configuration Missing")) {
-          errorMessage = "Missing Configuration: GOOGLE_SERVICE_ACCOUNT_KEY is not defined.";
+      // 1. Check Configuration Status first
+      const status = await checkDatabaseStatus();
+      setDbStatus(status);
+
+      // 2. Decide Source (Real or Mock)
+      // If configured, ALWAYS try to fetch real data.
+      // If NOT configured, use Mock data.
+      const useRealData = status.configured;
+      setIsUsingMock(!useRealData);
+
+      if (useRealData) {
+         // --- REAL DATA FETCH ---
+         const [portfolioResult, cashFlowResult, moneyResult] = await Promise.all([
+            getPortfolioData().catch(() => null),
+            getCashFlowData().catch(() => null),
+            getMoneyManagerData().catch(() => null)
+         ]);
+
+         // Allow empty data if real fetch returns valid empty structure
+         setData(portfolioResult || { netWorth: 0, totalCost: 0, totalPL: 0, totalPLPercent: 0, cashBalance: 0, holdings: [] });
+         setCashFlowData(cashFlowResult || { totalDepositedMYR: 0, totalConvertedMYR: 0, totalConvertedUSD: 0, avgRate: 0, deposits: [], conversions: [] });
+         setMoneyData(moneyResult || { accounts: [], transactions: [], totalBalance: 0, monthlyStats: { income: 0, expense: 0, incomeGrowth: 0, expenseGrowth: 0 }, categorySpending: [], graphData: [], upcomingBills: [], categories: [], incomeCategories: [], expenseCategories: [] });
+
+      } else {
+         // --- MOCK DATA FETCH (Preview Mode) ---
+         const [portfolioMock, cashFlowMock, moneyMock] = await Promise.all([
+             getMockPortfolioData(),
+             getMockCashFlowData(),
+             getMockMoneyManagerData()
+         ]);
+         
+         setData(portfolioMock);
+         setCashFlowData(cashFlowMock);
+         setMoneyData(moneyMock);
       }
-      setError(errorMessage);
+
+    } catch (err: any) {
+      console.error("Critical failure loading data", err);
+      setError("Failed to initialize application.");
     } finally {
       setLoading(false);
     }
   }, []);
+
+  const handleInitialize = async () => {
+      setIsInitializing(true);
+      const res = await initializeDatabase();
+      if (res.success) {
+          await fetchData();
+      } else {
+          alert("Initialization failed: " + res.error);
+      }
+      setIsInitializing(false);
+  };
 
   useEffect(() => {
     if (!isLocked) {
@@ -210,14 +240,23 @@ export default function Home() {
 
             {/* Actions (Right) */}
             <div className="flex items-center gap-2">
-               {/* Hide Balance Toggle */}
-               <button
-                onClick={() => setHideValues(!hideValues)}
-                className="p-2 text-slate-400 hover:text-white transition-colors"
-                title={hideValues ? "Show Values" : "Hide Values"}
-              >
-                {hideValues ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-              </button>
+               {isUsingMock && (
+                   <span className="hidden lg:inline-flex items-center gap-1.5 bg-amber-500/10 text-amber-500 text-xs px-2 py-1 rounded-full border border-amber-500/20 mr-2">
+                      <AlertCircle className="w-3 h-3" />
+                      Preview Mode
+                   </span>
+               )}
+
+               {/* Eye Icon - Only shows for Investment tab because Manager has its own in the Total Balance card */}
+               {activeModule === 'investment' && (
+                  <button
+                    onClick={() => setHideInvestments(!hideInvestments)}
+                    className="p-2 text-slate-400 hover:text-white transition-colors"
+                    title={hideInvestments ? "Show Investment Values" : "Hide Investment Values"}
+                  >
+                    {hideInvestments ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  </button>
+               )}
 
               <button
                 onClick={fetchData}
@@ -227,7 +266,6 @@ export default function Home() {
                 <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
               </button>
 
-              {/* Only show Add Trade in Investment Module */}
               {activeModule === 'investment' && (
                 <button
                   onClick={() => setIsModalOpen(true)}
@@ -263,51 +301,42 @@ export default function Home() {
             </button>
         </div>
 
-        {/* Investment Sub-Tabs */}
-        {activeModule === 'investment' && (
-          <div className="flex flex-col md:flex-row md:items-center justify-between mb-8 gap-4">
-            <div>
-              <h1 className="text-2xl font-bold text-white mb-1">Investment Portfolio</h1>
-              <p className="text-slate-500 text-sm">Stocks, Crypto, and ETFs</p>
-            </div>
-            
-            <div className="bg-slate-900/50 p-1 rounded-lg flex border border-slate-800 overflow-x-auto">
-               <button 
-                  onClick={() => setActiveInvTab('dashboard')}
-                  className={`flex items-center gap-2 px-4 py-1.5 rounded-md text-sm font-medium transition-all whitespace-nowrap ${activeInvTab === 'dashboard' ? 'bg-slate-800 text-white shadow-sm' : 'text-slate-400 hover:text-slate-200'}`}
-               >
-                 <LayoutDashboard className="w-4 h-4" />
-                 Dashboard
-               </button>
-               <button 
-                  onClick={() => setActiveInvTab('funding')}
-                  className={`flex items-center gap-2 px-4 py-1.5 rounded-md text-sm font-medium transition-all whitespace-nowrap ${activeInvTab === 'funding' ? 'bg-slate-800 text-white shadow-sm' : 'text-slate-400 hover:text-slate-200'}`}
-               >
-                 <ArrowRightLeft className="w-4 h-4" />
-                 Cash Flow
-               </button>
-            </div>
-          </div>
-        )}
+        {/* Global Total Balance Box (Visible on both pages) */}
+        <TotalBalanceCard 
+            totalBalance={moneyData?.totalBalance || 0} 
+            accounts={moneyData?.accounts || []} 
+            hideValues={hideBalance}
+            onTogglePrivacy={() => setHideBalance(!hideBalance)}
+        />
 
-        {/* Money Manager Header (Simple) */}
-        {activeModule === 'manager' && (
-           <div className="mb-8">
-              <h1 className="text-2xl font-bold text-white mb-1">Asset Management</h1>
-              <p className="text-slate-500 text-sm">Wallets, Banks, and Expenses</p>
-           </div>
-        )}
-
-        {error && (
-           <div className="mb-6 bg-slate-900 border border-slate-800 rounded-xl overflow-hidden shadow-sm">
-             <div className="bg-rose-500/10 border-b border-rose-500/20 p-4 flex items-center gap-3">
-               <AlertCircle className="w-5 h-5 text-rose-400" />
-               <h3 className="font-semibold text-rose-400">Connection Failed</h3>
-             </div>
-             <div className="p-6">
-                <p className="text-slate-300 mb-4">{error}</p>
-             </div>
-           </div>
+        {/* --- INITIALIZATION CHECK --- */}
+        {/* If we are connected (keys exist) but missing the specific Money Manager sheets, show Setup UI */}
+        {activeModule === 'manager' && dbStatus?.configured && !dbStatus.initialized && (
+            <div className="mb-8 p-6 bg-slate-900 border border-indigo-500/30 rounded-xl shadow-lg relative overflow-hidden">
+                <div className="absolute top-0 right-0 p-8 opacity-20">
+                     <Database className="w-24 h-24 text-indigo-500" />
+                </div>
+                <div className="relative z-10 max-w-2xl">
+                    <h2 className="text-xl font-bold text-white mb-2 flex items-center gap-2">
+                        <Wallet className="w-5 h-5 text-indigo-400" />
+                        Complete Your Setup
+                    </h2>
+                    <p className="text-slate-400 mb-6 text-sm leading-relaxed">
+                        You have successfully connected to Google Sheets, but we noticed you are missing the required 
+                        Money Manager tabs (<b>MM_Accounts</b>, <b>MM_Transactions</b>, etc.). 
+                        <br/><br/>
+                        Click below to automatically create these tabs with the correct headers in your spreadsheet.
+                    </p>
+                    <button 
+                        onClick={handleInitialize}
+                        disabled={isInitializing}
+                        className="bg-indigo-600 hover:bg-indigo-700 disabled:bg-indigo-600/50 text-white px-5 py-2.5 rounded-lg font-medium flex items-center gap-2 transition-all"
+                    >
+                        {isInitializing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Database className="w-4 h-4" />}
+                        {isInitializing ? "Setting up..." : "Initialize Money Manager Sheets"}
+                    </button>
+                </div>
+            </div>
         )}
 
         {/* --- Content Rendering --- */}
@@ -317,7 +346,7 @@ export default function Home() {
              data={moneyData} 
              loading={loading} 
              onRefresh={fetchData} 
-             hideValues={hideValues}
+             hideValues={hideBalance}
            />
         )}
 
@@ -325,22 +354,18 @@ export default function Home() {
             <FundingStats 
               cashFlow={cashFlowData} 
               portfolio={data} 
-              hideValues={hideValues}
+              hideValues={hideInvestments}
             />
         )}
 
         {activeModule === 'investment' && activeInvTab !== 'funding' && (
             <>
-                {/* Investment Stats */}
-                <SummaryCards data={data} loading={loading} hideValues={hideValues} />
+                <SummaryCards data={data} loading={loading} hideValues={hideInvestments} />
 
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                  {/* Main List Area */}
                   <div className="lg:col-span-2 space-y-6">
-                      <HoldingsTable data={data} hideValues={hideValues} />
+                      <HoldingsTable data={data} hideValues={hideInvestments} />
                   </div>
-
-                  {/* Sidebar Area */}
                   <div className="space-y-6">
                       <div>
                           <AllocationChart data={data} />

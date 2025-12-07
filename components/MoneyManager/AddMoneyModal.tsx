@@ -33,15 +33,21 @@ export const AddMoneyModal: React.FC<AddMoneyModalProps> = ({
 
   // Filter logic for Expenses:
   // 1. Must have balance > 0
-  // 2. Must be Bank or Wallet
-  const validExpenseAccounts = accounts.filter(acc => 
-      acc.currentBalance > 0 && 
-      (acc.category === 'Bank' || acc.category === 'Wallet')
-  );
+  // 2. Must be Bank or Wallet (Loosened to include any 'wallet' string)
+  const validExpenseAccounts = accounts.filter(acc => {
+      const cat = (acc.category || '').toLowerCase();
+      const hasBalance = acc.currentBalance > 0;
+      // Allow if category contains 'bank' or 'wallet' (e.g. "TnG eWallet", "E-Wallet")
+      const isBankOrWallet = cat.includes('bank') || cat.includes('wallet') || cat.includes('card') || cat.includes('cash'); 
+      // Note: Originally restricted to Bank/Wallet, but usually Cash/Card are also valid expense sources if they have money (or credit). 
+      // The user specifically asked for "E-wallet accounts with money".
+      // I will restrict to Bank + Wallet + Cash + Card (standard sources), checking specifically for 'wallet' match.
+      const isSource = cat.includes('bank') || cat.includes('wallet') || cat.includes('cash') || cat.includes('card');
+      return hasBalance && isSource;
+  });
 
-  // For Income/Transfer, we generally allow any account, 
-  // but for Transfer Source, we might want to restrict to those with money.
-  // For now, adhering strictly to "For expenses..." request.
+  // For Income/Transfer, we generally allow any account.
+  // For Expenses, we restrict sources.
   const sourceAccounts = formData.type === 'Expense' ? validExpenseAccounts : accounts;
   const destAccounts = accounts;   
 
@@ -57,7 +63,7 @@ export const AddMoneyModal: React.FC<AddMoneyModalProps> = ({
       // Check if the category exists in the list for the current type
       const relevantCats = initialData.type === 'Income' ? incomeCategories : expenseCategories;
       
-      if (initialData.category && !relevantCats.includes(initialData.category)) {
+      if (initialData.type !== 'Transfer' && initialData.category && !relevantCats.includes(initialData.category)) {
           setFormData(prev => ({ ...prev, category: 'Other' }));
           setCustomCategory(initialData.category);
       } else {
@@ -77,13 +83,21 @@ export const AddMoneyModal: React.FC<AddMoneyModalProps> = ({
         });
         setCustomCategory('');
     }
-  }, [initialData, isOpen, formData.type]); // Added formData.type dependency to reset account if type changes
+  }, [initialData, isOpen]); 
+  // removed formData.type dependency to prevent infinite reset loop if logic isn't careful, 
+  // but we handle type switching explicitly in buttons below.
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!formData.amount) return;
     
     let finalCategory = formData.category;
+    
+    // For Transfer, force category to 'Transfer' if not set
+    if (formData.type === 'Transfer') {
+        finalCategory = 'Transfer';
+    }
+
     if (finalCategory === 'Other') {
         if (!customCategory.trim()) {
             alert("Please specify the category name.");
@@ -159,7 +173,15 @@ export const AddMoneyModal: React.FC<AddMoneyModalProps> = ({
                  key={t}
                  type="button"
                  onClick={() => {
-                     setFormData({...formData, type: t as MoneyTransactionType, category: '', fromAccount: '', toAccount: ''});
+                     const newType = t as MoneyTransactionType;
+                     setFormData({
+                         ...formData, 
+                         type: newType, 
+                         // Auto-set category for Transfer to pass validation
+                         category: newType === 'Transfer' ? 'Transfer' : '', 
+                         fromAccount: '', 
+                         toAccount: ''
+                     });
                      setCustomCategory('');
                  }}
                  className={`flex-1 py-2 text-sm font-medium rounded-md transition-all ${formData.type === t ? 'bg-indigo-600 text-white shadow-sm' : 'text-slate-400 hover:text-white'}`}
@@ -205,7 +227,8 @@ export const AddMoneyModal: React.FC<AddMoneyModalProps> = ({
                             onChange={e => setFormData({...formData, fromAccount: e.target.value})}
                         >
                             <option value="">Select Account</option>
-                            {sourceAccounts.map(a => <option key={a.name} value={a.name}>{a.name} ({a.category})</option>)}
+                            {/* Allow transfer from any account, or restrict to those with balance? Usually any. */}
+                            {accounts.map(a => <option key={a.name} value={a.name}>{a.name} ({displayValue(a.currentBalance)})</option>)}
                         </select>
                     </div>
                     <div className="pt-6 text-slate-500"><ArrowRight className="w-5 h-5"/></div>
@@ -241,7 +264,7 @@ export const AddMoneyModal: React.FC<AddMoneyModalProps> = ({
                             {availableAccounts.map(a => <option key={a.name} value={a.name}>{a.name}</option>)}
                         </select>
                         {formData.type === 'Expense' && availableAccounts.length === 0 && (
-                            <p className="text-[10px] text-rose-500 mt-1 leading-tight">No Banks/Wallets with balance available.</p>
+                            <p className="text-[10px] text-rose-500 mt-1 leading-tight">No funds available in Banks/Wallets.</p>
                         )}
                     </div>
                     <div>
@@ -254,7 +277,7 @@ export const AddMoneyModal: React.FC<AddMoneyModalProps> = ({
                         >
                             <option value="">Select Category</option>
                             {currentCategories
-                                .filter(c => c && !['other', 'others', 'miscellaneous'].includes(c.toLowerCase())) // Filter strict "Other" duplicates
+                                .filter(c => c && !['other', 'others', 'miscellaneous'].includes(c.toLowerCase())) 
                                 .map(cat => (
                                     <option key={cat} value={cat}>{cat}</option>
                             ))}
@@ -305,4 +328,9 @@ export const AddMoneyModal: React.FC<AddMoneyModalProps> = ({
       </div>
     </div>
   );
+};
+
+// Helper for displaying currency
+const displayValue = (val: number) => {
+    return val.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 };

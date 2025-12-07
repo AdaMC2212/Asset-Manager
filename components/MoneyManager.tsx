@@ -32,15 +32,6 @@ const getTransactionCategoryIcon = (cat: string) => {
   return <ShoppingBag className="w-4 h-4" />;
 };
 
-const getAccountIcon = (category: string) => {
-  const c = category.toLowerCase();
-  if (c.includes('bank')) return <Smartphone className="w-6 h-6 text-indigo-400" />;
-  if (c.includes('wallet') || c.includes('pay') || c.includes('touch')) return <Smartphone className="w-6 h-6 text-blue-400" />;
-  if (c.includes('card')) return <CreditCard className="w-6 h-6 text-emerald-400" />;
-  if (c.includes('cash')) return <Banknote className="w-6 h-6 text-amber-400" />;
-  return <Wallet className="w-6 h-6 text-slate-400" />;
-};
-
 export const MoneyManager: React.FC<MoneyManagerProps> = ({ data, loading, onRefresh, hideValues }) => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isHistoryModalOpen, setIsHistoryModalOpen] = useState(false);
@@ -124,8 +115,6 @@ export const MoneyManager: React.FC<MoneyManagerProps> = ({ data, loading, onRef
     setEditingTransaction(tx);
     setIsModalOpen(true);
   };
-
-  const activeAccounts = data.accounts.filter(acc => acc.currentBalance !== 0);
 
   return (
     <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
@@ -256,21 +245,6 @@ export const MoneyManager: React.FC<MoneyManagerProps> = ({ data, loading, onRef
 
       {/* RIGHT COLUMN (Sidebar - Secondary Info) */}
       <div className="space-y-6">
-        
-        {/* Total Net Worth (Moved Here) */}
-        <div className="bg-gradient-to-br from-indigo-900/40 to-slate-900 border border-indigo-500/20 rounded-2xl p-6 relative overflow-hidden">
-             <div className="relative z-10">
-                 <div className="text-slate-400 text-xs font-semibold uppercase tracking-wider mb-1">Total Wallet Balance</div>
-                 <div className="text-3xl font-bold text-white mb-4">
-                     {hideValues ? 'RM ****' : <CountUp end={data.totalBalance} prefix="RM " />}
-                 </div>
-                 <div className="text-xs text-slate-400 border-t border-slate-700/50 pt-3 flex justify-between">
-                     <span>Across {activeAccounts.length} accounts</span>
-                 </div>
-             </div>
-             <Wallet className="absolute right-[-10px] bottom-[-10px] w-24 h-24 text-indigo-500/10 rotate-[-15deg]" />
-        </div>
-
         {/* Expense Breakdown for Selected Month */}
         <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-sm min-h-[300px] flex flex-col">
              <div className="flex justify-between items-center mb-4">
@@ -307,7 +281,7 @@ export const MoneyManager: React.FC<MoneyManagerProps> = ({ data, loading, onRef
                      </div>
                 )}
             </div>
-            <div className="mt-4 space-y-2 max-h-[150px] overflow-y-auto pr-2 custom-scrollbar">
+            <div className="mt-4 space-y-2 max-h-[250px] overflow-y-auto pr-2 custom-scrollbar">
                 {pieData.map((entry, index) => (
                      <div key={entry.name} className="flex justify-between text-xs">
                         <span className="flex items-center gap-2 text-slate-300">
@@ -317,38 +291,6 @@ export const MoneyManager: React.FC<MoneyManagerProps> = ({ data, loading, onRef
                         <span className="text-slate-400">{displayValue(entry.value)}</span>
                      </div>
                 ))}
-            </div>
-        </div>
-
-        {/* My Accounts (Sidebar List) */}
-        <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-sm">
-             <div className="flex justify-between items-center mb-4">
-                <h3 className="font-bold text-lg text-white">Active Accounts</h3>
-            </div>
-            <div className="space-y-3">
-                {activeAccounts.map((acc) => (
-                    <div key={acc.name} className="flex items-center justify-between p-3 rounded-xl bg-slate-950/50 border border-slate-800">
-                        <div className="flex items-center gap-3">
-                            {acc.logoUrl ? (
-                                <img src={acc.logoUrl} alt={acc.name} className="w-8 h-8 rounded-full bg-white object-contain p-0.5" />
-                            ) : (
-                                <div className="bg-slate-800 p-1.5 rounded-lg text-slate-400">
-                                    {getAccountIcon(acc.category)}
-                                </div>
-                            )}
-                            <div>
-                                <div className="text-sm font-semibold text-white">{acc.name}</div>
-                                <div className="text-[10px] text-slate-500 uppercase">{acc.category}</div>
-                            </div>
-                        </div>
-                        <div className="text-sm font-bold text-slate-300">
-                            {displayValue(acc.currentBalance)}
-                        </div>
-                    </div>
-                ))}
-                {activeAccounts.length === 0 && (
-                     <div className="text-center text-slate-500 text-xs py-2">No active accounts.</div>
-                )}
             </div>
         </div>
       </div>
