@@ -1,4 +1,3 @@
-
 'use server';
 
 import { getSheetClient, SPREADSHEET_ID, SHEET_NAME, CASH_FLOW_SHEET_NAME, PORTFOLIO_SHEET_NAME, MM_ACCOUNTS_SHEET, MM_TRANSACTIONS_SHEET, MM_CATEGORIES_SHEET } from '../lib/googleSheets';
@@ -472,23 +471,28 @@ export async function getMoneyManagerData(): Promise<MoneyManagerData> {
     const catRows = catResponse.data.values || [];
     const fetchedIncomeCats: string[] = [];
     const fetchedExpenseCats: string[] = [];
+    
+    // Loose keyword matching for Income, everything else is Expense
+    const INCOME_KEYWORDS = ['income', 'salary', 'bonus', 'allowance', 'dividend', 'profit', 'gift', 'side hustle'];
 
     // Skip header (Row 0)
     for(let i = 1; i < catRows.length; i++) {
         const row = catRows[i];
         if (row[0]) {
             const catName = row[0].toString().trim();
-            const catType = row[1]?.toString().trim().toLowerCase(); // Normalize case
+            // Col B might be Type. If missing, or if it matches Name (User error), treat as Expense?
+            const rawType = row[1]?.toString().trim().toLowerCase() || '';
 
             if (catName) {
-                if (catType === 'income') {
+                // Check if explicitly income or contains income keywords
+                const isIncome = INCOME_KEYWORDS.some(k => rawType.includes(k));
+                
+                if (isIncome) {
                     fetchedIncomeCats.push(catName);
-                } else if (catType === 'expense') {
-                    fetchedExpenseCats.push(catName);
                 } else {
-                    // Fallback: If type is missing/unknown, try to guess or just add to expense if valid?
-                    // Better to just ignore malformed rows or assume expense if it looks like one.
-                    // For now, let's just stick to strict-ish matching but case insensitive.
+                     // Default to expense for everything else (Food, Transport, etc)
+                     // or if type is 'expense'
+                    fetchedExpenseCats.push(catName);
                 }
             }
         }
@@ -498,8 +502,6 @@ export async function getMoneyManagerData(): Promise<MoneyManagerData> {
     const incomeCats = fetchedIncomeCats.length > 0 ? fetchedIncomeCats : DEFAULT_INCOME_CATS;
     const expenseCats = fetchedExpenseCats.length > 0 ? fetchedExpenseCats : DEFAULT_EXPENSE_CATS;
     
-    const allCategories = [...expenseCats, ...incomeCats];
-
     // --- Process Accounts ---
     const accRows = accResponse.data.values || [];
     const accounts: MoneyAccount[] = [];

@@ -1,4 +1,3 @@
-
 'use client';
 
 import React, { useState, useEffect } from 'react';
@@ -32,9 +31,19 @@ export const AddMoneyModal: React.FC<AddMoneyModalProps> = ({
   
   const [customCategory, setCustomCategory] = useState('');
 
-  // 1. Filter accounts loosely to allow "Cash" or other custom accounts to appear
-  const sourceAccounts = accounts; // Allow paying from any account
-  const destAccounts = accounts;   // Allow depositing to any account
+  // Filter logic for Expenses:
+  // 1. Must have balance > 0
+  // 2. Must be Bank or Wallet
+  const validExpenseAccounts = accounts.filter(acc => 
+      acc.currentBalance > 0 && 
+      (acc.category === 'Bank' || acc.category === 'Wallet')
+  );
+
+  // For Income/Transfer, we generally allow any account, 
+  // but for Transfer Source, we might want to restrict to those with money.
+  // For now, adhering strictly to "For expenses..." request.
+  const sourceAccounts = formData.type === 'Expense' ? validExpenseAccounts : accounts;
+  const destAccounts = accounts;   
 
   const currentCategories = formData.type === 'Income' ? incomeCategories : expenseCategories;
 
@@ -49,7 +58,6 @@ export const AddMoneyModal: React.FC<AddMoneyModalProps> = ({
       const relevantCats = initialData.type === 'Income' ? incomeCategories : expenseCategories;
       
       if (initialData.category && !relevantCats.includes(initialData.category)) {
-          // If category is not in the list, treat as "Other"
           setFormData(prev => ({ ...prev, category: 'Other' }));
           setCustomCategory(initialData.category);
       } else {
@@ -63,13 +71,13 @@ export const AddMoneyModal: React.FC<AddMoneyModalProps> = ({
             type: 'Expense',
             category: '',
             amount: 0,
-            fromAccount: sourceAccounts[0]?.name || '',
+            fromAccount: '', // Reset this so it forces selection from filtered list
             toAccount: '',
             note: ''
         });
         setCustomCategory('');
     }
-  }, [initialData, isOpen]); 
+  }, [initialData, isOpen, formData.type]); // Added formData.type dependency to reset account if type changes
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -112,7 +120,7 @@ export const AddMoneyModal: React.FC<AddMoneyModalProps> = ({
             type: 'Expense',
             category: '',
             amount: 0,
-            fromAccount: sourceAccounts[0]?.name || '',
+            fromAccount: '',
             toAccount: '',
             note: ''
         });
@@ -151,7 +159,7 @@ export const AddMoneyModal: React.FC<AddMoneyModalProps> = ({
                  key={t}
                  type="button"
                  onClick={() => {
-                     setFormData({...formData, type: t as MoneyTransactionType, category: ''});
+                     setFormData({...formData, type: t as MoneyTransactionType, category: '', fromAccount: '', toAccount: ''});
                      setCustomCategory('');
                  }}
                  className={`flex-1 py-2 text-sm font-medium rounded-md transition-all ${formData.type === t ? 'bg-indigo-600 text-white shadow-sm' : 'text-slate-400 hover:text-white'}`}
@@ -191,18 +199,20 @@ export const AddMoneyModal: React.FC<AddMoneyModalProps> = ({
                     <div className="flex-1">
                         <label className="block text-sm font-medium text-slate-400 mb-1">From</label>
                         <select
+                            required
                             className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-white"
                             value={formData.fromAccount}
                             onChange={e => setFormData({...formData, fromAccount: e.target.value})}
                         >
                             <option value="">Select Account</option>
-                            {sourceAccounts.map(a => <option key={a.name} value={a.name}>{a.name}</option>)}
+                            {sourceAccounts.map(a => <option key={a.name} value={a.name}>{a.name} ({a.category})</option>)}
                         </select>
                     </div>
                     <div className="pt-6 text-slate-500"><ArrowRight className="w-5 h-5"/></div>
                     <div className="flex-1">
                         <label className="block text-sm font-medium text-slate-400 mb-1">To</label>
                         <select
+                            required
                             className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-white"
                             value={formData.toAccount}
                             onChange={e => setFormData({...formData, toAccount: e.target.value})}
@@ -219,6 +229,7 @@ export const AddMoneyModal: React.FC<AddMoneyModalProps> = ({
                             {formData.type === 'Expense' ? 'Pay With' : 'Deposit To'}
                         </label>
                         <select
+                            required
                             className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-white"
                             value={formData.type === 'Expense' ? formData.fromAccount : formData.toAccount}
                             onChange={e => {
@@ -229,17 +240,21 @@ export const AddMoneyModal: React.FC<AddMoneyModalProps> = ({
                             <option value="">Select Account</option>
                             {availableAccounts.map(a => <option key={a.name} value={a.name}>{a.name}</option>)}
                         </select>
+                        {formData.type === 'Expense' && availableAccounts.length === 0 && (
+                            <p className="text-[10px] text-rose-500 mt-1 leading-tight">No Banks/Wallets with balance available.</p>
+                        )}
                     </div>
                     <div>
                         <label className="block text-sm font-medium text-slate-400 mb-1">Category</label>
                         <select
+                            required
                             className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-white appearance-none"
                             value={formData.category}
                             onChange={e => setFormData({...formData, category: e.target.value})}
                         >
                             <option value="">Select Category</option>
                             {currentCategories
-                                .filter(c => c && c.toLowerCase() !== 'other')
+                                .filter(c => c && !['other', 'others', 'miscellaneous'].includes(c.toLowerCase())) // Filter strict "Other" duplicates
                                 .map(cat => (
                                     <option key={cat} value={cat}>{cat}</option>
                             ))}
