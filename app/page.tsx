@@ -14,13 +14,6 @@ import { getPortfolioData, getCashFlowData, getMoneyManagerData, checkDatabaseSt
 import { PortfolioSummary, CashFlowSummary, MoneyManagerData } from '../types';
 import { DecryptedText } from '../components/ui/DecryptedText';
 
-// Fallback Mock Data Imports
-import { 
-  getPortfolioData as getMockPortfolioData, 
-  getCashFlowData as getMockCashFlowData, 
-  getMoneyManagerData as getMockMoneyManagerData 
-} from '../services/mockBackend';
-
 type AppModule = 'manager' | 'investment';
 type InvestmentTab = 'dashboard' | 'funding';
 
@@ -118,7 +111,6 @@ export default function Home() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [isUsingMock, setIsUsingMock] = useState(false);
   
   // Database Status for Money Manager
   const [dbStatus, setDbStatus] = useState<{ configured: boolean, initialized: boolean } | null>(null);
@@ -140,13 +132,10 @@ export default function Home() {
       const status = await checkDatabaseStatus();
       setDbStatus(status);
 
-      // 2. Decide Source (Real or Mock)
-      // If configured, ALWAYS try to fetch real data.
-      // If NOT configured, use Mock data.
-      const useRealData = status.configured;
-      setIsUsingMock(!useRealData);
-
-      if (useRealData) {
+      // 2. Decide Source
+      // If configured, try to fetch real data.
+      // If NOT configured, return empty data and show error/setup message.
+      if (status.configured) {
          // --- REAL DATA FETCH ---
          const [portfolioResult, cashFlowResult, moneyResult] = await Promise.all([
             getPortfolioData().catch(() => null),
@@ -160,16 +149,11 @@ export default function Home() {
          setMoneyData(moneyResult || { accounts: [], transactions: [], totalBalance: 0, monthlyStats: { income: 0, expense: 0, incomeGrowth: 0, expenseGrowth: 0 }, categorySpending: [], graphData: [], upcomingBills: [], categories: [], incomeCategories: [], expenseCategories: [] });
 
       } else {
-         // --- MOCK DATA FETCH (Preview Mode) ---
-         const [portfolioMock, cashFlowMock, moneyMock] = await Promise.all([
-             getMockPortfolioData(),
-             getMockCashFlowData(),
-             getMockMoneyManagerData()
-         ]);
-         
-         setData(portfolioMock);
-         setCashFlowData(cashFlowMock);
-         setMoneyData(moneyMock);
+         // --- NOT CONFIGURED ---
+         setData({ netWorth: 0, totalCost: 0, totalPL: 0, totalPLPercent: 0, cashBalance: 0, holdings: [] });
+         setCashFlowData({ totalDepositedMYR: 0, totalConvertedMYR: 0, totalConvertedUSD: 0, avgRate: 0, deposits: [], conversions: [] });
+         setMoneyData({ accounts: [], transactions: [], totalBalance: 0, monthlyStats: { income: 0, expense: 0, incomeGrowth: 0, expenseGrowth: 0 }, categorySpending: [], graphData: [], upcomingBills: [], categories: [], incomeCategories: [], expenseCategories: [] });
+         setError("Database connection missing. Please configure GOOGLE_SERVICE_ACCOUNT_KEY in your environment.");
       }
 
     } catch (err: any) {
@@ -240,10 +224,10 @@ export default function Home() {
 
             {/* Actions (Right) */}
             <div className="flex items-center gap-2">
-               {isUsingMock && (
-                   <span className="hidden lg:inline-flex items-center gap-1.5 bg-amber-500/10 text-amber-500 text-xs px-2 py-1 rounded-full border border-amber-500/20 mr-2">
+               {error && (
+                   <span className="hidden lg:inline-flex items-center gap-1.5 bg-rose-500/10 text-rose-500 text-xs px-2 py-1 rounded-full border border-rose-500/20 mr-2">
                       <AlertCircle className="w-3 h-3" />
-                      Preview Mode
+                      Config Error
                    </span>
                )}
 
