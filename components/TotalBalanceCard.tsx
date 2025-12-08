@@ -1,3 +1,4 @@
+
 'use client';
 import React, { useState } from 'react';
 import { Wallet, Eye, EyeOff, X, CreditCard, Smartphone, Banknote, ArrowUpRight, ArrowDownRight } from 'lucide-react';
@@ -47,7 +48,7 @@ export const TotalBalanceCard: React.FC<TotalBalanceCardProps> = ({
         <div className="absolute inset-0 bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500 opacity-70 group-hover:opacity-100 transition-opacity blur-[2px]" />
         
         {/* Main Card Content */}
-        <div className="relative h-full w-full rounded-[1.3rem] bg-slate-950/90 p-6 md:p-8 backdrop-blur-3xl">
+        <div className="relative h-full w-full rounded-[1.3rem] bg-slate-950/90 p-5 md:p-8 backdrop-blur-3xl">
             {/* Inner ambient glow */}
             <div className="absolute top-0 right-0 -mt-10 -mr-10 h-64 w-64 rounded-full bg-indigo-500/20 blur-3xl pointer-events-none" />
             <div className="absolute bottom-0 left-0 -mb-10 -ml-10 h-64 w-64 rounded-full bg-purple-500/10 blur-3xl pointer-events-none" />
@@ -62,7 +63,7 @@ export const TotalBalanceCard: React.FC<TotalBalanceCardProps> = ({
                     </div>
 
                     <div className="flex items-baseline gap-2">
-                         <h1 className="text-4xl md:text-5xl font-bold text-white tracking-tight drop-shadow-lg">
+                         <h1 className="text-3xl sm:text-4xl md:text-5xl font-bold text-white tracking-tight drop-shadow-lg">
                             {hideValues ? 'RM *******' : <CountUp end={totalBalance} prefix="RM " />}
                          </h1>
                     </div>
@@ -84,25 +85,29 @@ export const TotalBalanceCard: React.FC<TotalBalanceCardProps> = ({
                     </div>
                 </div>
 
-                <div className="flex items-center gap-4 w-full md:w-auto">
-                    <button 
-                        onClick={(e) => {
-                            e.stopPropagation();
-                            onTogglePrivacy();
-                        }}
-                        className="group/btn flex items-center justify-center w-12 h-12 rounded-full bg-white/5 hover:bg-white/10 border border-white/5 backdrop-blur-md transition-all active:scale-95"
-                    >
-                         {hideValues ? <EyeOff className="w-5 h-5 text-slate-400 group-hover/btn:text-white" /> : <Eye className="w-5 h-5 text-slate-400 group-hover/btn:text-white" />}
-                    </button>
-                    <div className="hidden md:block h-12 w-[1px] bg-white/10 mx-2"></div>
-                    <div className="hidden md:flex flex-col items-end">
-                        <span className="text-xs text-slate-500 uppercase tracking-wider mb-1">Status</span>
-                        <div className="flex items-center gap-2">
-                             <span className="relative flex h-2.5 w-2.5">
-                                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                                <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500"></span>
-                            </span>
-                            <span className="text-sm font-medium text-emerald-400">Synced</span>
+                <div className="flex items-center justify-between w-full md:w-auto">
+                     {/* Mobile eye button is moved to right via flex justify-between on wrapper if needed, but standard layout puts it next to status on desktop. On mobile, we might want it accessible top right? Currently sits below title on mobile stack. Let's keep it consistent. */}
+                    
+                    <div className="flex items-center gap-4">
+                        <button 
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                onTogglePrivacy();
+                            }}
+                            className="group/btn flex items-center justify-center w-12 h-12 rounded-full bg-white/5 hover:bg-white/10 border border-white/5 backdrop-blur-md transition-all active:scale-95"
+                        >
+                            {hideValues ? <EyeOff className="w-5 h-5 text-slate-400 group-hover/btn:text-white" /> : <Eye className="w-5 h-5 text-slate-400 group-hover/btn:text-white" />}
+                        </button>
+                        <div className="hidden md:block h-12 w-[1px] bg-white/10 mx-2"></div>
+                        <div className="hidden md:flex flex-col items-end">
+                            <span className="text-xs text-slate-500 uppercase tracking-wider mb-1">Status</span>
+                            <div className="flex items-center gap-2">
+                                <span className="relative flex h-2.5 w-2.5">
+                                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                                    <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500"></span>
+                                </span>
+                                <span className="text-sm font-medium text-emerald-400">Synced</span>
+                            </div>
                         </div>
                     </div>
                 </div>

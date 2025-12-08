@@ -1,3 +1,4 @@
+
 'use client';
 
 import React, { useState, useMemo } from 'react';
@@ -20,14 +21,14 @@ const PIE_COLORS = ['#f43f5e', '#ec4899', '#d946ef', '#a855f7', '#8b5cf6', '#636
 // Helper for Icons with colors
 const getCategoryStyles = (cat: string) => {
   const c = cat.toLowerCase();
-  if (c.includes('food') || c.includes('dining')) return { icon: <Utensils className="w-5 h-5" />, color: 'bg-orange-500', text: 'text-orange-100' };
-  if (c.includes('transport') || c.includes('fuel')) return { icon: <Car className="w-5 h-5" />, color: 'bg-blue-500', text: 'text-blue-100' };
-  if (c.includes('shop') || c.includes('fashion')) return { icon: <ShoppingBag className="w-5 h-5" />, color: 'bg-pink-500', text: 'text-pink-100' };
-  if (c.includes('bill') || c.includes('utility')) return { icon: <Zap className="w-5 h-5" />, color: 'bg-yellow-500', text: 'text-yellow-100' };
-  if (c.includes('salary') || c.includes('income')) return { icon: <Banknote className="w-5 h-5" />, color: 'bg-emerald-500', text: 'text-emerald-100' };
-  if (c.includes('tech') || c.includes('gadget')) return { icon: <Smartphone className="w-5 h-5" />, color: 'bg-indigo-500', text: 'text-indigo-100' };
+  if (c.includes('food') || c.includes('dining')) return { icon: <Utensils className="w-5 h-5 md:w-5 md:h-5" />, color: 'bg-orange-500', text: 'text-orange-100' };
+  if (c.includes('transport') || c.includes('fuel')) return { icon: <Car className="w-5 h-5 md:w-5 md:h-5" />, color: 'bg-blue-500', text: 'text-blue-100' };
+  if (c.includes('shop') || c.includes('fashion')) return { icon: <ShoppingBag className="w-5 h-5 md:w-5 md:h-5" />, color: 'bg-pink-500', text: 'text-pink-100' };
+  if (c.includes('bill') || c.includes('utility')) return { icon: <Zap className="w-5 h-5 md:w-5 md:h-5" />, color: 'bg-yellow-500', text: 'text-yellow-100' };
+  if (c.includes('salary') || c.includes('income')) return { icon: <Banknote className="w-5 h-5 md:w-5 md:h-5" />, color: 'bg-emerald-500', text: 'text-emerald-100' };
+  if (c.includes('tech') || c.includes('gadget')) return { icon: <Smartphone className="w-5 h-5 md:w-5 md:h-5" />, color: 'bg-indigo-500', text: 'text-indigo-100' };
   
-  return { icon: <Wallet className="w-5 h-5" />, color: 'bg-slate-600', text: 'text-slate-100' };
+  return { icon: <Wallet className="w-5 h-5 md:w-5 md:h-5" />, color: 'bg-slate-600', text: 'text-slate-100' };
 };
 
 export const MoneyManager: React.FC<MoneyManagerProps> = ({ data, loading, onRefresh, hideValues }) => {
@@ -149,75 +150,76 @@ export const MoneyManager: React.FC<MoneyManagerProps> = ({ data, loading, onRef
     <div className="grid grid-cols-1 xl:grid-cols-3 gap-8">
       
       {/* LEFT COLUMN (Main Focus) */}
-      <div className="xl:col-span-2 space-y-8">
+      <div className="xl:col-span-2 space-y-4 md:space-y-8">
         
         {/* Monthly Focus Header */}
-        <div className="flex flex-col md:flex-row justify-between items-center gap-6 p-1">
-             {/* Month Navigator - Disable if custom range active */}
-             <div className={`flex items-center gap-2 bg-slate-900/50 p-1.5 rounded-2xl border border-white/5 backdrop-blur-sm shadow-sm transition-opacity ${isCustomDateMode ? 'opacity-50 pointer-events-none grayscale' : ''}`}>
-                <button onClick={prevMonth} className="p-3 hover:bg-white/10 rounded-xl text-slate-400 hover:text-white transition-colors">
-                    <ChevronLeft className="w-5 h-5" />
+        <div className="flex flex-row justify-between items-center gap-2 md:gap-6 p-1">
+             {/* Month Navigator */}
+             <div className={`flex items-center gap-1 md:gap-2 bg-slate-900/50 p-1 md:p-1.5 rounded-2xl border border-white/5 backdrop-blur-sm shadow-sm transition-opacity ${isCustomDateMode ? 'opacity-50 pointer-events-none grayscale' : ''}`}>
+                <button onClick={prevMonth} className="p-2 md:p-3 hover:bg-white/10 rounded-xl text-slate-400 hover:text-white transition-colors">
+                    <ChevronLeft className="w-4 h-4 md:w-5 md:h-5" />
                 </button>
-                <div className="flex flex-col items-center min-w-[140px] px-2">
-                    <span className="text-white font-bold text-xl tracking-tight">{monthLabel.split(' ')[0]}</span>
-                    <span className="text-slate-500 text-xs font-medium uppercase tracking-wider">{monthLabel.split(' ')[1]}</span>
+                <div className="flex flex-col items-center min-w-[100px] md:min-w-[140px] px-1 md:px-2">
+                    <span className="text-white font-bold text-base md:text-xl tracking-tight">{monthLabel.split(' ')[0]}</span>
+                    <span className="text-slate-500 text-[10px] md:text-xs font-medium uppercase tracking-wider">{monthLabel.split(' ')[1]}</span>
                 </div>
-                <button onClick={nextMonth} className="p-3 hover:bg-white/10 rounded-xl text-slate-400 hover:text-white transition-colors">
-                    <ChevronRight className="w-5 h-5" />
+                <button onClick={nextMonth} className="p-2 md:p-3 hover:bg-white/10 rounded-xl text-slate-400 hover:text-white transition-colors">
+                    <ChevronRight className="w-4 h-4 md:w-5 md:h-5" />
                 </button>
              </div>
 
              <button 
                 onClick={() => { setEditingTransaction(null); setIsModalOpen(true); }}
-                className="w-full md:w-auto bg-indigo-600 hover:bg-indigo-500 hover:scale-105 active:scale-95 text-white px-6 py-3 rounded-2xl text-sm font-bold flex items-center justify-center gap-2 transition-all shadow-xl shadow-indigo-500/20"
+                className="bg-indigo-600 hover:bg-indigo-500 hover:scale-105 active:scale-95 text-white px-4 md:px-6 py-2 md:py-3 rounded-2xl text-sm font-bold flex items-center justify-center gap-2 transition-all shadow-xl shadow-indigo-500/20"
             >
                 <Plus className="w-5 h-5" />
-                Add New
+                <span className="hidden md:inline">Add New</span>
+                <span className="md:hidden">Add</span>
             </button>
         </div>
 
         {/* BENTO GRID STATS */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="grid grid-cols-3 md:grid-cols-3 gap-2 md:gap-4">
              {/* Income */}
-             <div className="bg-slate-900/50 backdrop-blur-md p-6 rounded-3xl border border-white/5 shadow-lg relative overflow-hidden group">
-                <div className="absolute top-0 right-0 p-8 opacity-5 group-hover:opacity-10 transition-opacity transform group-hover:scale-110 duration-500">
+             <div className="bg-slate-900/50 backdrop-blur-md p-3 md:p-6 rounded-2xl md:rounded-3xl border border-white/5 shadow-lg relative overflow-hidden group">
+                <div className="hidden md:block absolute top-0 right-0 p-8 opacity-5 group-hover:opacity-10 transition-opacity transform group-hover:scale-110 duration-500">
                     <ArrowDownRight className="w-24 h-24 text-emerald-500" />
                 </div>
-                <div className="relative z-10">
-                    <span className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-500/10 text-emerald-400 text-xs font-bold uppercase tracking-wider mb-4">
-                        <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></div> 
-                        {isCustomDateMode ? 'Period Income' : 'Income'}
+                <div className="relative z-10 text-center md:text-left">
+                    <span className="inline-flex items-center gap-1.5 px-2 md:px-3 py-0.5 md:py-1 rounded-full bg-emerald-500/10 text-emerald-400 text-[10px] md:text-xs font-bold uppercase tracking-wider mb-1 md:mb-4">
+                        <div className="w-1 md:w-1.5 h-1 md:h-1.5 rounded-full bg-emerald-500 animate-pulse"></div> 
+                        {isCustomDateMode ? 'Inc' : 'Income'}
                     </span>
-                    <div className="text-3xl font-bold text-white">
-                        {hideValues ? 'RM ****' : <CountUp end={monthlyStats.income} prefix="RM " />}
+                    <div className="text-sm md:text-3xl font-bold text-white truncate">
+                        {hideValues ? '****' : <CountUp end={monthlyStats.income} prefix="RM " />}
                     </div>
                 </div>
              </div>
 
              {/* Expense */}
-             <div className="bg-slate-900/50 backdrop-blur-md p-6 rounded-3xl border border-white/5 shadow-lg relative overflow-hidden group">
-                <div className="absolute top-0 right-0 p-8 opacity-5 group-hover:opacity-10 transition-opacity transform group-hover:scale-110 duration-500">
+             <div className="bg-slate-900/50 backdrop-blur-md p-3 md:p-6 rounded-2xl md:rounded-3xl border border-white/5 shadow-lg relative overflow-hidden group">
+                <div className="hidden md:block absolute top-0 right-0 p-8 opacity-5 group-hover:opacity-10 transition-opacity transform group-hover:scale-110 duration-500">
                     <ArrowUpRight className="w-24 h-24 text-rose-500" />
                 </div>
-                <div className="relative z-10">
-                    <span className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-rose-500/10 text-rose-400 text-xs font-bold uppercase tracking-wider mb-4">
-                        <div className="w-1.5 h-1.5 rounded-full bg-rose-500"></div> 
-                        {isCustomDateMode ? 'Period Expenses' : 'Expenses'}
+                <div className="relative z-10 text-center md:text-left">
+                    <span className="inline-flex items-center gap-1.5 px-2 md:px-3 py-0.5 md:py-1 rounded-full bg-rose-500/10 text-rose-400 text-[10px] md:text-xs font-bold uppercase tracking-wider mb-1 md:mb-4">
+                        <div className="w-1 md:w-1.5 h-1 md:h-1.5 rounded-full bg-rose-500"></div> 
+                        {isCustomDateMode ? 'Exp' : 'Expenses'}
                     </span>
-                    <div className="text-3xl font-bold text-white">
-                        {hideValues ? 'RM ****' : <CountUp end={monthlyStats.expense} prefix="RM " />}
+                    <div className="text-sm md:text-3xl font-bold text-white truncate">
+                        {hideValues ? '****' : <CountUp end={monthlyStats.expense} prefix="RM " />}
                     </div>
                 </div>
              </div>
 
              {/* Net */}
-             <div className="bg-slate-900/50 backdrop-blur-md p-6 rounded-3xl border border-white/5 shadow-lg relative overflow-hidden">
-                <div className="relative z-10">
-                     <span className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-indigo-500/10 text-indigo-400 text-xs font-bold uppercase tracking-wider mb-4">
-                        <div className="w-1.5 h-1.5 rounded-full bg-indigo-500"></div> Net Flow
+             <div className="bg-slate-900/50 backdrop-blur-md p-3 md:p-6 rounded-2xl md:rounded-3xl border border-white/5 shadow-lg relative overflow-hidden">
+                <div className="relative z-10 text-center md:text-left">
+                     <span className="inline-flex items-center gap-1.5 px-2 md:px-3 py-0.5 md:py-1 rounded-full bg-indigo-500/10 text-indigo-400 text-[10px] md:text-xs font-bold uppercase tracking-wider mb-1 md:mb-4">
+                        <div className="w-1 md:w-1.5 h-1 md:h-1.5 rounded-full bg-indigo-500"></div> Net
                     </span>
-                    <div className={`text-3xl font-bold ${monthlyStats.balance >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
-                        {hideValues ? 'RM ****' : (
+                    <div className={`text-sm md:text-3xl font-bold truncate ${monthlyStats.balance >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
+                        {hideValues ? '****' : (
                             <>
                                 {monthlyStats.balance > 0 ? '+' : ''}
                                 <CountUp end={monthlyStats.balance} prefix="RM " />
@@ -229,22 +231,22 @@ export const MoneyManager: React.FC<MoneyManagerProps> = ({ data, loading, onRef
         </div>
 
         {/* Transactions List */}
-        <div className="bg-slate-900/40 backdrop-blur-md border border-white/5 rounded-3xl p-6 shadow-xl">
-            <div className="flex justify-between items-center mb-6 px-2">
-                <div className="flex items-center gap-3">
-                    <h3 className="font-bold text-xl text-white flex items-center gap-2">
+        <div className="bg-slate-900/40 backdrop-blur-md border border-white/5 rounded-3xl p-4 md:p-6 shadow-xl">
+            <div className="flex justify-between items-center mb-4 md:mb-6 px-1">
+                <div className="flex items-center gap-2 md:gap-3">
+                    <h3 className="font-bold text-lg md:text-xl text-white flex items-center gap-2">
                         Activity
                     </h3>
-                    <span className="text-xs font-medium text-slate-500 bg-slate-800/50 px-3 py-1 rounded-full">{filteredTransactions.length} records</span>
+                    <span className="text-[10px] md:text-xs font-medium text-slate-500 bg-slate-800/50 px-2 md:px-3 py-0.5 md:py-1 rounded-full">{filteredTransactions.length}</span>
                 </div>
                 
                 <button 
                     onClick={() => setShowFilters(!showFilters)}
-                    className={`p-2 rounded-xl transition-all flex items-center gap-2 text-sm font-medium ${showFilters || hasActiveFilters ? 'bg-indigo-600 text-white' : 'bg-slate-800 text-slate-400 hover:text-white'}`}
+                    className={`p-2 rounded-xl transition-all flex items-center gap-2 text-xs md:text-sm font-medium ${showFilters || hasActiveFilters ? 'bg-indigo-600 text-white' : 'bg-slate-800 text-slate-400 hover:text-white'}`}
                 >
-                    <Filter className="w-4 h-4" />
+                    <Filter className="w-3.5 h-3.5 md:w-4 md:h-4" />
                     <span className="hidden md:inline">Filters</span>
-                    {hasActiveFilters && <div className="w-2 h-2 rounded-full bg-white animate-pulse"></div>}
+                    {hasActiveFilters && <div className="w-1.5 h-1.5 md:w-2 md:h-2 rounded-full bg-white animate-pulse"></div>}
                 </button>
             </div>
             
@@ -263,7 +265,7 @@ export const MoneyManager: React.FC<MoneyManagerProps> = ({ data, loading, onRef
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                         {/* Date Range */}
                         <div>
-                            <label className="block text-xs text-slate-400 mb-1.5">Date Range (Overrides Month)</label>
+                            <label className="block text-xs text-slate-400 mb-1.5">Date Range</label>
                             <div className="flex gap-2">
                                 <input 
                                     type="date" 
@@ -315,18 +317,18 @@ export const MoneyManager: React.FC<MoneyManagerProps> = ({ data, loading, onRef
                 </div>
             )}
             
-            <div className="space-y-3">
+            <div className="space-y-2 md:space-y-3">
                 {filteredTransactions.slice(0, 10).map((tx) => {
                     const style = getCategoryStyles(tx.category);
                     return (
-                        <div key={tx.id} className="group flex items-center justify-between p-3 rounded-2xl hover:bg-white/5 transition-all border border-transparent hover:border-white/5">
-                            <div className="flex items-center gap-4">
-                                <div className={`w-12 h-12 rounded-2xl flex items-center justify-center ${style.color} ${style.text} shadow-lg shadow-black/20`}>
+                        <div key={tx.id} className="group flex items-center justify-between p-2 md:p-3 rounded-2xl hover:bg-white/5 transition-all border border-transparent hover:border-white/5">
+                            <div className="flex items-center gap-3 md:gap-4">
+                                <div className={`w-10 h-10 md:w-12 md:h-12 rounded-xl md:rounded-2xl flex items-center justify-center ${style.color} ${style.text} shadow-lg shadow-black/20`}>
                                     {style.icon}
                                 </div>
-                                <div>
-                                    <div className="font-bold text-white text-sm">{tx.category}</div>
-                                    <div className="text-xs text-slate-400 mt-0.5">{tx.date} • {tx.note || 'No note'}</div>
+                                <div className="min-w-0">
+                                    <div className="font-bold text-white text-sm truncate pr-2">{tx.category}</div>
+                                    <div className="text-[10px] md:text-xs text-slate-400 mt-0.5 truncate max-w-[120px] md:max-w-[200px]">{tx.date} • {tx.note || 'No note'}</div>
                                 </div>
                             </div>
 
@@ -340,11 +342,12 @@ export const MoneyManager: React.FC<MoneyManagerProps> = ({ data, loading, onRef
                                     </div>
                                 </div>
                                 
-                                {/* Hover Actions */}
-                                <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity translate-x-2 group-hover:translate-x-0">
+                                {/* Hover Actions (Hidden on mobile generally, visible on tap/active usually, but hidden here for clean mobile view) */}
+                                <div className="hidden md:flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity translate-x-2 group-hover:translate-x-0">
                                     <button onClick={() => handleEdit(tx)} className="p-2 text-slate-400 hover:text-indigo-400 hover:bg-slate-800 rounded-lg"><Pencil className="w-4 h-4" /></button>
                                     <button onClick={() => handleDelete(tx)} className="p-2 text-slate-400 hover:text-rose-400 hover:bg-slate-800 rounded-lg"><Trash2 className="w-4 h-4" /></button>
                                 </div>
+                                {/* Mobile: Tap to edit (simpler) - we use the whole row usually, but here we can add a small dot menu or just let them tap the row in a real app. For now we stick to desktop hover for edit icons or tap */}
                             </div>
                         </div>
                     );

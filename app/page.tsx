@@ -330,7 +330,7 @@ export default function Home() {
              data={moneyData} 
              loading={loading} 
              onRefresh={fetchData} 
-             hideValues={hideBalance}
+             hideValues={false}
            />
         )}
 
