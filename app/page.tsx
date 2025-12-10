@@ -1,8 +1,7 @@
-
 'use client';
 
 import React, { useEffect, useState, useCallback } from 'react';
-import { Plus, LayoutDashboard, AlertCircle, RefreshCw, PieChart as PieChartIcon, ArrowRightLeft, Wallet, LineChart, Eye, EyeOff, Lock, ShieldCheck, Database, Loader2 } from 'lucide-react';
+import { Plus, LayoutDashboard, AlertCircle, RefreshCw, PieChart as PieChartIcon, ArrowRightLeft, Wallet, LineChart, Eye, EyeOff, Lock, ShieldCheck, Database, Loader2, Landmark } from 'lucide-react';
 import { SummaryCards } from '../components/SummaryCards';
 import { HoldingsTable } from '../components/HoldingsTable';
 import { AllocationChart } from '../components/AllocationChart';
@@ -292,6 +291,34 @@ export default function Home() {
             hideValues={hideBalance}
             onTogglePrivacy={() => setHideBalance(!hideBalance)}
         />
+
+        {/* Investment Sub-Navigation */}
+        {activeModule === 'investment' && (
+             <div className="flex space-x-1 bg-slate-900/50 p-1 rounded-xl w-fit mb-6 border border-slate-800">
+                <button
+                    onClick={() => setActiveInvTab('dashboard')}
+                    className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+                        activeInvTab === 'dashboard' 
+                        ? 'bg-slate-800 text-white shadow-sm' 
+                        : 'text-slate-400 hover:text-slate-200'
+                    }`}
+                >
+                    <LayoutDashboard className="w-4 h-4" />
+                    Portfolio Overview
+                </button>
+                <button
+                    onClick={() => setActiveInvTab('funding')}
+                    className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+                        activeInvTab === 'funding' 
+                        ? 'bg-slate-800 text-white shadow-sm' 
+                        : 'text-slate-400 hover:text-slate-200'
+                    }`}
+                >
+                    <Landmark className="w-4 h-4" />
+                    Cash Flow
+                </button>
+            </div>
+        )}
 
         {/* --- INITIALIZATION CHECK --- */}
         {/* If we are connected (keys exist) but missing the specific Money Manager sheets, show Setup UI */}
