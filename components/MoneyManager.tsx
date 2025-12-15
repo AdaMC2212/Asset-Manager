@@ -1,4 +1,3 @@
-
 'use client';
 
 import React, { useState, useMemo } from 'react';
@@ -46,8 +45,8 @@ export const MoneyManager: React.FC<MoneyManagerProps> = ({ data, loading, onRef
       endDate: ''
   });
 
-  const { filteredTransactions, monthlyStats, pieData, isCustomDateMode } = useMemo(() => {
-    if (!data) return { filteredTransactions: [], monthlyStats: { income: 0, expense: 0, balance: 0 }, pieData: [], isCustomDateMode: false };
+  const { filteredTransactions, monthlyStats, pieData, fullBreakdown, isCustomDateMode } = useMemo(() => {
+    if (!data) return { filteredTransactions: [], monthlyStats: { income: 0, expense: 0, balance: 0 }, pieData: [], fullBreakdown: [], isCustomDateMode: false };
 
     // Determine Base List (Date Filter)
     let filtered = [];
@@ -86,20 +85,27 @@ export const MoneyManager: React.FC<MoneyManagerProps> = ({ data, loading, onRef
     filtered.forEach(tx => {
         if (tx.type === 'Income') {
             income += tx.amount;
+            // Subtract income from category to get net spending
+            catTotals[tx.category] = (catTotals[tx.category] || 0) - tx.amount;
         } else if (tx.type === 'Expense') {
             expense += tx.amount;
+            // Add expense to category
             catTotals[tx.category] = (catTotals[tx.category] || 0) + tx.amount;
         }
     });
 
-    const pie = Object.entries(catTotals)
+    const breakdown = Object.entries(catTotals)
         .map(([name, value]) => ({ name, value }))
         .sort((a, b) => b.value - a.value);
+
+    // Pie chart only shows positive net spending (actual costs)
+    const pie = breakdown.filter(item => item.value > 0);
 
     return {
         filteredTransactions: filtered,
         monthlyStats: { income, expense, balance: income - expense },
         pieData: pie,
+        fullBreakdown: breakdown,
         isCustomDateMode: useCustomDate
     };
   }, [data, selectedDate, filters]);
@@ -342,12 +348,11 @@ export const MoneyManager: React.FC<MoneyManagerProps> = ({ data, loading, onRef
                                     </div>
                                 </div>
                                 
-                                {/* Hover Actions (Hidden on mobile generally, visible on tap/active usually, but hidden here for clean mobile view) */}
+                                {/* Hover Actions */}
                                 <div className="hidden md:flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity translate-x-2 group-hover:translate-x-0">
                                     <button onClick={() => handleEdit(tx)} className="p-2 text-slate-400 hover:text-indigo-400 hover:bg-slate-800 rounded-lg"><Pencil className="w-4 h-4" /></button>
                                     <button onClick={() => handleDelete(tx)} className="p-2 text-slate-400 hover:text-rose-400 hover:bg-slate-800 rounded-lg"><Trash2 className="w-4 h-4" /></button>
                                 </div>
-                                {/* Mobile: Tap to edit (simpler) - we use the whole row usually, but here we can add a small dot menu or just let them tap the row in a real app. For now we stick to desktop hover for edit icons or tap */}
                             </div>
                         </div>
                     );
@@ -378,7 +383,7 @@ export const MoneyManager: React.FC<MoneyManagerProps> = ({ data, loading, onRef
       <div className="space-y-6">
         {/* Pie Chart Card */}
         <div className="bg-slate-900/40 backdrop-blur-md border border-white/5 rounded-3xl p-6 shadow-xl flex flex-col min-h-[400px]">
-             <h3 className="font-bold text-xl text-white mb-6">Spending Breakdown</h3>
+             <h3 className="font-bold text-xl text-white mb-6">Net Spending Breakdown</h3>
             <div className="flex-grow relative">
                 {pieData.length > 0 && !hideValues ? (
                     <ResponsiveContainer width="100%" height={250}>
@@ -413,19 +418,21 @@ export const MoneyManager: React.FC<MoneyManagerProps> = ({ data, loading, onRef
                 {/* Center Label for Pie */}
                 {!hideValues && pieData.length > 0 && (
                     <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                        <span className="text-xs font-bold text-slate-500 uppercase tracking-widest">EXPENSE</span>
+                        <span className="text-xs font-bold text-slate-500 uppercase tracking-widest text-center">NET<br/>SPEND</span>
                     </div>
                 )}
             </div>
             
             <div className="mt-6 space-y-3 max-h-[300px] overflow-y-auto pr-2 custom-scrollbar">
-                {pieData.map((entry, index) => (
+                {fullBreakdown.map((entry, index) => (
                      <div key={entry.name} className="flex items-center justify-between p-2 hover:bg-white/5 rounded-lg transition-colors">
                         <div className="flex items-center gap-3">
-                             <div className="w-3 h-3 rounded-full" style={{ backgroundColor: PIE_COLORS[index % PIE_COLORS.length] }}></div>
+                             <div className="w-3 h-3 rounded-full" style={{ backgroundColor: PIE_COLORS[index % PIE_COLORS.length] || '#64748b' }}></div>
                              <span className="text-slate-300 text-sm font-medium">{entry.name}</span>
                         </div>
-                        <span className="text-white font-bold text-sm">{displayValue(entry.value)}</span>
+                        <span className={`font-bold text-sm ${entry.value < 0 ? 'text-emerald-400' : 'text-white'}`}>
+                            {entry.value < 0 ? '+' : ''}{displayValue(Math.abs(entry.value))}
+                        </span>
                      </div>
                 ))}
             </div>
