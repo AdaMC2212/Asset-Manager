@@ -33,6 +33,10 @@ const getCategoryStyles = (cat: string) => {
 export const MoneyManager: React.FC<MoneyManagerProps> = ({ data, loading, onRefresh, hideValues }) => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isHistoryModalOpen, setIsHistoryModalOpen] = useState(false);
+  
+  // State for Category Detail View
+  const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
+
   const [editingTransaction, setEditingTransaction] = useState<MoneyTransaction | null>(null);
   const [selectedDate, setSelectedDate] = useState(new Date());
   
@@ -109,6 +113,12 @@ export const MoneyManager: React.FC<MoneyManagerProps> = ({ data, loading, onRef
         isCustomDateMode: useCustomDate
     };
   }, [data, selectedDate, filters]);
+
+  // Derived filtered list for the specific category modal
+  const categoryTransactions = useMemo(() => {
+      if (!selectedCategory) return [];
+      return filteredTransactions.filter(tx => tx.category === selectedCategory);
+  }, [filteredTransactions, selectedCategory]);
 
   if (loading || !data) {
     return (
@@ -398,9 +408,11 @@ export const MoneyManager: React.FC<MoneyManagerProps> = ({ data, loading, onRef
                                 dataKey="value"
                                 stroke="none"
                                 cornerRadius={4}
+                                onClick={(data) => setSelectedCategory(data.name)}
+                                className="cursor-pointer focus:outline-none"
                             >
                                 {pieData.map((entry, index) => (
-                                    <Cell key={`cell-${index}`} fill={PIE_COLORS[index % PIE_COLORS.length]} />
+                                    <Cell key={`cell-${index}`} fill={PIE_COLORS[index % PIE_COLORS.length]} className="hover:opacity-80 transition-opacity cursor-pointer" />
                                 ))}
                             </Pie>
                             <Tooltip 
@@ -425,19 +437,73 @@ export const MoneyManager: React.FC<MoneyManagerProps> = ({ data, loading, onRef
             
             <div className="mt-6 space-y-3 max-h-[300px] overflow-y-auto pr-2 custom-scrollbar">
                 {fullBreakdown.map((entry, index) => (
-                     <div key={entry.name} className="flex items-center justify-between p-2 hover:bg-white/5 rounded-lg transition-colors">
+                     <button 
+                        key={entry.name} 
+                        onClick={() => setSelectedCategory(entry.name)}
+                        className="w-full flex items-center justify-between p-2 hover:bg-white/5 rounded-lg transition-colors group text-left"
+                    >
                         <div className="flex items-center gap-3">
                              <div className="w-3 h-3 rounded-full" style={{ backgroundColor: PIE_COLORS[index % PIE_COLORS.length] || '#64748b' }}></div>
-                             <span className="text-slate-300 text-sm font-medium">{entry.name}</span>
+                             <span className="text-slate-300 text-sm font-medium group-hover:text-white transition-colors">{entry.name}</span>
                         </div>
                         <span className={`font-bold text-sm ${entry.value < 0 ? 'text-emerald-400' : 'text-white'}`}>
                             {entry.value < 0 ? '+' : ''}{displayValue(Math.abs(entry.value))}
                         </span>
-                     </div>
+                     </button>
                 ))}
             </div>
         </div>
       </div>
+
+      {/* Category Details Modal */}
+      {selectedCategory && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md p-4 animate-in fade-in duration-200">
+            <div className="bg-slate-900 border border-slate-800 rounded-3xl w-full max-w-2xl shadow-2xl flex flex-col max-h-[85vh] overflow-hidden animate-in zoom-in-95 duration-200">
+                <div className="flex justify-between items-center p-6 border-b border-slate-800 bg-slate-900">
+                     <div>
+                        <div className="flex items-center gap-2">
+                            <h2 className="text-xl font-bold text-white">{selectedCategory} Details</h2>
+                            <span className="px-2 py-0.5 rounded-full bg-slate-800 text-slate-400 text-xs font-bold">{categoryTransactions.length}</span>
+                        </div>
+                        <p className="text-sm text-slate-500">{isCustomDateMode ? 'Custom Range' : monthLabel}</p>
+                     </div>
+                     <button onClick={() => setSelectedCategory(null)} className="p-2 hover:bg-slate-800 rounded-full text-slate-400 hover:text-white transition-colors"><X className="w-6 h-6" /></button>
+                </div>
+                <div className="overflow-y-auto p-4 flex-1 space-y-2">
+                    {categoryTransactions.length > 0 ? (
+                        categoryTransactions.map((tx) => (
+                             <div key={tx.id} className="flex items-center justify-between p-3 rounded-xl hover:bg-white/5 border border-transparent hover:border-white/5 group transition-colors">
+                                <div className="flex flex-col">
+                                    <span className="text-white font-medium">{tx.note || tx.category}</span>
+                                    <span className="text-xs text-slate-500">{tx.date} • {tx.fromAccount} {tx.toAccount ? `→ ${tx.toAccount}` : ''}</span>
+                                </div>
+                                <div className="text-right flex items-center gap-4">
+                                    <span className={`font-bold ${tx.type === 'Income' ? 'text-emerald-400' : tx.type === 'Transfer' ? 'text-blue-400' : 'text-slate-200'}`}>
+                                        {tx.type === 'Income' ? '+' : tx.type === 'Transfer' ? '' : '-'} {displayValue(tx.amount, 'RM ')}
+                                    </span>
+                                    <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                        <button onClick={() => { setSelectedCategory(null); handleEdit(tx); }} className="p-2 text-slate-500 hover:text-indigo-400 bg-slate-800/50 rounded-lg hover:bg-slate-800"><Pencil className="w-4 h-4" /></button>
+                                        <button onClick={() => handleDelete(tx)} className="p-2 text-slate-500 hover:text-rose-400 bg-slate-800/50 rounded-lg hover:bg-slate-800"><Trash2 className="w-4 h-4" /></button>
+                                    </div>
+                                </div>
+                            </div>
+                        ))
+                    ) : (
+                        <div className="py-12 text-center text-slate-500 flex flex-col items-center">
+                            <Calendar className="w-10 h-10 text-slate-800 mb-2" />
+                            No transactions found for this category.
+                        </div>
+                    )}
+                </div>
+                <div className="p-4 bg-slate-950/50 border-t border-slate-800 flex justify-between items-center text-sm">
+                    <span className="text-slate-400">Total Net for {selectedCategory}</span>
+                    <span className="text-white font-bold">
+                        {displayValue(Math.abs(fullBreakdown.find(c => c.name === selectedCategory)?.value || 0))}
+                    </span>
+                </div>
+            </div>
+        </div>
+      )}
 
       {/* History Modal */}
       {isHistoryModalOpen && (
