@@ -1,7 +1,8 @@
 'use client';
 
-import React, { useEffect, useState, useCallback } from 'react';
-import { Plus, LayoutDashboard, AlertCircle, RefreshCw, PieChart as PieChartIcon, ArrowRightLeft, Wallet, LineChart, Eye, EyeOff, Lock, ShieldCheck, Database, Loader2, Landmark } from 'lucide-react';
+import React, { useEffect, useState, useCallback, useMemo } from 'react';
+// Added Search to the lucide-react imports
+import { Plus, LayoutDashboard, AlertCircle, RefreshCw, PieChart as PieChartIcon, ArrowRightLeft, Wallet, LineChart, Eye, EyeOff, Lock, ShieldCheck, Database, Loader2, Landmark, Command as CommandIcon, Search } from 'lucide-react';
 import { SummaryCards } from '../components/SummaryCards';
 import { HoldingsTable } from '../components/HoldingsTable';
 import { AllocationChart } from '../components/AllocationChart';
@@ -9,6 +10,8 @@ import { FundingStats } from '../components/FundingStats';
 import { MoneyManager } from '../components/MoneyManager';
 import { AddTradeModal } from '../components/AddTradeModal';
 import { TotalBalanceCard } from '../components/TotalBalanceCard';
+import { CommandPalette } from '../components/CommandPalette';
+import { CardSkeleton, TableSkeleton } from '../components/ui/Skeleton';
 import { getPortfolioData, getCashFlowData, getMoneyManagerData, checkDatabaseStatus, initializeDatabase } from './actions';
 import { PortfolioSummary, CashFlowSummary, MoneyManagerData } from '../types';
 import { DecryptedText } from '../components/ui/DecryptedText';
@@ -88,15 +91,6 @@ const LockScreen = ({ onUnlock }: { onUnlock: () => void }) => {
                 Unlock Dashboard
             </button>
         </form>
-        
-        <div className="mt-6 text-center">
-            <button 
-                onClick={() => setShowHelp(!showHelp)}
-                className="text-xs text-slate-500 hover:text-indigo-400 transition-colors underline decoration-slate-700 underline-offset-4"
-            >
-                Deployment & Setup Help
-            </button>
-        </div>
       </div>
     </div>
   );
@@ -110,51 +104,52 @@ export default function Home() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isCommandOpen, setIsCommandOpen] = useState(false);
   
-  // Database Status for Money Manager
   const [dbStatus, setDbStatus] = useState<{ configured: boolean, initialized: boolean } | null>(null);
   const [isInitializing, setIsInitializing] = useState(false);
   
-  // Navigation State
   const [activeModule, setActiveModule] = useState<AppModule>('manager');
   const [activeInvTab, setActiveInvTab] = useState<InvestmentTab>('dashboard');
   
-  // Privacy State - Split
   const [hideBalance, setHideBalance] = useState(false);
   const [hideInvestments, setHideInvestments] = useState(false);
+
+  // Command Palette Items
+  const searchItems = useMemo(() => {
+    const items = [
+        { name: 'Dashboard', type: 'Module', module: 'investment' },
+        { name: 'Wallets', type: 'Module', module: 'manager' },
+        { name: 'Cash Flow', type: 'Module', module: 'investment' }
+    ];
+    if (data?.holdings) {
+        data.holdings.forEach(h => {
+            items.push({ name: h.ticker, type: 'Asset', module: 'investment' });
+        });
+    }
+    return items;
+  }, [data]);
 
   const fetchData = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      // 1. Check Configuration Status first
       const status = await checkDatabaseStatus();
       setDbStatus(status);
 
-      // 2. Decide Source
-      // If configured, try to fetch real data.
-      // If NOT configured, return empty data and show error/setup message.
       if (status.configured) {
-         // --- REAL DATA FETCH ---
          const [portfolioResult, cashFlowResult, moneyResult] = await Promise.all([
             getPortfolioData().catch(() => null),
             getCashFlowData().catch(() => null),
             getMoneyManagerData().catch(() => null)
          ]);
 
-         // Allow empty data if real fetch returns valid empty structure
          setData(portfolioResult || { netWorth: 0, totalCost: 0, totalPL: 0, totalPLPercent: 0, cashBalance: 0, holdings: [] });
          setCashFlowData(cashFlowResult || { totalDepositedMYR: 0, totalConvertedMYR: 0, totalConvertedUSD: 0, avgRate: 0, deposits: [], conversions: [] });
          setMoneyData(moneyResult || { accounts: [], transactions: [], totalBalance: 0, monthlyStats: { income: 0, expense: 0, incomeGrowth: 0, expenseGrowth: 0 }, categorySpending: [], graphData: [], upcomingBills: [], categories: [], incomeCategories: [], expenseCategories: [] });
-
       } else {
-         // --- NOT CONFIGURED ---
-         setData({ netWorth: 0, totalCost: 0, totalPL: 0, totalPLPercent: 0, cashBalance: 0, holdings: [] });
-         setCashFlowData({ totalDepositedMYR: 0, totalConvertedMYR: 0, totalConvertedUSD: 0, avgRate: 0, deposits: [], conversions: [] });
-         setMoneyData({ accounts: [], transactions: [], totalBalance: 0, monthlyStats: { income: 0, expense: 0, incomeGrowth: 0, expenseGrowth: 0 }, categorySpending: [], graphData: [], upcomingBills: [], categories: [], incomeCategories: [], expenseCategories: [] });
-         setError("Database connection missing. Please configure GOOGLE_SERVICE_ACCOUNT_KEY in your environment.");
+         setError("Database connection missing. Please configure GOOGLE_SERVICE_ACCOUNT_KEY.");
       }
-
     } catch (err: any) {
       console.error("Critical failure loading data", err);
       setError("Failed to initialize application.");
@@ -163,16 +158,16 @@ export default function Home() {
     }
   }, []);
 
-  const handleInitialize = async () => {
-      setIsInitializing(true);
-      const res = await initializeDatabase();
-      if (res.success) {
-          await fetchData();
-      } else {
-          alert("Initialization failed: " + res.error);
-      }
-      setIsInitializing(false);
-  };
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+        if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+            e.preventDefault();
+            setIsCommandOpen(prev => !prev);
+        }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
 
   useEffect(() => {
     if (!isLocked) {
@@ -188,54 +183,53 @@ export default function Home() {
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-200 font-sans selection:bg-indigo-500/30">
-      {/* Navbar */}
-      <nav className="border-b border-slate-800 bg-slate-950/50 backdrop-blur-md sticky top-0 z-40">
+      <nav className="border-b border-white/5 bg-slate-950/50 backdrop-blur-md sticky top-0 z-40">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between h-16 items-center">
             
-            {/* Logo */}
-            <div className="flex items-center gap-2">
-              <div className="bg-indigo-600 p-2 rounded-lg">
+            <div className="flex items-center gap-3">
+              <div className="bg-gradient-to-br from-indigo-500 to-purple-600 p-2 rounded-xl shadow-lg shadow-indigo-500/20">
                  <LineChart className="w-5 h-5 text-white" />
               </div>
-              <span className="font-bold text-xl text-white tracking-tight">
+              <span className="font-bold text-xl text-white tracking-tight hidden sm:block">
                 <DecryptedText text="AssetManager" speed={60} revealDirection="center" />
               </span>
             </div>
 
-            {/* Module Switcher (Center - Desktop) */}
-            <div className="hidden md:flex bg-slate-900/80 p-1 rounded-lg border border-slate-800">
+            <div className="hidden md:flex bg-slate-900/60 p-1 rounded-xl border border-white/5 backdrop-blur-md">
                <button 
                   onClick={() => setActiveModule('manager')}
-                  className={`flex items-center gap-2 px-4 py-1.5 rounded-md text-sm font-medium transition-all ${activeModule === 'manager' ? 'bg-indigo-600 text-white shadow-sm' : 'text-slate-400 hover:text-slate-200'}`}
+                  className={`flex items-center gap-2 px-5 py-2 rounded-lg text-sm font-semibold transition-all ${activeModule === 'manager' ? 'bg-white/10 text-white shadow-inner' : 'text-slate-400 hover:text-slate-200'}`}
                >
                  <Wallet className="w-4 h-4" />
                  Money Manager
                </button>
                <button 
                   onClick={() => setActiveModule('investment')}
-                  className={`flex items-center gap-2 px-4 py-1.5 rounded-md text-sm font-medium transition-all ${activeModule === 'investment' ? 'bg-indigo-600 text-white shadow-sm' : 'text-slate-400 hover:text-slate-200'}`}
+                  className={`flex items-center gap-2 px-5 py-2 rounded-lg text-sm font-semibold transition-all ${activeModule === 'investment' ? 'bg-white/10 text-white shadow-inner' : 'text-slate-400 hover:text-slate-200'}`}
                >
                  <LineChart className="w-4 h-4" />
                  Investments
                </button>
             </div>
 
-            {/* Actions (Right) */}
             <div className="flex items-center gap-2">
-               {error && (
-                   <span className="hidden lg:inline-flex items-center gap-1.5 bg-rose-500/10 text-rose-500 text-xs px-2 py-1 rounded-full border border-rose-500/20 mr-2">
-                      <AlertCircle className="w-3 h-3" />
-                      Config Error
-                   </span>
-               )}
+               <button
+                 onClick={() => setIsCommandOpen(true)}
+                 className="hidden lg:flex items-center gap-2 px-3 py-2 bg-slate-900/50 border border-white/5 rounded-lg text-slate-500 hover:text-slate-300 transition-colors mr-2 text-sm"
+               >
+                 <Search className="w-4 h-4" />
+                 <span>Search...</span>
+                 <div className="flex items-center gap-1 px-1.5 py-0.5 rounded bg-slate-800 text-[10px] font-bold">
+                    <CommandIcon className="w-3 h-3" /> K
+                 </div>
+               </button>
 
-               {/* Eye Icon - Only shows for Investment tab because Manager has its own in the Total Balance card */}
                {activeModule === 'investment' && (
                   <button
                     onClick={() => setHideInvestments(!hideInvestments)}
-                    className="p-2 text-slate-400 hover:text-white transition-colors"
-                    title={hideInvestments ? "Show Investment Values" : "Hide Investment Values"}
+                    className="p-2.5 text-slate-400 hover:text-white transition-colors bg-white/5 rounded-xl border border-white/5"
+                    title={hideInvestments ? "Show Values" : "Hide Values"}
                   >
                     {hideInvestments ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                   </button>
@@ -243,8 +237,8 @@ export default function Home() {
 
               <button
                 onClick={fetchData}
-                className="p-2 text-slate-400 hover:text-white transition-colors"
-                title="Refresh Data"
+                className="p-2.5 text-slate-400 hover:text-white transition-colors bg-white/5 rounded-xl border border-white/5"
+                title="Refresh"
               >
                 <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
               </button>
@@ -252,10 +246,10 @@ export default function Home() {
               {activeModule === 'investment' && (
                 <button
                   onClick={() => setIsModalOpen(true)}
-                  className="bg-indigo-600 hover:bg-indigo-700 text-white text-xs md:text-sm font-medium px-3 py-2 rounded-lg flex items-center gap-2 transition-all shadow-lg shadow-indigo-500/20 ml-2"
+                  className="bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-bold px-4 py-2.5 rounded-xl flex items-center gap-2 transition-all shadow-xl shadow-indigo-500/20 ml-2"
                 >
-                  <Plus className="w-4 h-4" />
-                  <span className="hidden sm:inline">Trade</span>
+                  <Plus className="w-5 h-5" />
+                  <span className="hidden sm:inline">Add Trade</span>
                 </button>
               )}
             </div>
@@ -263,28 +257,24 @@ export default function Home() {
         </div>
       </nav>
 
-      {/* Main Content */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        
-        {/* Module Switcher (Mobile Only) */}
-        <div className="md:hidden flex bg-slate-900/80 p-1 rounded-lg border border-slate-800 mb-6">
+        <div className="md:hidden flex bg-slate-900/60 p-1 rounded-xl border border-white/5 mb-6">
             <button 
               onClick={() => setActiveModule('manager')}
-              className={`flex-1 flex items-center justify-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-all ${activeModule === 'manager' ? 'bg-indigo-600 text-white shadow-sm' : 'text-slate-400 hover:text-slate-200'}`}
+              className={`flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg text-sm font-bold transition-all ${activeModule === 'manager' ? 'bg-white/10 text-white shadow-sm' : 'text-slate-400 hover:text-slate-200'}`}
             >
               <Wallet className="w-4 h-4" />
-              Money Manager
+              Manager
             </button>
             <button 
               onClick={() => setActiveModule('investment')}
-              className={`flex-1 flex items-center justify-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-all ${activeModule === 'investment' ? 'bg-indigo-600 text-white shadow-sm' : 'text-slate-400 hover:text-slate-200'}`}
+              className={`flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg text-sm font-bold transition-all ${activeModule === 'investment' ? 'bg-white/10 text-white shadow-sm' : 'text-slate-400 hover:text-slate-200'}`}
             >
               <LineChart className="w-4 h-4" />
               Investments
             </button>
         </div>
 
-        {/* Global Total Balance Box (Visible on both pages) */}
         <TotalBalanceCard 
             totalBalance={moneyData?.totalBalance || 0} 
             accounts={moneyData?.accounts || []} 
@@ -292,23 +282,22 @@ export default function Home() {
             onTogglePrivacy={() => setHideBalance(!hideBalance)}
         />
 
-        {/* Investment Sub-Navigation */}
         {activeModule === 'investment' && (
-             <div className="flex space-x-1 bg-slate-900/50 p-1 rounded-xl w-fit mb-6 border border-slate-800">
+             <div className="flex space-x-1 bg-slate-900/40 p-1 rounded-xl w-fit mb-8 border border-white/5 backdrop-blur-md">
                 <button
                     onClick={() => setActiveInvTab('dashboard')}
-                    className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+                    className={`flex items-center gap-2 px-5 py-2.5 rounded-lg text-sm font-semibold transition-all ${
                         activeInvTab === 'dashboard' 
                         ? 'bg-slate-800 text-white shadow-sm' 
                         : 'text-slate-400 hover:text-slate-200'
                     }`}
                 >
                     <LayoutDashboard className="w-4 h-4" />
-                    Portfolio Overview
+                    Portfolio
                 </button>
                 <button
                     onClick={() => setActiveInvTab('funding')}
-                    className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+                    className={`flex items-center gap-2 px-5 py-2.5 rounded-lg text-sm font-semibold transition-all ${
                         activeInvTab === 'funding' 
                         ? 'bg-slate-800 text-white shadow-sm' 
                         : 'text-slate-400 hover:text-slate-200'
@@ -320,78 +309,76 @@ export default function Home() {
             </div>
         )}
 
-        {/* --- INITIALIZATION CHECK --- */}
-        {/* If we are connected (keys exist) but missing the specific Money Manager sheets, show Setup UI */}
-        {activeModule === 'manager' && dbStatus?.configured && !dbStatus.initialized && (
-            <div className="mb-8 p-6 bg-slate-900 border border-indigo-500/30 rounded-xl shadow-lg relative overflow-hidden">
-                <div className="absolute top-0 right-0 p-8 opacity-20">
-                     <Database className="w-24 h-24 text-indigo-500" />
-                </div>
-                <div className="relative z-10 max-w-2xl">
-                    <h2 className="text-xl font-bold text-white mb-2 flex items-center gap-2">
-                        <Wallet className="w-5 h-5 text-indigo-400" />
-                        Complete Your Setup
-                    </h2>
-                    <p className="text-slate-400 mb-6 text-sm leading-relaxed">
-                        You have successfully connected to Google Sheets, but we noticed you are missing the required 
-                        Money Manager tabs (<b>MM_Accounts</b>, <b>MM_Transactions</b>, etc.). 
-                        <br/><br/>
-                        Click below to automatically create these tabs with the correct headers in your spreadsheet.
-                    </p>
-                    <button 
-                        onClick={handleInitialize}
-                        disabled={isInitializing}
-                        className="bg-indigo-600 hover:bg-indigo-700 disabled:bg-indigo-600/50 text-white px-5 py-2.5 rounded-lg font-medium flex items-center gap-2 transition-all"
-                    >
-                        {isInitializing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Database className="w-4 h-4" />}
-                        {isInitializing ? "Setting up..." : "Initialize Money Manager Sheets"}
-                    </button>
-                </div>
+        {error && (
+            <div className="mb-8 p-4 bg-rose-500/10 border border-rose-500/20 text-rose-500 rounded-2xl flex items-center gap-3">
+                <AlertCircle className="w-5 h-5" />
+                <p className="font-semibold">{error}</p>
             </div>
         )}
 
-        {/* --- Content Rendering --- */}
-        
-        {activeModule === 'manager' && (
-           <MoneyManager 
-             data={moneyData} 
-             loading={loading} 
-             onRefresh={fetchData} 
-             hideValues={false}
-           />
-        )}
-
-        {activeModule === 'investment' && activeInvTab === 'funding' && (
-            <FundingStats 
-              cashFlow={cashFlowData} 
-              portfolio={data} 
-              hideValues={hideInvestments}
-            />
-        )}
-
-        {activeModule === 'investment' && activeInvTab !== 'funding' && (
-            <>
-                <SummaryCards data={data} loading={loading} hideValues={hideInvestments} />
-
-                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                  <div className="lg:col-span-2 space-y-6">
-                      <HoldingsTable data={data} hideValues={hideInvestments} />
-                  </div>
-                  <div className="space-y-6">
-                      <div>
-                          <AllocationChart data={data} />
-                      </div>
-                  </div>
+        {loading ? (
+            <div className="space-y-8">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    <CardSkeleton /> <CardSkeleton /> <CardSkeleton />
                 </div>
+                <TableSkeleton />
+            </div>
+        ) : (
+            <>
+                {activeModule === 'manager' && (
+                    <MoneyManager 
+                        data={moneyData} 
+                        loading={loading} 
+                        onRefresh={fetchData} 
+                        hideValues={hideBalance}
+                    />
+                )}
+
+                {activeModule === 'investment' && activeInvTab === 'funding' && (
+                    <FundingStats 
+                    cashFlow={cashFlowData} 
+                    portfolio={data} 
+                    hideValues={hideInvestments}
+                    />
+                )}
+
+                {activeModule === 'investment' && activeInvTab === 'dashboard' && (
+                    <>
+                        <SummaryCards data={data} loading={loading} hideValues={hideInvestments} />
+                        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                            <div className="lg:col-span-2 space-y-8">
+                                <HoldingsTable data={data} hideValues={hideInvestments} />
+                            </div>
+                            <div className="space-y-8">
+                                <AllocationChart data={data} />
+                                <div className="glass-card rounded-3xl p-6 relative overflow-hidden">
+                                    <div className="absolute top-0 right-0 p-10 opacity-5 -mr-10 -mt-10 bg-indigo-500 rounded-full blur-2xl"></div>
+                                    <h3 className="text-white font-bold mb-3 relative z-10">Market Insights</h3>
+                                    <p className="text-slate-400 text-sm leading-relaxed relative z-10">
+                                        Your portfolio is currently tracking {data?.holdings.length} assets across {new Set(data?.holdings.map(h => h.sector)).size} sectors. 
+                                        Keep an eye on {data?.holdings[0]?.ticker} as it makes up {data?.holdings[0]?.allocation.toFixed(1)}% of your equity value.
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+                    </>
+                )}
             </>
         )}
-
       </main>
 
       <AddTradeModal 
         isOpen={isModalOpen} 
         onClose={() => setIsModalOpen(false)}
         onSuccess={fetchData}
+      />
+
+      <CommandPalette 
+        isOpen={isCommandOpen}
+        onClose={() => setIsCommandOpen(false)}
+        onSelectModule={setActiveModule}
+        onAddTrade={() => setIsModalOpen(true)}
+        searchItems={searchItems}
       />
     </div>
   );
