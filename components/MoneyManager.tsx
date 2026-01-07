@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useMemo } from 'react';
-import { Plus, Wallet, ShoppingBag, Car, Shirt, Zap, Wifi, Music, Utensils, Smartphone, Banknote, Calendar, ChevronLeft, ChevronRight, X, ArrowUpRight, ArrowDownRight, Pencil, Trash2, Filter, XCircle } from 'lucide-react';
+import { Plus, Wallet, ShoppingBag, Car, Shirt, Zap, Wifi, Music, Utensils, Smartphone, Banknote, Calendar, ChevronLeft, ChevronRight, X, ArrowUpRight, ArrowDownRight, Pencil, Trash2, Filter, XCircle, TrendingUp, TrendingDown } from 'lucide-react';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts';
 import { MoneyManagerData, MoneyTransaction } from '../types';
 import { AddMoneyModal } from './MoneyManager/AddMoneyModal';
@@ -49,51 +49,46 @@ export const MoneyManager: React.FC<MoneyManagerProps> = ({ data, loading, onRef
       endDate: ''
   });
 
-  const { filteredTransactions, monthlyStats, pieData, fullBreakdown, isCustomDateMode } = useMemo(() => {
-    if (!data) return { filteredTransactions: [], monthlyStats: { income: 0, expense: 0, balance: 0 }, pieData: [], fullBreakdown: [], isCustomDateMode: false };
+  const { filteredTransactions, baseTransactionsForBreakdown, monthlyStats, pieData, fullBreakdown, isCustomDateMode } = useMemo(() => {
+    if (!data) return { filteredTransactions: [], baseTransactionsForBreakdown: [], monthlyStats: { income: 0, expense: 0, balance: 0 }, pieData: [], fullBreakdown: [], isCustomDateMode: false };
 
-    // Determine Base List (Date Filter)
-    let filtered = [];
+    // 1. Determine Date Range Base
+    let base = [];
     const useCustomDate = !!(filters.startDate && filters.endDate);
     
     if (useCustomDate) {
-        // Custom Range Filter
-        filtered = data.transactions.filter(tx => {
-            return tx.date >= filters.startDate && tx.date <= filters.endDate;
-        });
+        base = data.transactions.filter(tx => tx.date >= filters.startDate && tx.date <= filters.endDate);
     } else {
-        // Default Monthly Filter
         const targetMonth = selectedDate.getMonth();
         const targetYear = selectedDate.getFullYear();
-        filtered = data.transactions.filter(tx => {
+        base = data.transactions.filter(tx => {
             const txDate = new Date(tx.date);
             return txDate.getMonth() === targetMonth && txDate.getFullYear() === targetYear;
         });
     }
 
-    // Apply Type Filter
-    if (filters.type !== 'All') {
-        filtered = filtered.filter(tx => tx.type === filters.type);
-    }
-
-    // Apply Account Filter
+    // 2. Filter by Account (Applied to both Activity List and Breakdown)
     if (filters.account !== 'All') {
-        filtered = filtered.filter(tx => tx.fromAccount === filters.account || tx.toAccount === filters.account);
+        base = base.filter(tx => tx.fromAccount === filters.account || tx.toAccount === filters.account);
     }
 
-    // Calculate Stats based on FILTERED view
+    // 3. Activity List (Type Filter applied)
+    let activityFiltered = [...base];
+    if (filters.type !== 'All') {
+        activityFiltered = activityFiltered.filter(tx => tx.type === filters.type);
+    }
+
+    // 4. Calculate Net Stats & Breakdown (Ignore Type Filter to show true Net flow for the month)
     let income = 0;
     let expense = 0;
     const catTotals: Record<string, number> = {};
 
-    filtered.forEach(tx => {
+    base.forEach(tx => {
         if (tx.type === 'Income') {
             income += tx.amount;
-            // Subtract income from category to get net spending
             catTotals[tx.category] = (catTotals[tx.category] || 0) - tx.amount;
         } else if (tx.type === 'Expense') {
             expense += tx.amount;
-            // Add expense to category
             catTotals[tx.category] = (catTotals[tx.category] || 0) + tx.amount;
         }
     });
@@ -102,11 +97,12 @@ export const MoneyManager: React.FC<MoneyManagerProps> = ({ data, loading, onRef
         .map(([name, value]) => ({ name, value }))
         .sort((a, b) => b.value - a.value);
 
-    // Pie chart only shows positive net spending (actual costs)
+    // Pie chart shows positive net spending (actual cost centers)
     const pie = breakdown.filter(item => item.value > 0);
 
     return {
-        filteredTransactions: filtered,
+        filteredTransactions: activityFiltered,
+        baseTransactionsForBreakdown: base,
         monthlyStats: { income, expense, balance: income - expense },
         pieData: pie,
         fullBreakdown: breakdown,
@@ -115,10 +111,24 @@ export const MoneyManager: React.FC<MoneyManagerProps> = ({ data, loading, onRef
   }, [data, selectedDate, filters]);
 
   // Derived filtered list for the specific category modal
-  const categoryTransactions = useMemo(() => {
-      if (!selectedCategory) return [];
-      return filteredTransactions.filter(tx => tx.category === selectedCategory);
-  }, [filteredTransactions, selectedCategory]);
+  // We use baseTransactionsForBreakdown so users see both income and expense for that category
+  const { categoryTransactions, categorySummary } = useMemo(() => {
+      if (!selectedCategory) return { categoryTransactions: [], categorySummary: { income: 0, expense: 0, net: 0 } };
+      
+      const transactions = baseTransactionsForBreakdown.filter(tx => tx.category === selectedCategory);
+      
+      let income = 0;
+      let expense = 0;
+      transactions.forEach(tx => {
+          if (tx.type === 'Income') income += tx.amount;
+          else if (tx.type === 'Expense') expense += tx.amount;
+      });
+
+      return { 
+          categoryTransactions: transactions,
+          categorySummary: { income, expense, net: expense - income }
+      };
+  }, [baseTransactionsForBreakdown, selectedCategory]);
 
   if (loading || !data) {
     return (
@@ -246,7 +256,7 @@ export const MoneyManager: React.FC<MoneyManagerProps> = ({ data, loading, onRef
              </div>
         </div>
 
-        {/* Transactions List */}
+        {/* Activity List */}
         <div className="bg-slate-900/40 backdrop-blur-md border border-white/5 rounded-3xl p-4 md:p-6 shadow-xl">
             <div className="flex justify-between items-center mb-4 md:mb-6 px-1">
                 <div className="flex items-center gap-2 md:gap-3">
@@ -389,7 +399,7 @@ export const MoneyManager: React.FC<MoneyManagerProps> = ({ data, loading, onRef
         </div>
       </div>
 
-      {/* RIGHT COLUMN (Sidebar) */}
+      {/* RIGHT COLUMN (Sidebar Breakdown) */}
       <div className="space-y-6">
         {/* Pie Chart Card */}
         <div className="bg-slate-900/40 backdrop-blur-md border border-white/5 rounded-3xl p-6 shadow-xl flex flex-col min-h-[400px]">
@@ -435,18 +445,18 @@ export const MoneyManager: React.FC<MoneyManagerProps> = ({ data, loading, onRef
                 )}
             </div>
             
-            <div className="mt-6 space-y-3 max-h-[300px] overflow-y-auto pr-2 custom-scrollbar">
+            <div className="mt-6 space-y-2 max-h-[300px] overflow-y-auto pr-2 custom-scrollbar">
                 {fullBreakdown.map((entry, index) => (
                      <button 
                         key={entry.name} 
                         onClick={() => setSelectedCategory(entry.name)}
-                        className="w-full flex items-center justify-between p-2 hover:bg-white/5 rounded-lg transition-colors group text-left"
+                        className="w-full flex items-center justify-between p-2.5 hover:bg-white/5 rounded-xl transition-all group text-left border border-transparent hover:border-white/5"
                     >
                         <div className="flex items-center gap-3">
-                             <div className="w-3 h-3 rounded-full" style={{ backgroundColor: PIE_COLORS[index % PIE_COLORS.length] || '#64748b' }}></div>
-                             <span className="text-slate-300 text-sm font-medium group-hover:text-white transition-colors">{entry.name}</span>
+                             <div className="w-3 h-3 rounded-full shadow-[0_0_8px_rgba(0,0,0,0.3)]" style={{ backgroundColor: PIE_COLORS[index % PIE_COLORS.length] || '#64748b' }}></div>
+                             <span className="text-slate-300 text-sm font-semibold group-hover:text-white transition-colors">{entry.name}</span>
                         </div>
-                        <span className={`font-bold text-sm ${entry.value < 0 ? 'text-emerald-400' : 'text-white'}`}>
+                        <span className={`font-bold text-sm ${entry.value < 0 ? 'text-emerald-400' : 'text-slate-100'}`}>
                             {entry.value < 0 ? '+' : ''}{displayValue(Math.abs(entry.value))}
                         </span>
                      </button>
@@ -455,33 +465,65 @@ export const MoneyManager: React.FC<MoneyManagerProps> = ({ data, loading, onRef
         </div>
       </div>
 
-      {/* Category Details Modal */}
+      {/* Category Details Modal - Enhanced */}
       {selectedCategory && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md p-4 animate-in fade-in duration-200">
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/80 backdrop-blur-md p-4 animate-in fade-in duration-300">
             <div className="bg-slate-900 border border-slate-800 rounded-3xl w-full max-w-2xl shadow-2xl flex flex-col max-h-[85vh] overflow-hidden animate-in zoom-in-95 duration-200">
-                <div className="flex justify-between items-center p-6 border-b border-slate-800 bg-slate-900">
+                <div className="flex justify-between items-start p-6 border-b border-slate-800 bg-slate-900/50">
                      <div>
-                        <div className="flex items-center gap-2">
-                            <h2 className="text-xl font-bold text-white">{selectedCategory} Details</h2>
-                            <span className="px-2 py-0.5 rounded-full bg-slate-800 text-slate-400 text-xs font-bold">{categoryTransactions.length}</span>
+                        <div className="flex items-center gap-3 mb-1">
+                            <div className={`p-2 rounded-xl ${getCategoryStyles(selectedCategory).color}`}>
+                                {getCategoryStyles(selectedCategory).icon}
+                            </div>
+                            <h2 className="text-2xl font-bold text-white tracking-tight">{selectedCategory}</h2>
+                            <span className="px-2.5 py-1 rounded-full bg-slate-800 text-slate-400 text-xs font-bold uppercase tracking-wider">
+                                {categoryTransactions.length} Items
+                            </span>
                         </div>
-                        <p className="text-sm text-slate-500">{isCustomDateMode ? 'Custom Range' : monthLabel}</p>
+                        <p className="text-slate-500 text-sm ml-11">{isCustomDateMode ? 'Selected Range' : monthLabel}</p>
                      </div>
-                     <button onClick={() => setSelectedCategory(null)} className="p-2 hover:bg-slate-800 rounded-full text-slate-400 hover:text-white transition-colors"><X className="w-6 h-6" /></button>
+                     <button onClick={() => setSelectedCategory(null)} className="p-2 hover:bg-slate-800 rounded-full text-slate-400 hover:text-white transition-all"><X className="w-6 h-6" /></button>
                 </div>
-                <div className="overflow-y-auto p-4 flex-1 space-y-2">
+                
+                {/* Category Summary Header */}
+                <div className="grid grid-cols-3 gap-2 px-6 py-4 bg-slate-950/30 border-b border-slate-800">
+                    <div className="text-center">
+                        <div className="text-[10px] text-slate-500 font-bold uppercase tracking-widest mb-1">Total Income</div>
+                        <div className="text-sm font-bold text-emerald-400">{displayValue(categorySummary.income)}</div>
+                    </div>
+                    <div className="text-center border-x border-white/5">
+                        <div className="text-[10px] text-slate-500 font-bold uppercase tracking-widest mb-1">Total Expense</div>
+                        <div className="text-sm font-bold text-rose-400">{displayValue(categorySummary.expense)}</div>
+                    </div>
+                    <div className="text-center">
+                        <div className="text-[10px] text-slate-500 font-bold uppercase tracking-widest mb-1">Net Flow</div>
+                        <div className={`text-sm font-bold ${categorySummary.net <= 0 ? 'text-emerald-400' : 'text-slate-100'}`}>
+                            {categorySummary.net <= 0 ? '-' : ''}{displayValue(Math.abs(categorySummary.net))}
+                        </div>
+                    </div>
+                </div>
+
+                <div className="overflow-y-auto p-4 flex-1 space-y-1.5 custom-scrollbar">
                     {categoryTransactions.length > 0 ? (
                         categoryTransactions.map((tx) => (
-                             <div key={tx.id} className="flex items-center justify-between p-3 rounded-xl hover:bg-white/5 border border-transparent hover:border-white/5 group transition-colors">
-                                <div className="flex flex-col">
-                                    <span className="text-white font-medium">{tx.note || tx.category}</span>
-                                    <span className="text-xs text-slate-500">{tx.date} • {tx.fromAccount} {tx.toAccount ? `→ ${tx.toAccount}` : ''}</span>
+                             <div key={tx.id} className="flex items-center justify-between p-3.5 rounded-2xl hover:bg-white/5 border border-transparent hover:border-white/5 group transition-all">
+                                <div className="flex items-center gap-4">
+                                    <div className={`p-2 rounded-lg bg-slate-800/50 ${tx.type === 'Income' ? 'text-emerald-400' : 'text-rose-400'}`}>
+                                        {tx.type === 'Income' ? <TrendingUp className="w-4 h-4" /> : <TrendingDown className="w-4 h-4" />}
+                                    </div>
+                                    <div className="flex flex-col">
+                                        <span className="text-white font-semibold text-sm">{tx.note || tx.category}</span>
+                                        <span className="text-xs text-slate-500">{tx.date} • {tx.fromAccount || tx.toAccount}</span>
+                                    </div>
                                 </div>
                                 <div className="text-right flex items-center gap-4">
-                                    <span className={`font-bold ${tx.type === 'Income' ? 'text-emerald-400' : tx.type === 'Transfer' ? 'text-blue-400' : 'text-slate-200'}`}>
-                                        {tx.type === 'Income' ? '+' : tx.type === 'Transfer' ? '' : '-'} {displayValue(tx.amount, 'RM ')}
-                                    </span>
-                                    <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                    <div className="flex flex-col items-end">
+                                        <span className={`font-bold text-sm ${tx.type === 'Income' ? 'text-emerald-400' : 'text-slate-100'}`}>
+                                            {tx.type === 'Income' ? '+' : '-'} {displayValue(tx.amount, 'RM ')}
+                                        </span>
+                                        <span className="text-[10px] text-slate-600 font-medium uppercase">{tx.type}</span>
+                                    </div>
+                                    <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity translate-x-1 group-hover:translate-x-0">
                                         <button onClick={() => { setSelectedCategory(null); handleEdit(tx); }} className="p-2 text-slate-500 hover:text-indigo-400 bg-slate-800/50 rounded-lg hover:bg-slate-800"><Pencil className="w-4 h-4" /></button>
                                         <button onClick={() => handleDelete(tx)} className="p-2 text-slate-500 hover:text-rose-400 bg-slate-800/50 rounded-lg hover:bg-slate-800"><Trash2 className="w-4 h-4" /></button>
                                     </div>
@@ -495,11 +537,14 @@ export const MoneyManager: React.FC<MoneyManagerProps> = ({ data, loading, onRef
                         </div>
                     )}
                 </div>
-                <div className="p-4 bg-slate-950/50 border-t border-slate-800 flex justify-between items-center text-sm">
-                    <span className="text-slate-400">Total Net for {selectedCategory}</span>
-                    <span className="text-white font-bold">
-                        {displayValue(Math.abs(fullBreakdown.find(c => c.name === selectedCategory)?.value || 0))}
-                    </span>
+                
+                <div className="p-6 bg-slate-950 border-t border-slate-800 flex justify-center">
+                    <button 
+                        onClick={() => setSelectedCategory(null)}
+                        className="w-full bg-slate-800 hover:bg-slate-700 text-white font-bold py-3 rounded-2xl transition-all active:scale-95"
+                    >
+                        Close Details
+                    </button>
                 </div>
             </div>
         </div>
