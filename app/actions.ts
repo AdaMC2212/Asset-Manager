@@ -168,44 +168,43 @@ export async function getPortfolioData(): Promise<PortfolioSummary> {
     let totalCost = 0;
     let cashBalance = 0;
 
-    // INTEGRATION: Specifically target F25 for Uninvested Cash
-    // Row 25 is index 24, Column F is index 5
+    // Target F25 explicitly for Uninvested Cash positioning
     if (rows[24] && rows[24][5]) {
         cashBalance = parseMoney(rows[24][5]);
     }
 
     const rowPromises = [];
 
-    // Scan for Summary Stats as fallbacks or supplemental data
+    // Scan for Summary Stats
     for (let i = 1; i < rows.length; i++) {
       const row = rows[i];
-      if (row[11]) {
-        const label = row[11].toString().trim();
-        const val = parseMoney(row[12]);
+      if (row[4]) {
+        const label = row[4].toString().trim();
+        const val = parseMoney(row[5]);
         if (label === 'Total Invested') totalCost = val;
-        // Only override cashBalance if it wasn't found in F25 or is explicitly labeled elsewhere
-        else if (label === 'Total Cash' && cashBalance === 0) cashBalance = val;
         else if (label === 'Net Asset') netWorth = val;
       }
 
       const status = row[3]?.toString().trim();
       if (status === 'Active') {
         const ticker = row[1]?.toString().toUpperCase().trim();
-        if (ticker) {
+        if (ticker && ticker !== 'SYMBOL') {
           rowPromises.push(
              (async () => {
                 const quantity = parseMoney(row[2]);
                 const avgCost = parseMoney(row[4]);
                 const currentPrice = parseMoney(row[5]);
-                const currentValue = quantity * currentPrice;
-                const totalCostForHolding = quantity * avgCost;
-                const unrealizedPL = currentValue - totalCostForHolding;
+                const currentValue = parseMoney(row[8]);
+                const unrealizedPL = parseMoney(row[7]);
+                
                 const sector = await getSector(ticker);
                 const assetClass = getAssetClass(ticker);
+                
                 return {
                     ticker, quantity, avgCost, currentPrice, currentValue,
-                    totalCost: totalCostForHolding, unrealizedPL,
-                    unrealizedPLPercent: totalCostForHolding > 0 ? (unrealizedPL / totalCostForHolding) * 100 : 0,
+                    totalCost: quantity * avgCost, 
+                    unrealizedPL,
+                    unrealizedPLPercent: (quantity * avgCost) > 0 ? (unrealizedPL / (quantity * avgCost)) * 100 : 0,
                     allocation: 0, sector, assetClass
                 };
              })()
@@ -281,10 +280,11 @@ export async function getMoneyManagerData(): Promise<MoneyManagerData> {
   try {
     const { googleSheets } = await getSheetClient();
     const [accResponse, txResponse, catResponse] = await Promise.all([
-        googleSheets.spreadsheets.values.get({ spreadsheetId: SPREADSHEET_ID, range: `${MM_ACCOUNTS_SHEET}!A:E` }),
+        googleSheets.spreadsheets.values.get({ spreadsheetId: SPREADSHEET_ID, range: `${MM_ACCOUNTS_SHEET}!A:F` }), // Extended to F to capture everything
         googleSheets.spreadsheets.values.get({ spreadsheetId: SPREADSHEET_ID, range: `${MM_TRANSACTIONS_SHEET}!A:G` }),
         googleSheets.spreadsheets.values.get({ spreadsheetId: SPREADSHEET_ID, range: `${MM_CATEGORIES_SHEET}!A:B` })
     ]);
+    
     const catRows = catResponse.data.values || [];
     const fetchedIncomeCats: string[] = [];
     const fetchedExpenseCats: string[] = [];
@@ -294,17 +294,29 @@ export async function getMoneyManagerData(): Promise<MoneyManagerData> {
     }
     const incomeCats = fetchedIncomeCats.length > 0 ? fetchedIncomeCats : DEFAULT_INCOME_CATS;
     const expenseCats = fetchedExpenseCats.length > 0 ? fetchedExpenseCats : DEFAULT_EXPENSE_CATS;
+    
     const accRows = accResponse.data.values || [];
     const accounts: MoneyAccount[] = [];
     const accountMap: Record<string, MoneyAccount> = {};
+    
     for (let i = 1; i < accRows.length; i++) {
       if (accRows[i][0]) {
         const initialBal = parseMoney(accRows[i][3]);
-        const acc = { name: accRows[i][0], category: accRows[i][1] || 'General', logoUrl: accRows[i][2] || '', initialBalance: initialBal, currentBalance: initialBal };
+        // INTEGRATION: Use Column E (index 4) as the 'final version' source of truth for balances
+        const currentBalFromSheet = parseMoney(accRows[i][4]); 
+        
+        const acc = { 
+            name: accRows[i][0], 
+            category: accRows[i][1] || 'General', 
+            logoUrl: accRows[i][2] || '', 
+            initialBalance: initialBal, 
+            currentBalance: currentBalFromSheet 
+        };
         accounts.push(acc);
         accountMap[accRows[i][0]] = acc;
       }
     }
+    
     const txRows = txResponse.data.values || [];
     const transactions: MoneyTransaction[] = [];
     const categoryTotals: Record<string, number> = {};
@@ -316,10 +328,12 @@ export async function getMoneyManagerData(): Promise<MoneyManagerData> {
     const currentMonthKey = `${today.getFullYear()}-${today.getMonth()}`; 
     const lastMonthDate = new Date(today.getFullYear(), today.getMonth() - 1, 1);
     const lastMonthKey = `${lastMonthDate.getFullYear()}-${lastMonthDate.getMonth()}`;
+    
     let currentMonthIncome = 0;
     let currentMonthExpense = 0;
     let lastMonthIncome = 0;
     let lastMonthExpense = 0;
+    
     for (let i = 1; i < txRows.length; i++) {
        const row = txRows[i];
        if (row[0] && row[3]) {
@@ -329,14 +343,12 @@ export async function getMoneyManagerData(): Promise<MoneyManagerData> {
          const category = row[2] || 'Uncategorized';
          const fromAcc = row[4]?.trim();
          const toAcc = row[5]?.trim();
+         
          if (category && category !== 'Uncategorized') uniqueCategories.add(category);
          transactions.push({ id: `mtx-${i}`, rowIndex: i + 1, date: formatDateDisplay(dateObj), type: type as any, category, amount, fromAccount: fromAcc, toAccount: toAcc, note: row[6] });
-         if (type === 'Income' && toAcc && accountMap[toAcc]) accountMap[toAcc].currentBalance += amount;
-         else if (type === 'Expense' && fromAcc && accountMap[fromAcc]) accountMap[fromAcc].currentBalance -= amount;
-         else if (type === 'Transfer') {
-             if (fromAcc && accountMap[fromAcc]) accountMap[fromAcc].currentBalance -= amount;
-             if (toAcc && accountMap[toAcc]) accountMap[toAcc].currentBalance += amount;
-         }
+         
+         // Note: We no longer modify currentBalance here because we trust the sheet's final version (Column E)
+         
          if (type === 'Income' || type === 'Expense') {
             const txMonthKey = `${dateObj.getFullYear()}-${dateObj.getMonth()}`;
             if (txMonthKey === currentMonthKey) {
@@ -354,19 +366,31 @@ export async function getMoneyManagerData(): Promise<MoneyManagerData> {
          if (dateObj > today && type === 'Expense') upcomingBills.push({ id: `bill-${i}`, name: row[6] || category, date: formatDateDisplay(dateObj), amount: amount, isPaid: false });
        }
     }
+    
     accounts.sort((a, b) => b.currentBalance - a.currentBalance);
     transactions.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+    
     const graphData = Object.entries(graphMap).sort(([, a], [, b]) => a.sortKey - b.sortKey).slice(-7).map(([key, val]) => {
         const [y, m] = key.split('-');
         return { name: new Date(parseInt(y), parseInt(m) - 1, 1).toLocaleString('default', { month: 'short' }), income: val.income, expense: val.expense };
     });
+    
     const calcGrowth = (curr: number, prev: number) => prev === 0 ? (curr > 0 ? 100 : 0) : ((curr - prev) / prev) * 100;
     const categorySpending = Object.keys(categoryTotals).filter(cat => categoryTotals[cat] > 0).map(cat => {
         const spent = categoryTotals[cat];
         const limit = Math.max(spent * 1.2, 500); 
         return { category: cat, spent, limit, percentage: (spent / limit) * 100 };
     }).sort((a, b) => b.spent - a.spent);
-    return { accounts, transactions, totalBalance: accounts.reduce((sum, acc) => sum + acc.currentBalance, 0), monthlyStats: { income: currentMonthIncome, expense: currentMonthExpense, incomeGrowth: calcGrowth(currentMonthIncome, lastMonthIncome), expenseGrowth: calcGrowth(currentMonthExpense, lastMonthExpense) }, categorySpending, graphData, upcomingBills, categories: Array.from(uniqueCategories).sort().length > 0 ? Array.from(uniqueCategories).sort() : expenseCats, incomeCategories: incomeCats, expenseCategories: expenseCats };
+    
+    return { 
+        accounts, 
+        transactions, 
+        totalBalance: accounts.reduce((sum, acc) => sum + acc.currentBalance, 0), // Pure sum from Column E
+        monthlyStats: { income: currentMonthIncome, expense: currentMonthExpense, incomeGrowth: calcGrowth(currentMonthIncome, lastMonthIncome), expenseGrowth: calcGrowth(currentMonthExpense, lastMonthExpense) }, 
+        categorySpending, graphData, upcomingBills, 
+        categories: Array.from(uniqueCategories).sort().length > 0 ? Array.from(uniqueCategories).sort() : expenseCats, 
+        incomeCategories: incomeCats, expenseCategories: expenseCats 
+    };
   } catch (error) { return defaultData; }
 }
 
