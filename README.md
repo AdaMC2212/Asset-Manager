@@ -27,7 +27,7 @@ A robust and modern web application designed to streamline asset tracking and ma
 * **Styling:** Tailwind CSS & PostCSS
 * **Linting:** ESLint
 * **Deployment:** Vercel
-
+***
 ## 📂 Project Structure
 
 ```bash
