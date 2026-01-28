@@ -2,7 +2,7 @@
 
 A robust and modern web application designed to streamline asset tracking and management. Built with performance and scalability in mind, this application leverages the power of Next.js and TypeScript to provide a seamless user experience across all devices.
 
-🔗 **Live Demo:** [adamcyx-assetmanager.vercel.app](https://adamcyx-assetmanager.vercel.app)
+🔗 **Live Demo:** 
 ***
 ## 🌟 Features & Functions
 
