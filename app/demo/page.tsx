@@ -2,111 +2,27 @@
 'use client';
 
 import React, { useEffect, useState, useCallback, useMemo } from 'react';
-// Added Search to the lucide-react imports
-import { Plus, LayoutDashboard, AlertCircle, RefreshCw, PieChart as PieChartIcon, ArrowRightLeft, Wallet, LineChart, Eye, EyeOff, Lock, ShieldCheck, Database, Loader2, Landmark, Command as CommandIcon, Search, Beaker, ArrowRight } from 'lucide-react';
-import { SummaryCards } from '../components/SummaryCards';
-import { HoldingsTable } from '../components/HoldingsTable';
-import { AllocationChart } from '../components/AllocationChart';
-import { FundingStats } from '../components/FundingStats';
-import { MoneyManager } from '../components/MoneyManager';
-import { AddTradeModal } from '../components/AddTradeModal';
-import { TotalBalanceCard } from '../components/TotalBalanceCard';
-import { CommandPalette } from '../components/CommandPalette';
-import { CardSkeleton, TableSkeleton } from '../components/ui/Skeleton';
-import { getPortfolioData, getCashFlowData, getMoneyManagerData, checkDatabaseStatus, initializeDatabase } from './actions';
-import { PortfolioSummary, CashFlowSummary, MoneyManagerData } from '../types';
-import { DecryptedText } from '../components/ui/DecryptedText';
+import { Plus, LayoutDashboard, AlertCircle, RefreshCw, Wallet, LineChart, Eye, EyeOff, Command as CommandIcon, Search, Beaker, LogOut, Landmark } from 'lucide-react';
 import Link from 'next/link';
+
+// Adjust imports for nested directory structure
+import { SummaryCards } from '../../components/SummaryCards';
+import { HoldingsTable } from '../../components/HoldingsTable';
+import { AllocationChart } from '../../components/AllocationChart';
+import { FundingStats } from '../../components/FundingStats';
+import { MoneyManager } from '../../components/MoneyManager';
+import { AddTradeModal } from '../../components/AddTradeModal';
+import { TotalBalanceCard } from '../../components/TotalBalanceCard';
+import { CommandPalette } from '../../components/CommandPalette';
+import { CardSkeleton, TableSkeleton } from '../../components/ui/Skeleton';
+import { getPortfolioData, getCashFlowData, getMoneyManagerData, checkDatabaseStatus } from '../actions';
+import { PortfolioSummary, CashFlowSummary, MoneyManagerData } from '../../types';
+import { DecryptedText } from '../../components/ui/DecryptedText';
 
 type AppModule = 'manager' | 'investment';
 type InvestmentTab = 'dashboard' | 'funding';
 
-const LockScreen = ({ onUnlock }: { onUnlock: () => void }) => {
-  const [pin, setPin] = useState('');
-  const [error, setError] = useState(false);
-  const [showHelp, setShowHelp] = useState(false);
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    const envPin = process.env.NEXT_PUBLIC_APP_PASSWORD;
-    const targetPin = envPin || 'admin';
-    
-    if (pin === targetPin) {
-      onUnlock();
-    } else {
-      setError(true);
-      setPin('');
-    }
-  };
-
-  return (
-    <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center p-4 relative overflow-hidden">
-      <div className="absolute inset-0 z-0 opacity-20 pointer-events-none" 
-           style={{ 
-             backgroundImage: 'linear-gradient(#334155 1px, transparent 1px), linear-gradient(90deg, #334155 1px, transparent 1px)', 
-             backgroundSize: '40px 40px' 
-           }}>
-      </div>
-      
-      <div className="w-full max-w-sm bg-slate-900/80 backdrop-blur-md border border-slate-800 rounded-2xl p-8 shadow-2xl relative z-10 overflow-hidden">
-        <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500"></div>
-        
-        <div className="flex flex-col items-center mb-8">
-            <div className="bg-slate-800 p-4 rounded-full mb-4 border border-slate-700 shadow-inner">
-                <ShieldCheck className="w-10 h-10 text-indigo-500" />
-            </div>
-            <h1 className="text-2xl font-bold text-white tracking-tight flex items-center gap-1">
-              <DecryptedText text="AssetManager" speed={50} className="text-white" />
-            </h1>
-            <p className="text-slate-500 text-sm mt-1">Secure Portfolio Access</p>
-        </div>
-
-        <form onSubmit={handleSubmit} className="space-y-6">
-            <div>
-                <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2 ml-1">Access PIN</label>
-                <div className="relative">
-                    <input 
-                        type="password" 
-                        inputMode="numeric"
-                        pattern="[0-9]*"
-                        value={pin}
-                        onChange={(e) => { setPin(e.target.value); setError(false); }}
-                        className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent text-center text-2xl tracking-[0.5em] placeholder:tracking-normal transition-all"
-                        placeholder="••••"
-                        autoFocus
-                    />
-                    <Lock className="absolute right-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-600" />
-                </div>
-            </div>
-
-            {error && (
-                <div className="flex items-center justify-center gap-2 text-rose-500 text-sm animate-pulse">
-                    <AlertCircle className="w-4 h-4" />
-                    <span>Incorrect PIN</span>
-                </div>
-            )}
-
-            <button 
-                type="submit"
-                className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-3.5 rounded-xl transition-all shadow-lg shadow-indigo-500/25 active:scale-95"
-            >
-                Unlock Dashboard
-            </button>
-        </form>
-
-        <div className="mt-8 pt-6 border-t border-white/5 text-center">
-             <Link href="/demo" className="inline-flex items-center gap-2 text-slate-400 hover:text-white text-sm transition-colors group">
-                <span>View Demo Version</span>
-                <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
-             </Link>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-export default function Home() {
-  const [isLocked, setIsLocked] = useState(true);
+export default function DemoPage() {
   const [data, setData] = useState<PortfolioSummary | null>(null);
   const [cashFlowData, setCashFlowData] = useState<CashFlowSummary | null>(null);
   const [moneyData, setMoneyData] = useState<MoneyManagerData | null>(null);
@@ -114,9 +30,6 @@ export default function Home() {
   const [error, setError] = useState<string | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isCommandOpen, setIsCommandOpen] = useState(false);
-  
-  const [dbStatus, setDbStatus] = useState<{ configured: boolean, initialized: boolean, isDemo?: boolean } | null>(null);
-  const [isInitializing, setIsInitializing] = useState(false);
   
   const [activeModule, setActiveModule] = useState<AppModule>('manager');
   const [activeInvTab, setActiveInvTab] = useState<InvestmentTab>('dashboard');
@@ -143,25 +56,25 @@ export default function Home() {
     setLoading(true);
     setError(null);
     try {
-      const status = await checkDatabaseStatus();
-      setDbStatus(status);
+      // FORCE DEMO = TRUE
+      const status = await checkDatabaseStatus(true);
 
       if (status.configured) {
          const [portfolioResult, cashFlowResult, moneyResult] = await Promise.all([
-            getPortfolioData().catch(() => null),
-            getCashFlowData().catch(() => null),
-            getMoneyManagerData().catch(() => null)
+            getPortfolioData(true).catch(() => null),
+            getCashFlowData(true).catch(() => null),
+            getMoneyManagerData(true).catch(() => null)
          ]);
 
          setData(portfolioResult || { netWorth: 0, totalCost: 0, totalPL: 0, totalPLPercent: 0, cashBalance: 0, holdings: [] });
          setCashFlowData(cashFlowResult || { totalDepositedMYR: 0, totalConvertedMYR: 0, totalConvertedUSD: 0, avgRate: 0, deposits: [], conversions: [] });
          setMoneyData(moneyResult || { accounts: [], transactions: [], totalBalance: 0, monthlyStats: { income: 0, expense: 0, incomeGrowth: 0, expenseGrowth: 0 }, categorySpending: [], graphData: [], upcomingBills: [], categories: [], incomeCategories: [], expenseCategories: [] });
       } else {
-         setError("Database connection missing. Please configure GOOGLE_SERVICE_ACCOUNT_KEY.");
+         setError("Failed to initialize demo.");
       }
     } catch (err: any) {
-      console.error("Critical failure loading data", err);
-      setError("Failed to initialize application.");
+      console.error("Critical failure loading demo data", err);
+      setError("Failed to load demo.");
     } finally {
       setLoading(false);
     }
@@ -179,16 +92,9 @@ export default function Home() {
   }, []);
 
   useEffect(() => {
-    if (!isLocked) {
-      fetchData();
-      const interval = setInterval(fetchData, 60000);
-      return () => clearInterval(interval);
-    }
-  }, [fetchData, isLocked]);
-
-  if (isLocked) {
-    return <LockScreen onUnlock={() => setIsLocked(false)} />;
-  }
+    fetchData();
+    // No interval for demo, or less frequent
+  }, [fetchData]);
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-200 font-sans selection:bg-indigo-500/30">
@@ -203,11 +109,9 @@ export default function Home() {
               <span className="font-bold text-xl text-white tracking-tight hidden sm:block">
                 <DecryptedText text="AssetManager" speed={60} revealDirection="center" />
               </span>
-              {dbStatus?.isDemo && (
-                 <span className="flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-amber-500/10 border border-amber-500/20 text-amber-400 text-[10px] font-bold uppercase tracking-wide">
-                    <Beaker className="w-3 h-3" /> Demo
-                 </span>
-              )}
+              <span className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-500/10 border border-amber-500/20 text-amber-400 text-[10px] font-bold uppercase tracking-wide">
+                 <Beaker className="w-3 h-3" /> Demo Mode
+              </span>
             </div>
 
             <div className="hidden md:flex bg-slate-900/60 p-1 rounded-xl border border-white/5 backdrop-blur-md">
@@ -239,23 +143,13 @@ export default function Home() {
                  </div>
                </button>
 
-               {activeModule === 'investment' && (
-                  <button
-                    onClick={() => setHideInvestments(!hideInvestments)}
-                    className="p-2.5 text-slate-400 hover:text-white transition-colors bg-white/5 rounded-xl border border-white/5"
-                    title={hideInvestments ? "Show Values" : "Hide Values"}
-                  >
-                    {hideInvestments ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                  </button>
-               )}
-
-              <button
-                onClick={fetchData}
-                className="p-2.5 text-slate-400 hover:text-white transition-colors bg-white/5 rounded-xl border border-white/5"
-                title="Refresh"
-              >
-                <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
-              </button>
+               <Link
+                href="/"
+                className="p-2.5 text-slate-400 hover:text-white transition-colors bg-rose-500/10 hover:bg-rose-500/20 rounded-xl border border-rose-500/20"
+                title="Exit Demo"
+               >
+                 <LogOut className="w-4 h-4" />
+               </Link>
 
               {activeModule === 'investment' && (
                 <button
@@ -272,6 +166,23 @@ export default function Home() {
       </nav>
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        
+        {/* DEMO BANNER */}
+        <div className="mb-6 p-3 bg-indigo-500/10 border border-indigo-500/20 rounded-xl flex items-center justify-between">
+            <div className="flex items-center gap-3">
+                <div className="p-2 bg-indigo-500 rounded-lg">
+                    <Beaker className="w-4 h-4 text-white" />
+                </div>
+                <div>
+                    <h3 className="text-sm font-bold text-white">Preview Environment</h3>
+                    <p className="text-xs text-indigo-300">You are viewing a simulated dataset. Changes here will not affect your real portfolio.</p>
+                </div>
+            </div>
+            <Link href="/" className="text-xs font-bold text-white bg-indigo-600 hover:bg-indigo-700 px-4 py-2 rounded-lg transition-colors">
+                Login to Real App
+            </Link>
+        </div>
+
         <div className="md:hidden flex bg-slate-900/60 p-1 rounded-xl border border-white/5 mb-6">
             <button 
               onClick={() => setActiveModule('manager')}

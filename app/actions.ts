@@ -5,6 +5,49 @@ import { getSheetClient, SPREADSHEET_ID, SHEET_NAME, CASH_FLOW_SHEET_NAME, PORTF
 import { PortfolioSummary, Holding, TradeAction, CashFlowSummary, Deposit, Conversion, MoneyManagerData, MoneyAccount, MoneyTransaction, CategorySpending, GraphDataPoint, Bill, MonthlyStats } from '../types';
 import yahooFinance from 'yahoo-finance2';
 
+// --- MOCK DATA FOR DEMO MODE ---
+const MOCK_PRICES: Record<string, number> = {
+  AAPL: 175.50, VOO: 475.00, QQQ: 440.00, INTC: 32.00, NVDA: 900.00, SMH: 220.00,
+  META: 500.00, AMZN: 180.00, IWM: 205.00, TSLA: 175.00, JPM: 195.00, PLTR: 25.00,
+  UNH: 480.00, AVGO: 1300.00, IBIT: 70.00, QQQM: 180.00, GOOGL: 150.00, MSFT: 420.00
+};
+
+const MOCK_TRANSACTIONS_RAW = [
+  { date: '2024-04-01', ticker: 'AAPL', action: 'Buy', quantity: 1.0000, price: 170.03, fees: 0 },
+  { date: '2024-04-01', ticker: 'VOO', action: 'Buy', quantity: 5.0000, price: 440, fees: 1.62 },
+  { date: '2024-04-15', ticker: 'QQQ', action: 'Buy', quantity: 3.0000, price: 430, fees: 1.62 },
+  { date: '2024-05-30', ticker: 'NVDA', action: 'Buy', quantity: 2.0000, price: 113, fees: 1.2 },
+  { date: '2024-06-18', ticker: 'SMH', action: 'Buy', quantity: 2.0000, price: 215, fees: 1.41 },
+  { date: '2024-07-11', ticker: 'META', action: 'Buy', quantity: 1.0000, price: 460, fees: 1.2 },
+  { date: '2024-08-07', ticker: 'AMZN', action: 'Buy', quantity: 5.0000, price: 165, fees: 1.21 },
+  { date: '2025-01-13', ticker: 'TSLA', action: 'Buy', quantity: 2.0000, price: 170, fees: 0.71 },
+  { date: '2025-01-14', ticker: 'JPM', action: 'Buy', quantity: 1.0000, price: 190, fees: 0.71 },
+  { date: '2025-01-17', ticker: 'IBIT', action: 'Buy', quantity: 10.0000, price: 35, fees: 1.21 },
+  { date: '2025-02-25', ticker: 'PLTR', action: 'Buy', quantity: 10.0000, price: 22, fees: 1.25 }
+];
+
+const MOCK_MONEY_DATA = {
+    accounts: [
+        { name: 'Maybank', category: 'Bank', logoUrl: '', initialBalance: 12000, currentBalance: 8450.50 },
+        { name: 'GXBank', category: 'Bank', logoUrl: '', initialBalance: 5000, currentBalance: 5200 },
+        { name: 'TnG eWallet', category: 'Wallet', logoUrl: '', initialBalance: 500, currentBalance: 145.20 },
+        { name: 'Cash', category: 'Cash', logoUrl: '', initialBalance: 500, currentBalance: 320 },
+        { name: 'Credit Card', category: 'Card', logoUrl: '', initialBalance: 0, currentBalance: -1250 }
+    ],
+    transactions: [
+        { id: '1', date: '2024-03-24', type: 'Expense', category: 'Food', amount: 25.50, fromAccount: 'TnG eWallet', note: 'Lunch' },
+        { id: '2', date: '2024-03-23', type: 'Expense', category: 'Transport', amount: 50.00, fromAccount: 'Maybank', note: 'Petrol' },
+        { id: '3', date: '2024-03-22', type: 'Income', category: 'Salary', amount: 5500.00, toAccount: 'Maybank', note: 'March Salary' },
+        { id: '4', date: '2024-03-21', type: 'Expense', category: 'Utilities', amount: 180.00, fromAccount: 'Maybank', note: 'Electric Bill' },
+        { id: '5', date: '2024-03-20', type: 'Expense', category: 'Fashion', amount: 299.00, fromAccount: 'GXBank', note: 'Uniqlo Haul' },
+        { id: '6', date: '2024-03-19', type: 'Expense', category: 'Food', amount: 15.00, fromAccount: 'Cash', note: 'Hawker Stall' },
+        { id: '7', date: '2024-03-18', type: 'Transfer', category: 'Transfer', amount: 200.00, fromAccount: 'Maybank', toAccount: 'TnG eWallet', note: 'Topup' },
+        { id: '8', date: '2024-03-15', type: 'Expense', category: 'Entertainment', amount: 45.00, fromAccount: 'Credit Card', note: 'Movie Night' },
+        { id: '9', date: '2024-03-12', type: 'Expense', category: 'Healthcare', amount: 120.00, fromAccount: 'Maybank', note: 'Supplements' },
+        { id: '10', date: '2024-03-10', type: 'Income', category: 'Bonus', amount: 1000.00, toAccount: 'GXBank', note: 'Performance Bonus' }
+    ]
+};
+
 // --- Helper Functions for Categorization ---
 
 const SECTOR_MAP: Record<string, string> = {
@@ -40,6 +83,10 @@ const getAssetClass = (ticker: string) => {
 const getSector = async (ticker: string) => {
   const t = ticker.toUpperCase();
   if (SECTOR_MAP[t]) return SECTOR_MAP[t];
+  
+  // In Demo mode or if offline, we skip Yahoo Finance check to prevent errors
+  if (!process.env.GOOGLE_SERVICE_ACCOUNT_KEY) return 'Other';
+
   try {
     const quote = await yahooFinance.quoteSummary(t, { modules: ['summaryProfile', 'quoteType'] }) as any;
     const sector = quote.summaryProfile?.sector;
@@ -75,26 +122,32 @@ const formatDateDisplay = (date: Date): string => {
   return date.toISOString().split('T')[0];
 };
 
-export async function checkDatabaseStatus() {
+// ACTIONS
+
+export async function checkDatabaseStatus(forceDemo: boolean = false) {
     if (typeof window !== 'undefined') throw new Error("Server Action");
-    const isConfigured = !!process.env.GOOGLE_SERVICE_ACCOUNT_KEY;
-    if (!isConfigured) return { configured: false, initialized: false };
+    
+    // DEMO MODE CHECK
+    if (forceDemo || !process.env.GOOGLE_SERVICE_ACCOUNT_KEY) {
+        return { configured: true, initialized: true, isDemo: true };
+    }
+
     try {
         const { googleSheets } = await getSheetClient();
         await googleSheets.spreadsheets.values.get({
             spreadsheetId: SPREADSHEET_ID,
             range: `${MM_ACCOUNTS_SHEET}!A1:A1`, 
         });
-        return { configured: true, initialized: true };
+        return { configured: true, initialized: true, isDemo: false };
     } catch (error: any) {
-        if (error.message?.includes("Unable to parse range")) return { configured: true, initialized: false };
-        return { configured: true, initialized: false, error: error.message };
+        if (error.message?.includes("Unable to parse range")) return { configured: true, initialized: false, isDemo: false };
+        return { configured: true, initialized: false, error: error.message, isDemo: false };
     }
 }
 
-export async function initializeDatabase() {
+export async function initializeDatabase(forceDemo: boolean = false) {
     if (typeof window !== 'undefined') throw new Error("Server Action");
-    if (!process.env.GOOGLE_SERVICE_ACCOUNT_KEY) return { success: false, error: "No API Key" };
+    if (forceDemo || !process.env.GOOGLE_SERVICE_ACCOUNT_KEY) return { success: true }; 
     try {
         const { googleSheets } = await getSheetClient();
         const requests = [];
@@ -144,12 +197,57 @@ export async function initializeDatabase() {
     }
 }
 
-/**
- * Server Action: Fetches portfolio data from Google Sheets
- */
-export async function getPortfolioData(): Promise<PortfolioSummary> {
+export async function getPortfolioData(forceDemo: boolean = false): Promise<PortfolioSummary> {
   if (typeof window !== 'undefined') throw new Error("Server Action");
-  if (!process.env.GOOGLE_SERVICE_ACCOUNT_KEY) throw new Error("Configuration Missing.");
+
+  // DEMO MODE CHECK
+  if (forceDemo || !process.env.GOOGLE_SERVICE_ACCOUNT_KEY) {
+      const holdingsMap: Record<string, Holding> = {};
+      const txs = MOCK_TRANSACTIONS_RAW;
+      
+      txs.forEach(tx => {
+          if (!holdingsMap[tx.ticker]) {
+              holdingsMap[tx.ticker] = {
+                  ticker: tx.ticker, quantity: 0, avgCost: 0, currentPrice: 0, currentValue: 0,
+                  totalCost: 0, unrealizedPL: 0, unrealizedPLPercent: 0, allocation: 0,
+                  sector: SECTOR_MAP[tx.ticker] || 'Other', assetClass: getAssetClass(tx.ticker)
+              };
+          }
+          const h = holdingsMap[tx.ticker];
+          if (tx.action === 'Buy') {
+              const cost = (tx.quantity * tx.price) + tx.fees;
+              h.totalCost += cost;
+              h.quantity += tx.quantity;
+          }
+      });
+
+      let netWorth = 0;
+      let totalCost = 0;
+      const holdings = Object.values(holdingsMap).map(h => {
+          h.avgCost = h.quantity > 0 ? h.totalCost / h.quantity : 0;
+          h.currentPrice = MOCK_PRICES[h.ticker] || h.avgCost * 1.1; // 10% gain default
+          h.currentValue = h.quantity * h.currentPrice;
+          h.unrealizedPL = h.currentValue - h.totalCost;
+          h.unrealizedPLPercent = h.totalCost > 0 ? (h.unrealizedPL / h.totalCost) * 100 : 0;
+          netWorth += h.currentValue;
+          totalCost += h.totalCost;
+          return h;
+      });
+
+      const cashBalance = 5000;
+      netWorth += cashBalance;
+
+      holdings.forEach(h => h.allocation = (h.currentValue / netWorth) * 100);
+
+      return {
+          netWorth,
+          totalCost,
+          totalPL: netWorth - totalCost,
+          totalPLPercent: totalCost > 0 ? ((netWorth - totalCost) / totalCost) * 100 : 0,
+          cashBalance,
+          holdings: holdings.sort((a, b) => b.currentValue - a.currentValue)
+      };
+  }
 
   try {
     const { googleSheets } = await getSheetClient();
@@ -168,14 +266,12 @@ export async function getPortfolioData(): Promise<PortfolioSummary> {
     let totalCost = 0;
     let cashBalance = 0;
 
-    // Target F25 explicitly for Uninvested Cash positioning
     if (rows[24] && rows[24][5]) {
         cashBalance = parseMoney(rows[24][5]);
     }
 
     const rowPromises = [];
 
-    // Scan for Summary Stats
     for (let i = 1; i < rows.length; i++) {
       const row = rows[i];
       if (row[4]) {
@@ -240,8 +336,28 @@ export async function getPortfolioData(): Promise<PortfolioSummary> {
   }
 }
 
-export async function getCashFlowData(): Promise<CashFlowSummary> {
+export async function getCashFlowData(forceDemo: boolean = false): Promise<CashFlowSummary> {
   if (typeof window !== 'undefined') throw new Error("Server Action");
+
+  if (forceDemo || !process.env.GOOGLE_SERVICE_ACCOUNT_KEY) {
+      const deposits: Deposit[] = [
+        { date: '2024-03-01', amountMYR: 5000, reason: 'Initial Capital' },
+        { date: '2024-04-15', amountMYR: 2000, reason: 'Monthly Savings' }
+      ];
+      const conversions: Conversion[] = [
+        { date: '2024-03-05', amountMYR: 4500, amountUSD: 950, rate: 4.73 },
+        { date: '2024-04-20', amountMYR: 1800, amountUSD: 380, rate: 4.74 }
+      ];
+      return {
+        totalDepositedMYR: 7000,
+        totalConvertedMYR: 6300,
+        totalConvertedUSD: 1330,
+        avgRate: 4.736,
+        deposits: deposits.reverse(), 
+        conversions: conversions.reverse()
+      };
+  }
+
   try {
     const { googleSheets } = await getSheetClient();
     const response = await googleSheets.spreadsheets.values.get({
@@ -273,10 +389,48 @@ export async function getCashFlowData(): Promise<CashFlowSummary> {
   }
 }
 
-export async function getMoneyManagerData(): Promise<MoneyManagerData> {
+export async function getMoneyManagerData(forceDemo: boolean = false): Promise<MoneyManagerData> {
   if (typeof window !== 'undefined') throw new Error("Server Action");
   const defaultData: MoneyManagerData = { accounts: [], transactions: [], totalBalance: 0, monthlyStats: { income: 0, expense: 0, incomeGrowth: 0, expenseGrowth: 0 }, categorySpending: [], graphData: [], upcomingBills: [], categories: [...DEFAULT_EXPENSE_CATS, ...DEFAULT_INCOME_CATS], incomeCategories: DEFAULT_INCOME_CATS, expenseCategories: DEFAULT_EXPENSE_CATS };
-  if (!process.env.GOOGLE_SERVICE_ACCOUNT_KEY) return defaultData;
+  
+  // DEMO MODE CHECK
+  if (forceDemo || !process.env.GOOGLE_SERVICE_ACCOUNT_KEY) {
+      const accs = MOCK_MONEY_DATA.accounts as MoneyAccount[];
+      const txsRaw = MOCK_MONEY_DATA.transactions;
+      const transactions = txsRaw.map((t, i) => ({ ...t, rowIndex: i + 1, type: t.type as any })) as MoneyTransaction[];
+      
+      const totalBalance = accs.reduce((sum, a) => sum + a.currentBalance, 0);
+      
+      // Basic stats calc
+      const income = transactions.filter(t => t.type === 'Income').reduce((sum, t) => sum + t.amount, 0);
+      const expense = transactions.filter(t => t.type === 'Expense').reduce((sum, t) => sum + t.amount, 0);
+
+      const categoryTotals: Record<string, number> = {};
+      transactions.filter(t => t.type === 'Expense').forEach(t => categoryTotals[t.category] = (categoryTotals[t.category] || 0) + t.amount);
+      const categorySpending = Object.entries(categoryTotals).map(([c, val]) => ({
+          category: c, spent: val, limit: 1000, percentage: (val / 1000) * 100
+      })).sort((a,b) => b.spent - a.spent);
+
+      const graphData = [
+        { name: 'Jan', income: 4500, expense: 2000 },
+        { name: 'Feb', income: 5200, expense: 2300 },
+        { name: 'Mar', income: 6500, expense: 2850 }
+      ];
+
+      return {
+          accounts: accs,
+          transactions: transactions,
+          totalBalance,
+          monthlyStats: { income, expense, incomeGrowth: 10, expenseGrowth: 5 },
+          categorySpending,
+          graphData,
+          upcomingBills: [],
+          categories: [...DEFAULT_EXPENSE_CATS, ...DEFAULT_INCOME_CATS],
+          incomeCategories: DEFAULT_INCOME_CATS,
+          expenseCategories: DEFAULT_EXPENSE_CATS
+      };
+  }
+
   try {
     const { googleSheets } = await getSheetClient();
     const [accResponse, txResponse, catResponse] = await Promise.all([
@@ -394,8 +548,9 @@ export async function getMoneyManagerData(): Promise<MoneyManagerData> {
   } catch (error) { return defaultData; }
 }
 
-export async function addMoneyTransaction(data: MoneyTransaction) {
+export async function addMoneyTransaction(data: MoneyTransaction, forceDemo: boolean = false) {
   if (typeof window !== 'undefined') throw new Error("Server Action");
+  if (forceDemo || !process.env.GOOGLE_SERVICE_ACCOUNT_KEY) return { success: true };
   try {
     const { googleSheets } = await getSheetClient();
     await googleSheets.spreadsheets.values.append({ spreadsheetId: SPREADSHEET_ID, range: `${MM_TRANSACTIONS_SHEET}!A:G`, valueInputOption: 'USER_ENTERED', requestBody: { values: [[data.date, data.type, data.category, data.amount, data.fromAccount || '', data.toAccount || '', data.note || '']] } });
@@ -403,8 +558,9 @@ export async function addMoneyTransaction(data: MoneyTransaction) {
   } catch (error) { return { success: false, error: 'Failed' }; }
 }
 
-export async function updateMoneyTransaction(rowIndex: number, data: MoneyTransaction) {
+export async function updateMoneyTransaction(rowIndex: number, data: MoneyTransaction, forceDemo: boolean = false) {
   if (typeof window !== 'undefined') throw new Error("Server Action");
+  if (forceDemo || !process.env.GOOGLE_SERVICE_ACCOUNT_KEY) return { success: true };
   try {
     const { googleSheets } = await getSheetClient();
     await googleSheets.spreadsheets.values.update({ spreadsheetId: SPREADSHEET_ID, range: `${MM_TRANSACTIONS_SHEET}!A${rowIndex}:G${rowIndex}`, valueInputOption: 'USER_ENTERED', requestBody: { values: [[data.date, data.type, data.category, data.amount, data.fromAccount || '', data.toAccount || '', data.note || '']] } });
@@ -412,8 +568,9 @@ export async function updateMoneyTransaction(rowIndex: number, data: MoneyTransa
   } catch (error) { return { success: false, error: 'Failed' }; }
 }
 
-export async function deleteMoneyTransaction(rowIndex: number) {
+export async function deleteMoneyTransaction(rowIndex: number, forceDemo: boolean = false) {
   if (typeof window !== 'undefined') throw new Error("Server Action");
+  if (forceDemo || !process.env.GOOGLE_SERVICE_ACCOUNT_KEY) return { success: true };
   try {
     const { googleSheets } = await getSheetClient();
     await googleSheets.spreadsheets.values.clear({ spreadsheetId: SPREADSHEET_ID, range: `${MM_TRANSACTIONS_SHEET}!A${rowIndex}:G${rowIndex}` });
@@ -421,8 +578,9 @@ export async function deleteMoneyTransaction(rowIndex: number) {
   } catch (error) { return { success: false, error: 'Failed' }; }
 }
 
-export async function addCategory(category: string, type: 'Income' | 'Expense') {
+export async function addCategory(category: string, type: 'Income' | 'Expense', forceDemo: boolean = false) {
   if (typeof window !== 'undefined') throw new Error("Server Action");
+  if (forceDemo || !process.env.GOOGLE_SERVICE_ACCOUNT_KEY) return { success: true };
   try {
     const { googleSheets } = await getSheetClient();
     const col = type === 'Expense' ? 'A' : 'B';
@@ -433,8 +591,9 @@ export async function addCategory(category: string, type: 'Income' | 'Expense') 
   } catch (error) { return { success: false, error: 'Failed' }; }
 }
 
-export async function deleteCategory(category: string, type: 'Income' | 'Expense') {
+export async function deleteCategory(category: string, type: 'Income' | 'Expense', forceDemo: boolean = false) {
   if (typeof window !== 'undefined') throw new Error("Server Action");
+  if (forceDemo || !process.env.GOOGLE_SERVICE_ACCOUNT_KEY) return { success: true };
   try {
     const { googleSheets } = await getSheetClient();
     const col = type === 'Expense' ? 'A' : 'B';
@@ -448,8 +607,9 @@ export async function deleteCategory(category: string, type: 'Income' | 'Expense
   } catch (error) { return { success: false, error: 'Failed' }; }
 }
 
-export async function updateCategory(oldName: string, newName: string, type: 'Income' | 'Expense') {
+export async function updateCategory(oldName: string, newName: string, type: 'Income' | 'Expense', forceDemo: boolean = false) {
   if (typeof window !== 'undefined') throw new Error("Server Action");
+  if (forceDemo || !process.env.GOOGLE_SERVICE_ACCOUNT_KEY) return { success: true };
   try {
     const { googleSheets } = await getSheetClient();
     const col = type === 'Expense' ? 'A' : 'B';
@@ -463,8 +623,9 @@ export async function updateCategory(oldName: string, newName: string, type: 'In
   } catch (error) { return { success: false, error: 'Failed' }; }
 }
 
-export async function addTrade(data: any) {
+export async function addTrade(data: any, forceDemo: boolean = false) {
   if (typeof window !== 'undefined') throw new Error("Server Action");
+  if (forceDemo || !process.env.GOOGLE_SERVICE_ACCOUNT_KEY) return { success: true };
   try {
     const { googleSheets } = await getSheetClient();
     await googleSheets.spreadsheets.values.append({ spreadsheetId: SPREADSHEET_ID, range: `${SHEET_NAME}!A:G`, valueInputOption: 'USER_ENTERED', requestBody: { values: [[data.date, data.ticker, data.action, data.quantity, data.price, data.fees, (data.quantity * data.price)]] } });
@@ -472,8 +633,9 @@ export async function addTrade(data: any) {
   } catch (error) { return { success: false, error: 'Failed' }; }
 }
 
-export async function addDeposit(data: { date: string, amount: number, reason: string }) {
+export async function addDeposit(data: { date: string, amount: number, reason: string }, forceDemo: boolean = false) {
   if (typeof window !== 'undefined') throw new Error("Server Action");
+  if (forceDemo || !process.env.GOOGLE_SERVICE_ACCOUNT_KEY) return { success: true };
   try {
     const { googleSheets } = await getSheetClient();
     await googleSheets.spreadsheets.values.append({ spreadsheetId: SPREADSHEET_ID, range: `${CASH_FLOW_SHEET_NAME}!A:C`, valueInputOption: 'USER_ENTERED', requestBody: { values: [[data.date, data.amount, data.reason]] } });
@@ -481,8 +643,9 @@ export async function addDeposit(data: { date: string, amount: number, reason: s
   } catch (error) { return { success: false, error: 'Failed' }; }
 }
 
-export async function addConversion(data: { date: string, myr: number, usd: number, rate: number }) {
+export async function addConversion(data: { date: string, myr: number, usd: number, rate: number }, forceDemo: boolean = false) {
   if (typeof window !== 'undefined') throw new Error("Server Action");
+  if (forceDemo || !process.env.GOOGLE_SERVICE_ACCOUNT_KEY) return { success: true };
   try {
     const { googleSheets } = await getSheetClient();
     await googleSheets.spreadsheets.values.append({ spreadsheetId: SPREADSHEET_ID, range: `${CASH_FLOW_SHEET_NAME}!E:H`, valueInputOption: 'USER_ENTERED', requestBody: { values: [[data.date, data.myr, data.usd, data.rate]] } });
