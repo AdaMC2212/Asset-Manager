@@ -143,7 +143,6 @@ export const AddMoneyModal: React.FC<AddMoneyModalProps> = ({
         alert('Failed: ' + result.error);
       }
     } catch (err) {
-      console.error(err);
       alert('Error occurred.');
     } finally {
       setIsSubmitting(false);

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { ArrowLeftRight, Landmark, Banknote, TrendingUp, Plus } from 'lucide-react';
+import { Landmark, Banknote, TrendingUp, Plus } from 'lucide-react';
 import { CashFlowSummary, PortfolioSummary } from '../types';
 import { AddFundingModal } from './FundingStats/AddFundingModal';
 

@@ -40,12 +40,6 @@ export interface PortfolioSummary {
   holdings: Holding[];
 }
 
-export interface PieChartData {
-  name: string;
-  value: number;
-  fill?: string;
-}
-
 export interface Deposit {
   date: string;
   amountMYR: number;

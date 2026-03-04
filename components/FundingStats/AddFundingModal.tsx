@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
-import { X, Loader2, ArrowRight } from 'lucide-react';
+import { X, Loader2 } from 'lucide-react';
 import { addDeposit, addConversion } from '../../app/actions';
 
 interface AddFundingModalProps {
@@ -75,7 +75,6 @@ export const AddFundingModal: React.FC<AddFundingModalProps> = ({ isOpen, onClos
             alert('Failed: ' + result.error);
         }
     } catch (err) {
-        console.error(err);
         alert('An error occurred.');
     } finally {
         setIsSubmitting(false);

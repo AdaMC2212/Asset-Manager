@@ -160,7 +160,6 @@ export default function Home() {
          setError("Database connection missing. Please configure GOOGLE_SERVICE_ACCOUNT_KEY.");
       }
     } catch (err: any) {
-      console.error("Critical failure loading data", err);
       setError("Failed to initialize application.");
     } finally {
       setLoading(false);

@@ -16,7 +16,6 @@ export const getSheetClient = async () => {
   try {
     credentials = JSON.parse(keyString);
   } catch (e) {
-    console.error("Failed to parse GOOGLE_SERVICE_ACCOUNT_KEY", e);
     throw new Error('Failed to parse GOOGLE_SERVICE_ACCOUNT_KEY. Ensure it is valid JSON in your .env.local file.');
   }
 

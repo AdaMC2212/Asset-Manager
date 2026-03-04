@@ -1,5 +1,5 @@
 import React from 'react';
-import { TrendingUp, TrendingDown, Wallet, Landmark, ArrowUpRight, DollarSign } from 'lucide-react';
+import { TrendingUp, TrendingDown, Wallet, ArrowUpRight, DollarSign } from 'lucide-react';
 import { PortfolioSummary } from '../types';
 import { CountUp } from './ui/CountUp';
 

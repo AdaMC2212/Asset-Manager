@@ -109,7 +109,6 @@ export const AddTradeModal: React.FC<AddTradeModalProps> = ({ isOpen, onClose, o
         alert('Failed to add trade: ' + result.error);
       }
     } catch (err) {
-      console.error(err);
       alert('An unexpected error occurred.');
     } finally {
       setIsSubmitting(false);

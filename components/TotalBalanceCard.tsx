@@ -1,7 +1,7 @@
 
 'use client';
 import React, { useState } from 'react';
-import { Wallet, Eye, EyeOff, X, CreditCard, Smartphone, Banknote, ArrowUpRight, ArrowDownRight } from 'lucide-react';
+import { Wallet, Eye, EyeOff, X, CreditCard, Smartphone, Banknote } from 'lucide-react';
 import { MoneyAccount } from '../types';
 import { CountUp } from './ui/CountUp';
 

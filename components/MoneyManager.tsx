@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useMemo } from 'react';
-import { Plus, Wallet, ShoppingBag, Car, Shirt, Zap, Wifi, Music, Utensils, Smartphone, Banknote, Calendar, ChevronLeft, ChevronRight, X, ArrowUpRight, ArrowDownRight, Pencil, Trash2, Filter, XCircle, TrendingUp, TrendingDown } from 'lucide-react';
+import { Plus, Wallet, ShoppingBag, Car, Zap, Utensils, Smartphone, Banknote, Calendar, ChevronLeft, ChevronRight, X, ArrowUpRight, ArrowDownRight, Pencil, Trash2, Filter, XCircle, TrendingUp, TrendingDown } from 'lucide-react';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts';
 import { MoneyManagerData, MoneyTransaction } from '../types';
 import { AddMoneyModal } from './MoneyManager/AddMoneyModal';

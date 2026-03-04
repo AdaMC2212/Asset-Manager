@@ -73,7 +73,6 @@ export default function DemoPage() {
          setError("Failed to initialize demo.");
       }
     } catch (err: any) {
-      console.error("Critical failure loading demo data", err);
       setError("Failed to load demo.");
     } finally {
       setLoading(false);
