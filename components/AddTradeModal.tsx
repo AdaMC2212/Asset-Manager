@@ -1,7 +1,7 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
-import { X, Loader2 } from 'lucide-react';
+import React, { useEffect, useState } from 'react';
+import { Loader2, X } from 'lucide-react';
 import { Transaction, TradeAction } from '../types';
 import { addTrade } from '../app/actions';
 
@@ -12,37 +12,78 @@ interface AddTradeModalProps {
 }
 
 const SECTOR_LOOKUP: Record<string, string> = {
-  // Tech
-  AAPL: 'Technology', MSFT: 'Technology', NVDA: 'Semiconductors', INTC: 'Semiconductors', AMD: 'Semiconductors',
-  SMH: 'Semiconductors', META: 'Technology', GOOGL: 'Technology', GOOG: 'Technology', AMZN: 'Consumer Cyclical', 
-  PLTR: 'Technology', AVGO: 'Semiconductors', NFLX: 'Communication Services', CRM: 'Technology', ADBE: 'Technology',
-  ORCL: 'Technology', CSCO: 'Technology', TSM: 'Semiconductors', QCOM: 'Semiconductors', MU: 'Semiconductors',
-  
-  // Auto
-  TSLA: 'Automotive', F: 'Automotive', GM: 'Automotive', RIVN: 'Automotive', LCID: 'Automotive',
-
-  // Financials
-  JPM: 'Financials', BAC: 'Financials', V: 'Financials', MA: 'Financials', WFC: 'Financials',
-  GS: 'Financials', MS: 'Financials', BLK: 'Financials', C: 'Financials',
-
-  // Healthcare
-  UNH: 'Healthcare', JNJ: 'Healthcare', PFE: 'Healthcare', LLY: 'Healthcare', MRK: 'Healthcare',
-  ABBV: 'Healthcare', TMO: 'Healthcare',
-
-  // Energy
-  XOM: 'Energy', CVX: 'Energy', SHEL: 'Energy', COP: 'Energy',
-
-  // Consumer
-  WMT: 'Consumer Defensive', KO: 'Consumer Defensive', PEP: 'Consumer Defensive', PG: 'Consumer Defensive',
-  COST: 'Consumer Defensive', MCD: 'Consumer Cyclical', SBUX: 'Consumer Cyclical', NKE: 'Consumer Cyclical',
-
-  // ETFs
-  VOO: 'Index ETF', SPY: 'Index ETF', QQQ: 'Index ETF', QQQM: 'Index ETF', IWM: 'Index ETF', 
-  VTI: 'Index ETF', VEA: 'Index ETF', VWO: 'Index ETF', BND: 'Bond ETF', GLD: 'Commodity ETF',
-  XLE: 'Energy ETF', XLF: 'Financial ETF', XLK: 'Tech ETF', XLV: 'Healthcare ETF',
-
-  // Crypto
-  IBIT: 'Crypto', BTC: 'Crypto', ETH: 'Crypto', COIN: 'Crypto', MSTR: 'Crypto Proxy'
+  AAPL: 'Technology',
+  MSFT: 'Technology',
+  NVDA: 'Semiconductors',
+  INTC: 'Semiconductors',
+  AMD: 'Semiconductors',
+  SMH: 'Semiconductors',
+  META: 'Technology',
+  GOOGL: 'Technology',
+  GOOG: 'Technology',
+  AMZN: 'Consumer Cyclical',
+  PLTR: 'Technology',
+  AVGO: 'Semiconductors',
+  NFLX: 'Communication Services',
+  CRM: 'Technology',
+  ADBE: 'Technology',
+  ORCL: 'Technology',
+  CSCO: 'Technology',
+  TSM: 'Semiconductors',
+  QCOM: 'Semiconductors',
+  MU: 'Semiconductors',
+  TSLA: 'Automotive',
+  F: 'Automotive',
+  GM: 'Automotive',
+  RIVN: 'Automotive',
+  LCID: 'Automotive',
+  JPM: 'Financials',
+  BAC: 'Financials',
+  V: 'Financials',
+  MA: 'Financials',
+  WFC: 'Financials',
+  GS: 'Financials',
+  MS: 'Financials',
+  BLK: 'Financials',
+  C: 'Financials',
+  UNH: 'Healthcare',
+  JNJ: 'Healthcare',
+  PFE: 'Healthcare',
+  LLY: 'Healthcare',
+  MRK: 'Healthcare',
+  ABBV: 'Healthcare',
+  TMO: 'Healthcare',
+  XOM: 'Energy',
+  CVX: 'Energy',
+  SHEL: 'Energy',
+  COP: 'Energy',
+  WMT: 'Consumer Defensive',
+  KO: 'Consumer Defensive',
+  PEP: 'Consumer Defensive',
+  PG: 'Consumer Defensive',
+  COST: 'Consumer Defensive',
+  MCD: 'Consumer Cyclical',
+  SBUX: 'Consumer Cyclical',
+  NKE: 'Consumer Cyclical',
+  VOO: 'Index ETF',
+  SPY: 'Index ETF',
+  QQQ: 'Index ETF',
+  QQQM: 'Index ETF',
+  IWM: 'Index ETF',
+  VTI: 'Index ETF',
+  VEA: 'Index ETF',
+  VWO: 'Index ETF',
+  BND: 'Bond ETF',
+  GLD: 'Commodity ETF',
+  XLE: 'Energy ETF',
+  XLF: 'Financial ETF',
+  XLK: 'Tech ETF',
+  XLV: 'Healthcare ETF',
+  IBIT: 'Crypto',
+  BTC: 'Crypto',
+  ETH: 'Crypto',
+  COIN: 'Crypto',
+  MSTR: 'Crypto Proxy',
 };
 
 export const AddTradeModal: React.FC<AddTradeModalProps> = ({ isOpen, onClose, onSuccess }) => {
@@ -52,35 +93,41 @@ export const AddTradeModal: React.FC<AddTradeModalProps> = ({ isOpen, onClose, o
     action: TradeAction.BUY,
     assetClass: 'Equity',
     sector: 'Technology',
-    ticker: '' // Initialize to empty string to ensure controlled input
+    ticker: '',
   });
 
-  // Auto-match sector when ticker changes
   useEffect(() => {
-    if (formData.ticker) {
-      const upperTicker = formData.ticker.toUpperCase();
-      const matchedSector = SECTOR_LOOKUP[upperTicker];
-      if (matchedSector) {
-        setFormData(prev => ({ ...prev, sector: matchedSector }));
-        
-        // Auto set asset class for some known types
-        if (['BTC', 'ETH', 'IBIT', 'COIN'].includes(upperTicker) || matchedSector === 'Crypto') {
-             setFormData(prev => ({ ...prev, assetClass: 'Crypto' }));
-        } else if (['VOO', 'SPY', 'QQQ', 'QQQM', 'IWM', 'SMH'].includes(upperTicker) || matchedSector.includes('ETF')) {
-             setFormData(prev => ({ ...prev, assetClass: 'ETF' }));
-        }
-      }
+    if (!isOpen) return;
+    const handleKey = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') onClose();
+    };
+    window.addEventListener('keydown', handleKey);
+    return () => window.removeEventListener('keydown', handleKey);
+  }, [isOpen, onClose]);
+
+  useEffect(() => {
+    if (!formData.ticker) return;
+    const upperTicker = formData.ticker.toUpperCase();
+    const matchedSector = SECTOR_LOOKUP[upperTicker];
+
+    if (!matchedSector) return;
+
+    setFormData((prev) => ({ ...prev, sector: matchedSector }));
+
+    if (['BTC', 'ETH', 'IBIT', 'COIN'].includes(upperTicker) || matchedSector === 'Crypto') {
+      setFormData((prev) => ({ ...prev, assetClass: 'Crypto' }));
+    } else if (['VOO', 'SPY', 'QQQ', 'QQQM', 'IWM', 'SMH'].includes(upperTicker) || matchedSector.includes('ETF')) {
+      setFormData((prev) => ({ ...prev, assetClass: 'ETF' }));
     }
   }, [formData.ticker]);
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleSubmit = async (event: React.FormEvent) => {
+    event.preventDefault();
     if (!formData.ticker || !formData.quantity || !formData.price) return;
 
     setIsSubmitting(true);
     try {
-      // Prepare the simplified object expected by the Server Action
-      const tradeData = {
+      const result = await addTrade({
         date: formData.date,
         ticker: formData.ticker.toUpperCase(),
         action: formData.action,
@@ -88,28 +135,26 @@ export const AddTradeModal: React.FC<AddTradeModalProps> = ({ isOpen, onClose, o
         price: Number(formData.price),
         fees: Number(formData.fees || 0),
         assetClass: formData.assetClass,
-        sector: formData.sector
-      };
+        sector: formData.sector,
+      });
 
-      const result = await addTrade(tradeData);
-      
-      if (result.success) {
-        onSuccess();
-        onClose();
-        // Reset form slightly but keep dates
-        setFormData({
-            date: new Date().toISOString().split('T')[0],
-            action: TradeAction.BUY,
-            assetClass: 'Equity',
-            sector: 'Technology',
-            ticker: '',
-            fees: 0
-        });
-      } else {
-        alert('Failed to add trade: ' + result.error);
+      if (!result.success) {
+        alert(`Failed to add trade: ${result.error}`);
+        return;
       }
+
+      onSuccess();
+      onClose();
+      setFormData({
+        date: new Date().toISOString().split('T')[0],
+        action: TradeAction.BUY,
+        assetClass: 'Equity',
+        sector: 'Technology',
+        ticker: '',
+        fees: 0,
+      });
     } catch (err) {
-      alert('An unexpected error occurred.');
+      alert('Unexpected error while creating trade.');
     } finally {
       setIsSubmitting(false);
     }
@@ -118,33 +163,36 @@ export const AddTradeModal: React.FC<AddTradeModalProps> = ({ isOpen, onClose, o
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
-      <div className="bg-slate-900 border border-slate-800 rounded-xl w-full max-w-lg shadow-2xl">
-        <div className="flex justify-between items-center p-6 border-b border-slate-800">
-          <h2 className="text-xl font-bold text-white">Add New Trade</h2>
-          <button onClick={onClose} className="text-slate-400 hover:text-white transition-colors">
-            <X className="w-6 h-6" />
+    <div className="fixed inset-0 z-[110] flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm" onClick={onClose}>
+      <div className="panel-elevated motion-zoom-in w-full max-w-2xl rounded-3xl" onClick={(event) => event.stopPropagation()}>
+        <div className="flex items-center justify-between border-b border-[var(--border-soft)] px-6 py-5">
+          <div>
+            <h2 className="font-display text-2xl text-[var(--text-primary)]">Add Trade</h2>
+            <p className="text-sm text-[var(--text-secondary)]">Record a buy or sell event with allocation metadata.</p>
+          </div>
+          <button type="button" onClick={onClose} className="focus-ring rounded-lg p-2 text-[var(--text-muted)] transition hover:bg-white/5 hover:text-[var(--text-primary)]">
+            <X className="h-5 w-5" />
           </button>
         </div>
-        
-        <form onSubmit={handleSubmit} className="p-6 space-y-4">
-          <div className="grid grid-cols-2 gap-4">
+
+        <form onSubmit={handleSubmit} className="max-h-[75vh] space-y-4 overflow-y-auto p-6">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div>
-              <label className="block text-sm font-medium text-slate-400 mb-1">Date</label>
+              <label className="mb-1 block text-xs font-semibold uppercase tracking-[0.16em] text-[var(--text-muted)]">Date</label>
               <input
                 type="date"
                 required
-                className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                className="focus-ring w-full rounded-xl border border-[var(--border-soft)] bg-[var(--bg-base)] px-3 py-2 text-sm text-[var(--text-primary)]"
                 value={formData.date}
-                onChange={e => setFormData({...formData, date: e.target.value})}
+                onChange={(event) => setFormData({ ...formData, date: event.target.value })}
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-slate-400 mb-1">Action</label>
+              <label className="mb-1 block text-xs font-semibold uppercase tracking-[0.16em] text-[var(--text-muted)]">Action</label>
               <select
-                className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                className="focus-ring w-full rounded-xl border border-[var(--border-soft)] bg-[var(--bg-base)] px-3 py-2 text-sm text-[var(--text-primary)]"
                 value={formData.action}
-                onChange={e => setFormData({...formData, action: e.target.value as TradeAction})}
+                onChange={(event) => setFormData({ ...formData, action: event.target.value as TradeAction })}
               >
                 <option value={TradeAction.BUY}>Buy</option>
                 <option value={TradeAction.SELL}>Sell</option>
@@ -152,24 +200,24 @@ export const AddTradeModal: React.FC<AddTradeModalProps> = ({ isOpen, onClose, o
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div>
-              <label className="block text-sm font-medium text-slate-400 mb-1">Ticker</label>
+              <label className="mb-1 block text-xs font-semibold uppercase tracking-[0.16em] text-[var(--text-muted)]">Ticker</label>
               <input
                 type="text"
                 required
                 placeholder="AAPL"
-                className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-white focus:outline-none focus:ring-2 focus:ring-indigo-500 uppercase"
+                className="focus-ring w-full rounded-xl border border-[var(--border-soft)] bg-[var(--bg-base)] px-3 py-2 text-sm uppercase text-[var(--text-primary)]"
                 value={formData.ticker}
-                onChange={e => setFormData({...formData, ticker: e.target.value})}
+                onChange={(event) => setFormData({ ...formData, ticker: event.target.value })}
               />
             </div>
-             <div>
-              <label className="block text-sm font-medium text-slate-400 mb-1">Sector</label>
+            <div>
+              <label className="mb-1 block text-xs font-semibold uppercase tracking-[0.16em] text-[var(--text-muted)]">Sector</label>
               <select
-                className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                className="focus-ring w-full rounded-xl border border-[var(--border-soft)] bg-[var(--bg-base)] px-3 py-2 text-sm text-[var(--text-primary)]"
                 value={formData.sector}
-                onChange={e => setFormData({...formData, sector: e.target.value})}
+                onChange={(event) => setFormData({ ...formData, sector: event.target.value })}
               >
                 <option value="Technology">Technology</option>
                 <option value="Semiconductors">Semiconductors</option>
@@ -187,51 +235,51 @@ export const AddTradeModal: React.FC<AddTradeModalProps> = ({ isOpen, onClose, o
             </div>
           </div>
 
-          <div className="grid grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
             <div>
-              <label className="block text-sm font-medium text-slate-400 mb-1">Quantity</label>
+              <label className="mb-1 block text-xs font-semibold uppercase tracking-[0.16em] text-[var(--text-muted)]">Quantity</label>
               <input
                 type="number"
                 step="0.0001"
                 required
-                className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                className="focus-ring w-full rounded-xl border border-[var(--border-soft)] bg-[var(--bg-base)] px-3 py-2 text-sm text-[var(--text-primary)]"
                 value={formData.quantity ?? ''}
-                onChange={e => setFormData({...formData, quantity: parseFloat(e.target.value)})}
+                onChange={(event) => setFormData({ ...formData, quantity: parseFloat(event.target.value) })}
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-slate-400 mb-1">Price ($)</label>
+              <label className="mb-1 block text-xs font-semibold uppercase tracking-[0.16em] text-[var(--text-muted)]">Price (USD)</label>
               <input
                 type="number"
                 step="0.01"
                 required
-                className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                className="focus-ring w-full rounded-xl border border-[var(--border-soft)] bg-[var(--bg-base)] px-3 py-2 text-sm text-[var(--text-primary)]"
                 value={formData.price ?? ''}
-                onChange={e => setFormData({...formData, price: parseFloat(e.target.value)})}
+                onChange={(event) => setFormData({ ...formData, price: parseFloat(event.target.value) })}
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-slate-400 mb-1">Fees ($)</label>
+              <label className="mb-1 block text-xs font-semibold uppercase tracking-[0.16em] text-[var(--text-muted)]">Fees (USD)</label>
               <input
                 type="number"
                 step="0.01"
-                className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                className="focus-ring w-full rounded-xl border border-[var(--border-soft)] bg-[var(--bg-base)] px-3 py-2 text-sm text-[var(--text-primary)]"
                 value={formData.fees ?? ''}
-                onChange={e => setFormData({...formData, fees: parseFloat(e.target.value)})}
+                onChange={(event) => setFormData({ ...formData, fees: parseFloat(event.target.value) })}
               />
             </div>
           </div>
 
-          <div className="pt-4">
+          <div className="pt-2">
             <button
               type="submit"
               disabled={isSubmitting}
-              className="w-full bg-indigo-600 hover:bg-indigo-700 disabled:bg-indigo-600/50 text-white font-semibold py-3 px-4 rounded-lg transition-colors flex justify-center items-center gap-2"
+              className="focus-ring inline-flex w-full items-center justify-center rounded-xl bg-[var(--accent-primary)] px-4 py-3 text-sm font-semibold text-white transition hover:bg-[var(--accent-secondary)] disabled:cursor-not-allowed disabled:opacity-60"
             >
               {isSubmitting ? (
                 <>
-                  <Loader2 className="w-5 h-5 animate-spin" />
-                  Saving to Sheets...
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Saving trade...
                 </>
               ) : (
                 'Confirm Trade'

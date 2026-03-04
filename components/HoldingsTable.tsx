@@ -1,88 +1,77 @@
 import React from 'react';
-import { PortfolioSummary, Holding } from '../types';
-// Added Plus to the lucide-react imports
-import { TrendingUp, TrendingDown, Layers, Plus } from 'lucide-react';
+import { Layers, TrendingDown, TrendingUp } from 'lucide-react';
+import { Holding, PortfolioSummary } from '../types';
 
 interface HoldingsTableProps {
   data: PortfolioSummary | null;
   hideValues?: boolean;
 }
 
-export const HoldingsTable: React.FC<HoldingsTableProps> = ({ data, hideValues }) => {
-  const displayValue = (val: number, prefix: string = '$') => {
-    if (hideValues) return `${prefix} ****`;
-    return `${prefix}${val.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-  };
+const displayCurrency = (value: number, hideValues?: boolean): string =>
+  hideValues
+    ? '$ ****'
+    : `$${value.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
+export const HoldingsTable: React.FC<HoldingsTableProps> = ({ data, hideValues }) => {
   return (
-    <div className="glass-card rounded-3xl overflow-hidden">
-      <div className="p-6 border-b border-white/5 flex justify-between items-center bg-white/[0.02]">
+    <section className="panel overflow-hidden rounded-3xl">
+      <div className="flex items-center justify-between border-b border-[var(--border-soft)] px-5 py-4 sm:px-6">
         <div className="flex items-center gap-3">
-            <Layers className="w-5 h-5 text-indigo-400" />
-            <h2 className="text-xl font-bold text-white tracking-tight">Active Holdings</h2>
+          <div className="rounded-xl border border-[var(--border-soft)] bg-black/20 p-2 text-[var(--text-secondary)]">
+            <Layers className="h-4 w-4" />
+          </div>
+          <h2 className="font-display text-xl text-[var(--text-primary)]">Active Holdings</h2>
         </div>
-        <div className="text-xs font-bold text-slate-500 uppercase tracking-widest bg-slate-800/50 px-3 py-1 rounded-full">
-            {data?.holdings.length || 0} Assets
-        </div>
+        <span className="chip text-[var(--text-secondary)]">{data?.holdings.length || 0} assets</span>
       </div>
+
       <div className="overflow-x-auto">
-        <table className="w-full text-left compact-table border-collapse">
-          <thead>
-            <tr className="border-b border-white/5 text-slate-500 text-[10px] uppercase tracking-[0.2em] font-black">
-              <th className="px-6 py-4">Asset / Sector</th>
-              <th className="px-6 py-4 text-right">Last Price</th>
-              <th className="px-6 py-4 text-right">Quantity</th>
+        <table className="w-full min-w-[760px] text-left">
+          <thead className="bg-black/15">
+            <tr className="text-[10px] font-semibold uppercase tracking-[0.2em] text-[var(--text-muted)]">
+              <th className="px-6 py-4">Asset</th>
+              <th className="px-6 py-4 text-right">Price</th>
+              <th className="px-6 py-4 text-right">Qty</th>
               <th className="px-6 py-4 text-right">Value</th>
-              <th className="px-6 py-4 text-right">P/L Performance</th>
+              <th className="px-6 py-4 text-right">P/L</th>
               <th className="px-6 py-4 text-right">Weight</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-white/5">
+          <tbody>
             {data?.holdings.map((holding: Holding) => {
               const isPositive = holding.unrealizedPL >= 0;
               return (
-                <tr key={holding.ticker} className="group hover:bg-white/[0.04] transition-all duration-200">
+                <tr key={holding.ticker} className="group border-t border-[var(--border-soft)] transition hover:bg-white/[0.03]">
                   <td className="px-6 py-4">
-                    <div className="flex items-center">
-                      <div className="w-10 h-10 rounded-xl bg-slate-800/80 flex items-center justify-center font-black text-xs text-white mr-3 border border-white/10 group-hover:scale-105 group-hover:bg-indigo-600 transition-all duration-300">
-                          {holding.ticker.substring(0, 4)}
+                    <div className="flex items-center gap-3">
+                      <div className="rounded-xl border border-[var(--border-soft)] bg-black/20 px-2.5 py-2 text-xs font-bold text-[var(--text-primary)]">
+                        {holding.ticker.slice(0, 4)}
                       </div>
                       <div>
-                        <div className="font-bold text-white text-sm group-hover:text-indigo-300 transition-colors">{holding.ticker}</div>
-                        <div className="text-[10px] text-slate-500 uppercase font-bold tracking-wider">{holding.sector}</div>
+                        <p className="text-sm font-semibold text-[var(--text-primary)]">{holding.ticker}</p>
+                        <p className="text-xs text-[var(--text-muted)]">{holding.sector}</p>
                       </div>
                     </div>
                   </td>
-                  <td className="px-6 py-4 text-right">
-                    <span className="text-white font-semibold text-sm">${holding.currentPrice.toFixed(2)}</span>
+                  <td className="px-6 py-4 text-right text-sm font-medium text-[var(--text-primary)]">${holding.currentPrice.toFixed(2)}</td>
+                  <td className="px-6 py-4 text-right text-sm text-[var(--text-secondary)]">
+                    {hideValues ? '****' : holding.quantity.toLocaleString(undefined, { maximumFractionDigits: 3 })}
                   </td>
+                  <td className="px-6 py-4 text-right text-sm font-semibold text-[var(--text-primary)]">{displayCurrency(holding.currentValue, hideValues)}</td>
                   <td className="px-6 py-4 text-right">
-                    <span className="text-slate-400 text-xs font-medium">
-                        {hideValues ? '****' : holding.quantity.toLocaleString(undefined, { maximumFractionDigits: 3 })}
-                    </span>
-                  </td>
-                  <td className="px-6 py-4 text-right">
-                    <div className="font-bold text-white text-sm">
-                        {displayValue(holding.currentValue)}
+                    <div className={`inline-flex items-center gap-1 text-sm font-semibold ${isPositive ? 'text-emerald-300' : 'text-rose-300'}`}>
+                      {isPositive ? <TrendingUp className="h-3.5 w-3.5" /> : <TrendingDown className="h-3.5 w-3.5" />}
+                      {isPositive ? '+' : ''}
+                      {displayCurrency(holding.unrealizedPL, hideValues)}
                     </div>
+                    <p className={`mt-1 text-[11px] ${isPositive ? 'text-emerald-400/80' : 'text-rose-400/80'}`}>
+                      {hideValues ? '****' : `${isPositive ? '+' : ''}${holding.unrealizedPLPercent.toFixed(2)}%`}
+                    </p>
                   </td>
                   <td className="px-6 py-4 text-right">
-                    <div className={`flex flex-col items-end`}>
-                        <div className={`flex items-center gap-1 font-bold text-sm ${isPositive ? 'text-emerald-400' : 'text-rose-400'}`}>
-                            {isPositive ? <TrendingUp className="w-3 h-3" /> : <TrendingDown className="w-3 h-3" />}
-                            {isPositive ? '+' : ''}{displayValue(holding.unrealizedPL)}
-                        </div>
-                        <div className={`text-[10px] font-black tracking-widest ${isPositive ? 'text-emerald-500' : 'text-rose-500'}`}>
-                            {hideValues ? '****' : (isPositive ? '+' : '') + holding.unrealizedPLPercent.toFixed(2) + '%'}
-                        </div>
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 text-right">
-                    <div className="flex flex-col items-end gap-1.5">
-                        <span className="text-slate-300 text-[10px] font-black tracking-widest">{hideValues ? '**' : holding.allocation.toFixed(1)}%</span>
-                        <div className="w-16 h-1 bg-white/5 rounded-full overflow-hidden">
-                             <div className="h-full bg-gradient-to-r from-indigo-500 to-purple-500 rounded-full" style={{ width: `${holding.allocation}%` }}></div>
-                        </div>
+                    <p className="text-xs font-semibold text-[var(--text-secondary)]">{hideValues ? '**' : `${holding.allocation.toFixed(1)}%`}</p>
+                    <div className="ml-auto mt-2 h-1.5 w-20 overflow-hidden rounded-full bg-black/30">
+                      <div className="h-full rounded-full bg-gradient-to-r from-[var(--accent-primary)] to-cyan-400" style={{ width: `${holding.allocation}%` }} />
                     </div>
                   </td>
                 </tr>
@@ -90,20 +79,14 @@ export const HoldingsTable: React.FC<HoldingsTableProps> = ({ data, hideValues }
             })}
             {(!data || data.holdings.length === 0) && (
               <tr>
-                <td colSpan={6} className="px-6 py-20 text-center">
-                  <div className="flex flex-col items-center gap-3">
-                    <div className="w-16 h-16 rounded-full bg-slate-900 flex items-center justify-center border border-white/5 shadow-inner">
-                        <Plus className="w-6 h-6 text-slate-700" />
-                    </div>
-                    <div className="text-slate-500 font-bold text-sm">No holdings detected.</div>
-                    <p className="text-xs text-slate-600 max-w-xs leading-relaxed">Your portfolio sheet is empty. Start by adding your first trade to begin tracking your assets.</p>
-                  </div>
+                <td colSpan={6} className="px-6 py-16 text-center text-sm text-[var(--text-muted)]">
+                  No holdings found. Add a trade to start portfolio analytics.
                 </td>
               </tr>
             )}
           </tbody>
         </table>
       </div>
-    </div>
+    </section>
   );
 };

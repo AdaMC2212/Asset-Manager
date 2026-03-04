@@ -1,151 +1,200 @@
 'use client';
 
-import React, { useState, useEffect, useRef } from 'react';
-import { Search, Command, X, ArrowRight, LineChart, Wallet, Plus } from 'lucide-react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { ArrowRight, Command, LineChart, Plus, RefreshCw, Search, Wallet } from 'lucide-react';
+import { AppModule, CommandSearchItem, InvestmentTab, QuickActionType } from '../types/ui';
 
 interface CommandPaletteProps {
   isOpen: boolean;
   onClose: () => void;
-  onSelectModule: (module: 'manager' | 'investment') => void;
-  onAddTrade: () => void;
-  searchItems: { name: string; type: string; module: string }[];
+  onSelectModule: (module: AppModule) => void;
+  onSelectInvestmentTab?: (tab: InvestmentTab) => void;
+  onRunAction?: (action?: QuickActionType) => void;
+  searchItems: CommandSearchItem[];
 }
 
-export const CommandPalette: React.FC<CommandPaletteProps> = ({ 
-  isOpen, 
-  onClose, 
-  onSelectModule, 
-  onAddTrade,
-  searchItems 
+type PaletteRow = CommandSearchItem & { groupLabel: string };
+
+const GROUP_ORDER = ['Actions', 'Modules', 'Assets'] as const;
+
+const getGroupLabel = (item: CommandSearchItem): string => {
+  if (item.type === 'action') return 'Actions';
+  if (item.type === 'module') return 'Modules';
+  return 'Assets';
+};
+
+const getIcon = (item: CommandSearchItem) => {
+  if (item.type === 'action') {
+    if (item.action === 'refresh') return <RefreshCw className="h-4 w-4" />;
+    return <Plus className="h-4 w-4" />;
+  }
+  if (item.module === 'manager') return <Wallet className="h-4 w-4" />;
+  return <LineChart className="h-4 w-4" />;
+};
+
+export const CommandPalette: React.FC<CommandPaletteProps> = ({
+  isOpen,
+  onClose,
+  onSelectModule,
+  onSelectInvestmentTab,
+  onRunAction,
+  searchItems,
 }) => {
   const [query, setQuery] = useState('');
+  const [activeIndex, setActiveIndex] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    if (isOpen) {
-      setQuery('');
-      setTimeout(() => inputRef.current?.focus(), 50);
-    }
+    if (!isOpen) return;
+    setQuery('');
+    setActiveIndex(0);
+    const timer = setTimeout(() => inputRef.current?.focus(), 40);
+    return () => clearTimeout(timer);
   }, [isOpen]);
 
-  const filteredItems = query === '' 
-    ? [] 
-    : searchItems.filter(item => 
-        item.name.toLowerCase().includes(query.toLowerCase())
-      ).slice(0, 8);
+  const filtered = useMemo<PaletteRow[]>(() => {
+    const q = query.trim().toLowerCase();
+    const rows = searchItems
+      .filter((item) => {
+        if (!q) return true;
+        if (item.name.toLowerCase().includes(q)) return true;
+        return (item.keywords || []).some((keyword) => keyword.toLowerCase().includes(q));
+      })
+      .slice(0, 20)
+      .map((item) => ({ ...item, groupLabel: getGroupLabel(item) }));
+
+    return rows.sort((a, b) => GROUP_ORDER.indexOf(a.groupLabel as (typeof GROUP_ORDER)[number]) - GROUP_ORDER.indexOf(b.groupLabel as (typeof GROUP_ORDER)[number]));
+  }, [query, searchItems]);
+
+  useEffect(() => {
+    if (!filtered.length) {
+      setActiveIndex(0);
+      return;
+    }
+    setActiveIndex((index) => Math.min(index, filtered.length - 1));
+  }, [filtered]);
+
+  const executeItem = (item: CommandSearchItem) => {
+    if (item.module) {
+      onSelectModule(item.module);
+      if (item.id === 'module-funding') {
+        onSelectInvestmentTab?.('funding');
+      }
+      if (item.id === 'module-investment') {
+        onSelectInvestmentTab?.('dashboard');
+      }
+    }
+    if (item.action) {
+      onRunAction?.(item.action);
+    }
+    onClose();
+  };
+
+  const groupedRows = useMemo(() => {
+    const groups = new Map<string, PaletteRow[]>();
+    for (const row of filtered) {
+      if (!groups.has(row.groupLabel)) {
+        groups.set(row.groupLabel, []);
+      }
+      groups.get(row.groupLabel)?.push(row);
+    }
+    return groups;
+  }, [filtered]);
 
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-start justify-center pt-[15vh] px-4 bg-slate-950/80 backdrop-blur-sm animate-in fade-in duration-200">
-      <div 
-        className="w-full max-w-xl bg-slate-900 border border-white/10 rounded-2xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200"
-        onClick={e => e.stopPropagation()}
-      >
-        <div className="flex items-center px-4 py-3 border-b border-white/5">
-          <Search className="w-5 h-5 text-slate-400 mr-3" />
-          <input 
+    <div className="fixed inset-0 z-[120] flex items-start justify-center bg-black/70 px-4 pt-[12vh] backdrop-blur-sm">
+      <div className="panel-elevated motion-zoom-in w-full max-w-2xl overflow-hidden rounded-3xl">
+        <div className="flex items-center border-b border-[var(--border-soft)] px-4 py-3">
+          <Search className="mr-3 h-5 w-5 text-[var(--text-muted)]" />
+          <input
             ref={inputRef}
-            type="text" 
-            placeholder="Search assets, modules, or commands..."
-            className="flex-1 bg-transparent border-none text-white focus:outline-none placeholder:text-slate-500 text-lg"
+            type="text"
+            placeholder="Search modules, assets, and actions..."
+            className="w-full bg-transparent text-base text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:outline-none"
             value={query}
-            onChange={e => setQuery(e.target.value)}
-            onKeyDown={e => {
-                if (e.key === 'Escape') onClose();
+            onChange={(event) => setQuery(event.target.value)}
+            onKeyDown={(event) => {
+              if (event.key === 'Escape') {
+                event.preventDefault();
+                onClose();
+                return;
+              }
+              if (event.key === 'ArrowDown') {
+                event.preventDefault();
+                if (!filtered.length) return;
+                setActiveIndex((index) => (index + 1) % filtered.length);
+                return;
+              }
+              if (event.key === 'ArrowUp') {
+                event.preventDefault();
+                if (!filtered.length) return;
+                setActiveIndex((index) => (index - 1 + filtered.length) % filtered.length);
+                return;
+              }
+              if (event.key === 'Enter') {
+                event.preventDefault();
+                if (!filtered[activeIndex]) return;
+                executeItem(filtered[activeIndex]);
+              }
             }}
           />
-          <div className="flex items-center gap-1.5 px-2 py-1 rounded bg-slate-800 border border-white/5 text-[10px] text-slate-400 font-bold">
+          <span className="rounded-md border border-[var(--border-soft)] bg-black/20 px-2 py-1 text-[10px] font-bold text-[var(--text-muted)]">
             ESC
-          </div>
+          </span>
         </div>
 
-        <div className="max-h-[60vh] overflow-y-auto p-2 custom-scrollbar">
-          {query === '' ? (
-            <div className="p-2 space-y-1">
-              <h3 className="px-3 py-2 text-[10px] font-bold text-slate-500 uppercase tracking-widest">Quick Actions</h3>
-              <button 
-                onClick={() => { onSelectModule('manager'); onClose(); }}
-                className="w-full flex items-center gap-3 px-3 py-3 rounded-xl hover:bg-white/5 transition-colors group"
-              >
-                <div className="p-2 rounded-lg bg-indigo-500/10 text-indigo-400 group-hover:bg-indigo-500 group-hover:text-white transition-all">
-                  <Wallet className="w-4 h-4" />
-                </div>
-                <div className="flex-1 text-left">
-                  <div className="text-sm font-semibold text-white">Go to Money Manager</div>
-                  <div className="text-xs text-slate-500">Manage wallets and daily expenses</div>
-                </div>
-              </button>
-              <button 
-                onClick={() => { onSelectModule('investment'); onClose(); }}
-                className="w-full flex items-center gap-3 px-3 py-3 rounded-xl hover:bg-white/5 transition-colors group"
-              >
-                <div className="p-2 rounded-lg bg-emerald-500/10 text-emerald-400 group-hover:bg-emerald-500 group-hover:text-white transition-all">
-                  <LineChart className="w-4 h-4" />
-                </div>
-                <div className="flex-1 text-left">
-                  <div className="text-sm font-semibold text-white">Go to Investments</div>
-                  <div className="text-xs text-slate-500">Portfolio analysis and holdings</div>
-                </div>
-              </button>
-              <button 
-                onClick={() => { onAddTrade(); onClose(); }}
-                className="w-full flex items-center gap-3 px-3 py-3 rounded-xl hover:bg-white/5 transition-colors group"
-              >
-                <div className="p-2 rounded-lg bg-blue-500/10 text-blue-400 group-hover:bg-blue-500 group-hover:text-white transition-all">
-                  <Plus className="w-4 h-4" />
-                </div>
-                <div className="flex-1 text-left">
-                  <div className="text-sm font-semibold text-white">Add New Trade</div>
-                  <div className="text-xs text-slate-500">Record a new buy/sell order</div>
-                </div>
-              </button>
-            </div>
+        <div className="max-h-[60vh] overflow-y-auto p-2">
+          {filtered.length === 0 ? (
+            <div className="p-10 text-center text-sm text-[var(--text-muted)]">No command found for "{query}".</div>
           ) : (
-            <div className="p-2 space-y-1">
-              {filteredItems.map((item, idx) => (
-                <button 
-                    key={idx}
-                    onClick={() => {
-                        onSelectModule(item.module as any);
-                        onClose();
-                    }}
-                    className="w-full flex items-center gap-3 px-3 py-3 rounded-xl hover:bg-white/5 transition-colors group"
-                >
-                    <div className="p-2 rounded-lg bg-slate-800 text-slate-400 group-hover:text-white transition-all">
-                        {item.type === 'Asset' ? <LineChart className="w-4 h-4" /> : <Command className="w-4 h-4" />}
-                    </div>
-                    <div className="flex-1 text-left">
-                        <div className="text-sm font-semibold text-white">{item.name}</div>
-                        <div className="text-[10px] text-slate-500 uppercase font-bold">{item.type} in {item.module}</div>
-                    </div>
-                    <ArrowRight className="w-4 h-4 text-slate-600 opacity-0 group-hover:opacity-100 transition-opacity" />
-                </button>
-              ))}
-              {filteredItems.length === 0 && (
-                <div className="p-12 text-center text-slate-500">
-                    No results for "{query}"
+            Array.from(groupedRows.entries()).map(([groupLabel, items]) => (
+              <div key={groupLabel} className="mb-2">
+                <p className="px-3 py-2 text-[10px] font-semibold uppercase tracking-[0.2em] text-[var(--text-muted)]">{groupLabel}</p>
+                <div className="space-y-1">
+                  {items.map((item) => {
+                    const itemIndex = filtered.findIndex((row) => row.id === item.id);
+                    const isActive = activeIndex === itemIndex;
+                    return (
+                      <button
+                        key={item.id}
+                        type="button"
+                        onClick={() => executeItem(item)}
+                        className={`focus-ring flex w-full items-center gap-3 rounded-xl px-3 py-3 text-left transition ${
+                          isActive ? 'bg-white/10' : 'hover:bg-white/5'
+                        }`}
+                      >
+                        <div className="rounded-lg border border-[var(--border-soft)] bg-black/20 p-2 text-[var(--text-secondary)]">{getIcon(item)}</div>
+                        <div className="min-w-0 flex-1">
+                          <p className="truncate text-sm font-semibold text-[var(--text-primary)]">{item.name}</p>
+                          <p className="truncate text-xs text-[var(--text-muted)]">
+                            {item.type.toUpperCase()}
+                            {item.module ? ` in ${item.module}` : ''}
+                          </p>
+                        </div>
+                        <ArrowRight className="h-4 w-4 text-[var(--text-muted)]" />
+                      </button>
+                    );
+                  })}
                 </div>
-              )}
-            </div>
+              </div>
+            ))
           )}
         </div>
 
-        <div className="p-4 bg-slate-950/50 border-t border-white/5 flex items-center justify-between">
-            <div className="flex items-center gap-4">
-                <div className="flex items-center gap-1.5 text-[10px] text-slate-500">
-                    <span className="px-1.5 py-0.5 rounded bg-slate-800 text-slate-400 border border-white/5">↑↓</span> to navigate
-                </div>
-                <div className="flex items-center gap-1.5 text-[10px] text-slate-500">
-                    <span className="px-1.5 py-0.5 rounded bg-slate-800 text-slate-400 border border-white/5">↵</span> to select
-                </div>
-            </div>
-            <div className="text-[10px] font-bold text-slate-600 uppercase tracking-widest">
-                NovaTrack Search
-            </div>
+        <div className="flex items-center justify-between border-t border-[var(--border-soft)] bg-black/20 px-4 py-3 text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--text-muted)]">
+          <div className="flex items-center gap-4">
+            <span>Up/Down to navigate</span>
+            <span>Enter to select</span>
+          </div>
+          <div className="inline-flex items-center gap-1.5">
+            <Command className="h-3 w-3" />
+            Command Palette
+          </div>
         </div>
       </div>
-      <div className="fixed inset-0 -z-10" onClick={onClose} />
+      <button type="button" className="absolute inset-0 -z-10 cursor-default" onClick={onClose} aria-label="Close command palette" />
     </div>
   );
 };

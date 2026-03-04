@@ -151,11 +151,20 @@ export const AddMoneyModal: React.FC<AddMoneyModalProps> = ({
 
   const availableAccounts = formData.type === 'Income' ? destAccounts : sourceAccounts;
 
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleKey = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') onClose();
+    };
+    window.addEventListener('keydown', handleKey);
+    return () => window.removeEventListener('keydown', handleKey);
+  }, [isOpen, onClose]);
+
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
-      <div className="bg-slate-900 border border-slate-800 rounded-xl w-full max-w-lg shadow-2xl">
+    <div className="fixed inset-0 z-[110] flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm" onClick={onClose}>
+      <div className="panel-elevated max-h-[85vh] w-full max-w-2xl overflow-y-auto rounded-3xl" onClick={(event) => event.stopPropagation()}>
         <div className="flex justify-between items-center p-6 border-b border-slate-800">
           <h2 className="text-xl font-bold text-white">
             {initialData ? 'Edit Transaction' : 'New Transaction'}

@@ -1,18 +1,21 @@
 'use client';
 
-import React, { useState, useMemo } from 'react';
-import { Plus, Wallet, ShoppingBag, Car, Zap, Utensils, Smartphone, Banknote, Calendar, ChevronLeft, ChevronRight, X, ArrowUpRight, ArrowDownRight, Pencil, Trash2, Filter, XCircle, TrendingUp, TrendingDown } from 'lucide-react';
-import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts';
+import React, { useEffect, useState, useMemo } from 'react';
+import { Wallet, ShoppingBag, Car, Zap, Utensils, Smartphone, Banknote, Calendar, X, Pencil, Trash2, TrendingUp, TrendingDown } from 'lucide-react';
 import { MoneyManagerData, MoneyTransaction } from '../types';
 import { AddMoneyModal } from './MoneyManager/AddMoneyModal';
+import { MoneyActivityList, MoneyFilters } from './MoneyManager/MoneyActivityList';
+import { MoneyBreakdownPanel } from './MoneyManager/MoneyBreakdownPanel';
+import { MoneyHeader } from './MoneyManager/MoneyHeader';
+import { MoneyStatsRow } from './MoneyManager/MoneyStatsRow';
 import { deleteMoneyTransaction } from '../app/actions';
-import { CountUp } from './ui/CountUp';
 
 interface MoneyManagerProps {
   data: MoneyManagerData | null;
   loading: boolean;
   onRefresh: () => void;
   hideValues?: boolean;
+  registerAddHandler?: (handler: () => void) => void;
 }
 
 const PIE_COLORS = ['#f43f5e', '#ec4899', '#d946ef', '#a855f7', '#8b5cf6', '#6366f1', '#3b82f6', '#0ea5e9'];
@@ -30,7 +33,7 @@ const getCategoryStyles = (cat: string) => {
   return { icon: <Wallet className="w-5 h-5 md:w-5 md:h-5" />, color: 'bg-slate-600', text: 'text-slate-100' };
 };
 
-export const MoneyManager: React.FC<MoneyManagerProps> = ({ data, loading, onRefresh, hideValues }) => {
+export const MoneyManager: React.FC<MoneyManagerProps> = ({ data, loading, onRefresh, hideValues, registerAddHandler }) => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isHistoryModalOpen, setIsHistoryModalOpen] = useState(false);
   
@@ -42,7 +45,7 @@ export const MoneyManager: React.FC<MoneyManagerProps> = ({ data, loading, onRef
   
   // Filter States
   const [showFilters, setShowFilters] = useState(false);
-  const [filters, setFilters] = useState({
+  const [filters, setFilters] = useState<MoneyFilters>({
       type: 'All', // All, Income, Expense, Transfer
       account: 'All',
       startDate: '',
@@ -170,7 +173,15 @@ export const MoneyManager: React.FC<MoneyManagerProps> = ({ data, loading, onRef
       });
   };
 
-  const hasActiveFilters = filters.type !== 'All' || filters.account !== 'All' || (filters.startDate && filters.endDate);
+  const hasActiveFilters = filters.type !== 'All' || filters.account !== 'All' || Boolean(filters.startDate && filters.endDate);
+
+  useEffect(() => {
+    if (!registerAddHandler) return;
+    registerAddHandler(() => {
+      setEditingTransaction(null);
+      setIsModalOpen(true);
+    });
+  }, [registerAddHandler]);
 
   return (
     <div className="grid grid-cols-1 xl:grid-cols-3 gap-8">
@@ -178,294 +189,55 @@ export const MoneyManager: React.FC<MoneyManagerProps> = ({ data, loading, onRef
       {/* LEFT COLUMN (Main Focus) */}
       <div className="xl:col-span-2 space-y-4 md:space-y-8">
         
-        {/* Monthly Focus Header */}
-        <div className="flex flex-row justify-between items-center gap-2 md:gap-6 p-1">
-             {/* Month Navigator */}
-             <div className={`flex items-center gap-1 md:gap-2 bg-slate-900/50 p-1 md:p-1.5 rounded-2xl border border-white/5 backdrop-blur-sm shadow-sm transition-opacity ${isCustomDateMode ? 'opacity-50 pointer-events-none grayscale' : ''}`}>
-                <button onClick={prevMonth} className="p-2 md:p-3 hover:bg-white/10 rounded-xl text-slate-400 hover:text-white transition-colors">
-                    <ChevronLeft className="w-4 h-4 md:w-5 md:h-5" />
-                </button>
-                <div className="flex flex-col items-center min-w-[100px] md:min-w-[140px] px-1 md:px-2">
-                    <span className="text-white font-bold text-base md:text-xl tracking-tight">{monthLabel.split(' ')[0]}</span>
-                    <span className="text-slate-500 text-[10px] md:text-xs font-medium uppercase tracking-wider">{monthLabel.split(' ')[1]}</span>
-                </div>
-                <button onClick={nextMonth} className="p-2 md:p-3 hover:bg-white/10 rounded-xl text-slate-400 hover:text-white transition-colors">
-                    <ChevronRight className="w-4 h-4 md:w-5 md:h-5" />
-                </button>
-             </div>
+        <MoneyHeader
+          monthLabel={monthLabel}
+          isCustomDateMode={isCustomDateMode}
+          onPrevMonth={prevMonth}
+          onNextMonth={nextMonth}
+          onAddNew={() => {
+            setEditingTransaction(null);
+            setIsModalOpen(true);
+          }}
+        />
 
-             <button 
-                onClick={() => { setEditingTransaction(null); setIsModalOpen(true); }}
-                className="bg-indigo-600 hover:bg-indigo-500 hover:scale-105 active:scale-95 text-white px-4 md:px-6 py-2 md:py-3 rounded-2xl text-sm font-bold flex items-center justify-center gap-2 transition-all shadow-xl shadow-indigo-500/20"
-            >
-                <Plus className="w-5 h-5" />
-                <span className="hidden md:inline">Add New</span>
-                <span className="md:hidden">Add</span>
-            </button>
-        </div>
-
-        {/* BENTO GRID STATS */}
-        <div className="grid grid-cols-3 md:grid-cols-3 gap-2 md:gap-4">
-             {/* Income */}
-             <div className="bg-slate-900/50 backdrop-blur-md p-3 md:p-6 rounded-2xl md:rounded-3xl border border-white/5 shadow-lg relative overflow-hidden group">
-                <div className="hidden md:block absolute top-0 right-0 p-8 opacity-5 group-hover:opacity-10 transition-opacity transform group-hover:scale-110 duration-500">
-                    <ArrowDownRight className="w-24 h-24 text-emerald-500" />
-                </div>
-                <div className="relative z-10 text-center md:text-left">
-                    <span className="inline-flex items-center gap-1.5 px-2 md:px-3 py-0.5 md:py-1 rounded-full bg-emerald-500/10 text-emerald-400 text-[10px] md:text-xs font-bold uppercase tracking-wider mb-1 md:mb-4">
-                        <div className="w-1 md:w-1.5 h-1 md:h-1.5 rounded-full bg-emerald-500 animate-pulse"></div> 
-                        {isCustomDateMode ? 'Inc' : 'Income'}
-                    </span>
-                    <div className="text-sm md:text-3xl font-bold text-white truncate">
-                        {hideValues ? '****' : <CountUp end={monthlyStats.income} prefix="RM " />}
-                    </div>
-                </div>
-             </div>
-
-             {/* Expense */}
-             <div className="bg-slate-900/50 backdrop-blur-md p-3 md:p-6 rounded-2xl md:rounded-3xl border border-white/5 shadow-lg relative overflow-hidden group">
-                <div className="hidden md:block absolute top-0 right-0 p-8 opacity-5 group-hover:opacity-10 transition-opacity transform group-hover:scale-110 duration-500">
-                    <ArrowUpRight className="w-24 h-24 text-rose-500" />
-                </div>
-                <div className="relative z-10 text-center md:text-left">
-                    <span className="inline-flex items-center gap-1.5 px-2 md:px-3 py-0.5 md:py-1 rounded-full bg-rose-500/10 text-rose-400 text-[10px] md:text-xs font-bold uppercase tracking-wider mb-1 md:mb-4">
-                        <div className="w-1 md:w-1.5 h-1 md:h-1.5 rounded-full bg-rose-500"></div> 
-                        {isCustomDateMode ? 'Exp' : 'Expenses'}
-                    </span>
-                    <div className="text-sm md:text-3xl font-bold text-white truncate">
-                        {hideValues ? '****' : <CountUp end={monthlyStats.expense} prefix="RM " />}
-                    </div>
-                </div>
-             </div>
-
-             {/* Net */}
-             <div className="bg-slate-900/50 backdrop-blur-md p-3 md:p-6 rounded-2xl md:rounded-3xl border border-white/5 shadow-lg relative overflow-hidden">
-                <div className="relative z-10 text-center md:text-left">
-                     <span className="inline-flex items-center gap-1.5 px-2 md:px-3 py-0.5 md:py-1 rounded-full bg-indigo-500/10 text-indigo-400 text-[10px] md:text-xs font-bold uppercase tracking-wider mb-1 md:mb-4">
-                        <div className="w-1 md:w-1.5 h-1 md:h-1.5 rounded-full bg-indigo-500"></div> Net
-                    </span>
-                    <div className={`text-sm md:text-3xl font-bold truncate ${monthlyStats.balance >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
-                        {hideValues ? '****' : (
-                            <>
-                                {monthlyStats.balance > 0 ? '+' : ''}
-                                <CountUp end={monthlyStats.balance} prefix="RM " />
-                            </>
-                        )}
-                    </div>
-                </div>
-             </div>
-        </div>
-
-        {/* Activity List */}
-        <div className="bg-slate-900/40 backdrop-blur-md border border-white/5 rounded-3xl p-4 md:p-6 shadow-xl">
-            <div className="flex justify-between items-center mb-4 md:mb-6 px-1">
-                <div className="flex items-center gap-2 md:gap-3">
-                    <h3 className="font-bold text-lg md:text-xl text-white flex items-center gap-2">
-                        Activity
-                    </h3>
-                    <span className="text-[10px] md:text-xs font-medium text-slate-500 bg-slate-800/50 px-2 md:px-3 py-0.5 md:py-1 rounded-full">{filteredTransactions.length}</span>
-                </div>
-                
-                <button 
-                    onClick={() => setShowFilters(!showFilters)}
-                    className={`p-2 rounded-xl transition-all flex items-center gap-2 text-xs md:text-sm font-medium ${showFilters || hasActiveFilters ? 'bg-indigo-600 text-white' : 'bg-slate-800 text-slate-400 hover:text-white'}`}
-                >
-                    <Filter className="w-3.5 h-3.5 md:w-4 md:h-4" />
-                    <span className="hidden md:inline">Filters</span>
-                    {hasActiveFilters && <div className="w-1.5 h-1.5 md:w-2 md:h-2 rounded-full bg-white animate-pulse"></div>}
-                </button>
-            </div>
-            
-            {/* Filter Section */}
-            {(showFilters || hasActiveFilters) && (
-                <div className="mb-6 p-4 bg-slate-900/60 rounded-2xl border border-white/5 space-y-4 animate-in slide-in-from-top-2 fade-in">
-                    <div className="flex justify-between items-center">
-                        <h4 className="text-xs font-bold text-slate-500 uppercase tracking-widest">Filter Options</h4>
-                        {hasActiveFilters && (
-                            <button onClick={clearFilters} className="text-xs text-rose-400 flex items-center gap-1 hover:underline">
-                                <XCircle className="w-3 h-3" /> Clear All
-                            </button>
-                        )}
-                    </div>
-                    
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                        {/* Date Range */}
-                        <div>
-                            <label className="block text-xs text-slate-400 mb-1.5">Date Range</label>
-                            <div className="flex gap-2">
-                                <input 
-                                    type="date" 
-                                    className="w-full bg-slate-950 border border-slate-700 rounded-lg px-2 py-1.5 text-xs text-white focus:outline-none focus:border-indigo-500"
-                                    value={filters.startDate}
-                                    onChange={(e) => setFilters({...filters, startDate: e.target.value})}
-                                />
-                                <span className="text-slate-600 self-center">-</span>
-                                <input 
-                                    type="date" 
-                                    className="w-full bg-slate-950 border border-slate-700 rounded-lg px-2 py-1.5 text-xs text-white focus:outline-none focus:border-indigo-500"
-                                    value={filters.endDate}
-                                    onChange={(e) => setFilters({...filters, endDate: e.target.value})}
-                                />
-                            </div>
-                        </div>
-
-                        {/* Type */}
-                        <div>
-                            <label className="block text-xs text-slate-400 mb-1.5">Transaction Type</label>
-                            <div className="flex bg-slate-950 p-1 rounded-lg border border-slate-800">
-                                {['All', 'Expense', 'Income', 'Transfer'].map(t => (
-                                    <button
-                                        key={t}
-                                        onClick={() => setFilters({...filters, type: t})}
-                                        className={`flex-1 text-[10px] font-bold py-1.5 rounded-md transition-all ${filters.type === t ? 'bg-indigo-600 text-white' : 'text-slate-500 hover:text-slate-300'}`}
-                                    >
-                                        {t}
-                                    </button>
-                                ))}
-                            </div>
-                        </div>
-
-                         {/* Account */}
-                         <div>
-                            <label className="block text-xs text-slate-400 mb-1.5">Account</label>
-                            <select
-                                className="w-full bg-slate-950 border border-slate-700 rounded-lg px-2 py-1.5 text-xs text-white focus:outline-none focus:border-indigo-500"
-                                value={filters.account}
-                                onChange={(e) => setFilters({...filters, account: e.target.value})}
-                            >
-                                <option value="All">All Accounts</option>
-                                {data.accounts.map(acc => (
-                                    <option key={acc.name} value={acc.name}>{acc.name}</option>
-                                ))}
-                            </select>
-                        </div>
-                    </div>
-                </div>
-            )}
-            
-            <div className="space-y-2 md:space-y-3">
-                {filteredTransactions.slice(0, 10).map((tx) => {
-                    const style = getCategoryStyles(tx.category);
-                    return (
-                        <div key={tx.id} className="group flex items-center justify-between p-2 md:p-3 rounded-2xl hover:bg-white/5 transition-all border border-transparent hover:border-white/5">
-                            <div className="flex items-center gap-3 md:gap-4">
-                                <div className={`w-10 h-10 md:w-12 md:h-12 rounded-xl md:rounded-2xl flex items-center justify-center ${style.color} ${style.text} shadow-lg shadow-black/20`}>
-                                    {style.icon}
-                                </div>
-                                <div className="min-w-0">
-                                    <div className="font-bold text-white text-sm truncate pr-2">{tx.category}</div>
-                                    <div className="text-[10px] md:text-xs text-slate-400 mt-0.5 truncate max-w-[120px] md:max-w-[200px]">{tx.date} • {tx.note || 'No note'}</div>
-                                </div>
-                            </div>
-
-                            <div className="text-right flex items-center gap-4">
-                                <div>
-                                    <div className={`font-bold text-sm ${tx.type === 'Income' ? 'text-emerald-400' : tx.type === 'Transfer' ? 'text-blue-400' : 'text-white'}`}>
-                                        {tx.type === 'Income' ? '+' : tx.type === 'Transfer' ? '' : '-'} {displayValue(tx.amount, 'RM ')}
-                                    </div>
-                                    <div className="text-[10px] text-slate-500 font-medium uppercase tracking-wide">
-                                        {tx.fromAccount} {tx.toAccount ? '→' : ''}
-                                    </div>
-                                </div>
-                                
-                                {/* Hover Actions */}
-                                <div className="hidden md:flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity translate-x-2 group-hover:translate-x-0">
-                                    <button onClick={() => handleEdit(tx)} className="p-2 text-slate-400 hover:text-indigo-400 hover:bg-slate-800 rounded-lg"><Pencil className="w-4 h-4" /></button>
-                                    <button onClick={() => handleDelete(tx)} className="p-2 text-slate-400 hover:text-rose-400 hover:bg-slate-800 rounded-lg"><Trash2 className="w-4 h-4" /></button>
-                                </div>
-                            </div>
-                        </div>
-                    );
-                })}
-
-                {filteredTransactions.length === 0 && (
-                     <div className="py-12 text-center text-slate-500 flex flex-col items-center">
-                        <Calendar className="w-12 h-12 text-slate-800 mb-2" />
-                        No transactions found for this period.
-                     </div>
-                )}
-            </div>
-
-            {filteredTransactions.length > 10 && (
-                <div className="mt-6 text-center">
-                    <button 
-                        onClick={() => setIsHistoryModalOpen(true)}
-                        className="text-sm text-indigo-400 hover:text-indigo-300 transition-colors font-medium flex items-center justify-center gap-1 w-full py-2 hover:bg-white/5 rounded-xl"
-                    >
-                        View All {filteredTransactions.length} Records <ArrowDownRight className="w-4 h-4" />
-                    </button>
-                </div>
-            )}
-        </div>
+        <MoneyStatsRow
+          income={monthlyStats.income}
+          expense={monthlyStats.expense}
+          balance={monthlyStats.balance}
+          isCustomDateMode={isCustomDateMode}
+          hideValues={hideValues}
+        />
+        <MoneyActivityList
+          filteredTransactions={filteredTransactions}
+          filters={filters}
+          accounts={data.accounts}
+          showFilters={showFilters}
+          hasActiveFilters={hasActiveFilters}
+          onToggleFilters={() => setShowFilters((prev) => !prev)}
+          onSetFilters={setFilters}
+          onClearFilters={clearFilters}
+          onEdit={handleEdit}
+          onDelete={handleDelete}
+          onViewAll={() => setIsHistoryModalOpen(true)}
+          displayValue={displayValue}
+          getCategoryStyles={getCategoryStyles}
+        />
       </div>
 
       {/* RIGHT COLUMN (Sidebar Breakdown) */}
       <div className="space-y-6">
-        {/* Pie Chart Card */}
-        <div className="bg-slate-900/40 backdrop-blur-md border border-white/5 rounded-3xl p-6 shadow-xl flex flex-col min-h-[400px]">
-             <h3 className="font-bold text-xl text-white mb-6">Net Spending Breakdown</h3>
-            <div className="flex-grow relative">
-                {pieData.length > 0 && !hideValues ? (
-                    <ResponsiveContainer width="100%" height={250}>
-                        <PieChart>
-                            <Pie
-                                data={pieData}
-                                cx="50%"
-                                cy="50%"
-                                innerRadius={60}
-                                outerRadius={80}
-                                paddingAngle={5}
-                                dataKey="value"
-                                stroke="none"
-                                cornerRadius={4}
-                                onClick={(data) => setSelectedCategory(data.name)}
-                                className="cursor-pointer focus:outline-none"
-                            >
-                                {pieData.map((entry, index) => (
-                                    <Cell key={`cell-${index}`} fill={PIE_COLORS[index % PIE_COLORS.length]} className="hover:opacity-80 transition-opacity cursor-pointer" />
-                                ))}
-                            </Pie>
-                            <Tooltip 
-                                formatter={(value: number) => `RM ${value.toLocaleString()}`}
-                                contentStyle={{ backgroundColor: '#0f172a', borderColor: 'rgba(255,255,255,0.1)', color: '#f8fafc', borderRadius: '12px' }}
-                                itemStyle={{ color: '#e2e8f0' }}
-                            />
-                        </PieChart>
-                    </ResponsiveContainer>
-                ) : (
-                     <div className="absolute inset-0 flex items-center justify-center text-slate-500 text-sm">
-                        {hideValues ? 'Hidden' : 'No Data'}
-                     </div>
-                )}
-                {/* Center Label for Pie */}
-                {!hideValues && pieData.length > 0 && (
-                    <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                        <span className="text-xs font-bold text-slate-500 uppercase tracking-widest text-center">NET<br/>SPEND</span>
-                    </div>
-                )}
-            </div>
-            
-            <div className="mt-6 space-y-2 max-h-[300px] overflow-y-auto pr-2 custom-scrollbar">
-                {fullBreakdown.map((entry, index) => (
-                     <button 
-                        key={entry.name} 
-                        onClick={() => setSelectedCategory(entry.name)}
-                        className="w-full flex items-center justify-between p-2.5 hover:bg-white/5 rounded-xl transition-all group text-left border border-transparent hover:border-white/5"
-                    >
-                        <div className="flex items-center gap-3">
-                             <div className="w-3 h-3 rounded-full shadow-[0_0_8px_rgba(0,0,0,0.3)]" style={{ backgroundColor: PIE_COLORS[index % PIE_COLORS.length] || '#64748b' }}></div>
-                             <span className="text-slate-300 text-sm font-semibold group-hover:text-white transition-colors">{entry.name}</span>
-                        </div>
-                        <span className={`font-bold text-sm ${entry.value < 0 ? 'text-emerald-400' : 'text-slate-100'}`}>
-                            {entry.value < 0 ? '+' : ''}{displayValue(Math.abs(entry.value))}
-                        </span>
-                     </button>
-                ))}
-            </div>
-        </div>
+        <MoneyBreakdownPanel
+          pieData={pieData}
+          fullBreakdown={fullBreakdown}
+          hideValues={hideValues}
+          colors={PIE_COLORS}
+          onSelectCategory={setSelectedCategory}
+          displayValue={displayValue}
+        />
       </div>
 
       {/* Category Details Modal - Enhanced */}
+
       {selectedCategory && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/80 backdrop-blur-md p-4 animate-in fade-in duration-300">
             <div className="bg-slate-900 border border-slate-800 rounded-3xl w-full max-w-2xl shadow-2xl flex flex-col max-h-[85vh] overflow-hidden animate-in zoom-in-95 duration-200">

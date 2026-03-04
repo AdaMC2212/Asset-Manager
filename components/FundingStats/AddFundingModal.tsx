@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { X, Loader2 } from 'lucide-react';
 import { addDeposit, addConversion } from '../../app/actions';
 
@@ -81,11 +81,20 @@ export const AddFundingModal: React.FC<AddFundingModalProps> = ({ isOpen, onClos
     }
   };
 
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleKey = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') onClose();
+    };
+    window.addEventListener('keydown', handleKey);
+    return () => window.removeEventListener('keydown', handleKey);
+  }, [isOpen, onClose]);
+
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
-      <div className="bg-slate-900 border border-slate-800 rounded-xl w-full max-w-lg shadow-2xl">
+    <div className="fixed inset-0 z-[110] flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm" onClick={onClose}>
+      <div className="panel-elevated w-full max-w-xl rounded-3xl" onClick={(event) => event.stopPropagation()}>
         <div className="flex justify-between items-center p-6 border-b border-slate-800">
           <h2 className="text-xl font-bold text-white">Add Cash Flow</h2>
           <button onClick={onClose} className="text-slate-400 hover:text-white transition-colors">
@@ -104,7 +113,7 @@ export const AddFundingModal: React.FC<AddFundingModalProps> = ({ isOpen, onClos
                 onClick={() => setActiveTab('conversion')}
                 className={`flex-1 py-3 text-sm font-medium transition-colors border-b-2 ${activeTab === 'conversion' ? 'border-indigo-500 text-indigo-400' : 'border-transparent text-slate-400 hover:text-slate-200'}`}
             >
-                Conversion (MYR → USD)
+                Conversion (MYR to USD)
             </button>
         </div>
 

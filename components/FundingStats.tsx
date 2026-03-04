@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { Landmark, Banknote, TrendingUp, Plus } from 'lucide-react';
+import React, { useMemo, useState } from 'react';
+import { Banknote, Landmark, Plus, TrendingUp } from 'lucide-react';
 import { CashFlowSummary, PortfolioSummary } from '../types';
 import { AddFundingModal } from './FundingStats/AddFundingModal';
 
@@ -7,184 +7,156 @@ interface FundingStatsProps {
   cashFlow: CashFlowSummary | null;
   portfolio: PortfolioSummary | null;
   hideValues?: boolean;
+  onRefresh?: () => void;
 }
 
-export const FundingStats: React.FC<FundingStatsProps> = ({ cashFlow, portfolio, hideValues }) => {
+const displayValue = (value: number, prefix: string, hide?: boolean) =>
+  hide ? `${prefix} ****` : `${prefix}${value.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+
+export const FundingStats: React.FC<FundingStatsProps> = ({ cashFlow, portfolio, hideValues, onRefresh }) => {
   const [isModalOpen, setIsModalOpen] = useState(false);
 
-  // We need to trigger a refresh of data when adding completes. 
-  // In a cleaner app, this would be passed down from page.tsx, 
-  // but for now we can rely on the SWR or the interval in App.tsx 
-  // picking it up eventually, OR we force a window reload/router refresh.
-  // Ideally, FundingStats should accept an `onRefresh` prop.
-  // Assuming the parent will re-render if we don't block.
-  // Actually, let's just use window.location.reload() for simplicity or assume the user waits for the 60s poll.
-  // Better: Add an onRefresh prop if possible, but I cannot change the interface call in page.tsx easily 
-  // without changing page.tsx too. I will check page.tsx... yes I can change page.tsx.
-  // I will use `window.location.reload()` as a fallback for now inside the onSuccess for simplicity, 
-  // or just let the background poll handle it? 
-  // A standard approach is:
-  const handleSuccess = () => {
-    // Ideally call onRefresh();
-    // For now, reload the page to fetch fresh data is the most robust way without prop drilling refactor.
-    window.location.reload();
-  };
+  const metrics = useMemo(() => {
+    const availableCash = portfolio?.cashBalance || 0;
+    const totalAccountValue = portfolio?.netWorth || 0;
+    const convertedUSD = cashFlow?.totalConvertedUSD || 0;
+    const lifecyclePL = totalAccountValue - convertedUSD;
+    const lifecyclePLPercent = convertedUSD > 0 ? (lifecyclePL / convertedUSD) * 100 : 0;
+
+    return {
+      availableCash,
+      totalAccountValue,
+      lifecyclePL,
+      lifecyclePLPercent,
+      isPositive: lifecyclePL >= 0,
+    };
+  }, [cashFlow, portfolio]);
 
   if (!cashFlow) {
-    return (
-       <div className="bg-slate-900 border border-slate-800 rounded-xl p-8 text-center text-slate-500">
-         Loading funding data...
-       </div>
-    );
+    return <div className="panel rounded-3xl p-8 text-center text-sm text-[var(--text-muted)]">Loading funding metrics...</div>;
   }
-
-  // Calculate Available Cash and Total Account Value
-  const availableCash = portfolio?.cashBalance || 0;
-  const currentNetWorth = portfolio?.netWorth || 0; 
-  const totalAccountValue = currentNetWorth; 
-  
-  const lifecyclePL = totalAccountValue - cashFlow.totalConvertedUSD;
-  const lifecyclePLPercent = cashFlow.totalConvertedUSD > 0 
-    ? (lifecyclePL / cashFlow.totalConvertedUSD) * 100 
-    : 0;
-
-  const isPositive = lifecyclePL >= 0;
-
-  const displayValue = (val: number, prefix: string) => {
-    if (hideValues) return `${prefix} ****`;
-    return `${prefix}${val.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-  };
 
   return (
     <div className="space-y-6">
-      
-      {/* Header with Add Button */}
-      <div className="flex justify-between items-center">
-        <h2 className="text-xl font-bold text-white">Cash Flow Analysis</h2>
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="font-display text-2xl text-[var(--text-primary)]">Cash Flow Analysis</h2>
+          <p className="text-sm text-[var(--text-secondary)]">Funding consistency, conversion quality, and return efficiency.</p>
+        </div>
         <button
-            onClick={() => setIsModalOpen(true)}
-            className="bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold px-4 py-2 rounded-lg flex items-center gap-2 transition-all shadow-lg shadow-indigo-500/20"
+          type="button"
+          onClick={() => setIsModalOpen(true)}
+          className="focus-ring inline-flex items-center rounded-xl bg-[var(--accent-primary)] px-4 py-2 text-sm font-semibold text-white shadow-[var(--shadow-soft)] transition hover:bg-[var(--accent-secondary)]"
         >
-            <Plus className="w-3 h-3" />
-            Add Transaction
+          <Plus className="mr-2 h-4 w-4" />
+          Add Transaction
         </button>
       </div>
 
-      {/* KPI Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <div className="bg-slate-900 border border-slate-800 rounded-xl p-5 shadow-sm">
-          <div className="flex items-center justify-between mb-2">
-            <h3 className="text-slate-400 text-xs font-semibold uppercase">Total Deposited (MYR)</h3>
-            <Landmark className="w-4 h-4 text-emerald-500" />
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
+        <div className="kpi-card p-5">
+          <div className="mb-3 flex items-center justify-between">
+            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--text-muted)]">Deposited MYR</p>
+            <Landmark className="h-4 w-4 text-emerald-300" />
           </div>
-          <div className="text-2xl font-bold text-white">
-            {displayValue(cashFlow.totalDepositedMYR, 'RM ')}
-          </div>
+          <p className="font-display text-2xl text-[var(--text-primary)]">{displayValue(cashFlow.totalDepositedMYR, 'RM ', hideValues)}</p>
         </div>
 
-        <div className="bg-slate-900 border border-slate-800 rounded-xl p-5 shadow-sm">
-           <div className="flex items-center justify-between mb-2">
-            <h3 className="text-slate-400 text-xs font-semibold uppercase">Total Converted (USD)</h3>
-            <Banknote className="w-4 h-4 text-blue-500" />
+        <div className="kpi-card p-5">
+          <div className="mb-3 flex items-center justify-between">
+            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--text-muted)]">Converted USD</p>
+            <Banknote className="h-4 w-4 text-cyan-300" />
           </div>
-          <div className="text-2xl font-bold text-white">
-            {displayValue(cashFlow.totalConvertedUSD, '$')}
-          </div>
-          <div className="text-xs text-slate-500 mt-1">
-             Avg Rate: {cashFlow.avgRate.toFixed(4)} MYR/USD
-          </div>
+          <p className="font-display text-2xl text-[var(--text-primary)]">{displayValue(cashFlow.totalConvertedUSD, '$', hideValues)}</p>
+          <p className="mt-1 text-xs text-[var(--text-muted)]">Avg FX: {cashFlow.avgRate.toFixed(4)} MYR/USD</p>
         </div>
 
-        <div className="bg-slate-900 border border-slate-800 rounded-xl p-5 shadow-sm">
-           <div className="flex items-center justify-between mb-2">
-            <h3 className="text-slate-400 text-xs font-semibold uppercase">Real Cash Balance</h3>
-            <Banknote className="w-4 h-4 text-indigo-500" />
+        <div className="kpi-card p-5">
+          <div className="mb-3 flex items-center justify-between">
+            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--text-muted)]">Real Cash Balance</p>
+            <Banknote className="h-4 w-4 text-indigo-300" />
           </div>
-          <div className="text-2xl font-bold text-white">
-             {displayValue(availableCash, '$')}
-          </div>
-          <div className="text-xs text-slate-500 mt-1">
-             Uninvested Capital
-          </div>
+          <p className="font-display text-2xl text-[var(--text-primary)]">{displayValue(metrics.availableCash, '$', hideValues)}</p>
         </div>
 
-        <div className="bg-slate-900 border border-slate-800 rounded-xl p-5 shadow-sm relative overflow-hidden">
-           <div className={`absolute top-0 right-0 p-10 opacity-10 blur-xl rounded-full ${isPositive ? 'bg-emerald-500' : 'bg-rose-500'}`}></div>
-           <div className="flex items-center justify-between mb-2 relative z-10">
-            <h3 className="text-slate-400 text-xs font-semibold uppercase">Lifecycle P/L</h3>
-            <TrendingUp className={`w-4 h-4 ${isPositive ? 'text-emerald-500' : 'text-rose-500'}`} />
+        <div className="kpi-card p-5">
+          <div className="mb-3 flex items-center justify-between">
+            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--text-muted)]">Lifecycle P/L</p>
+            <TrendingUp className={`h-4 w-4 ${metrics.isPositive ? 'text-emerald-300' : 'text-rose-300'}`} />
           </div>
-          <div className={`text-2xl font-bold relative z-10 ${isPositive ? 'text-emerald-400' : 'text-rose-400'}`}>
-             {isPositive ? '+' : ''}{displayValue(lifecyclePL, '$')}
-          </div>
-          <div className={`text-xs font-medium mt-1 relative z-10 ${isPositive ? 'text-emerald-500' : 'text-rose-500'}`}>
-             {hideValues ? '****' : (isPositive ? '+' : '') + lifecyclePLPercent.toFixed(2) + '% Total Return'}
-          </div>
+          <p className={`font-display text-2xl ${metrics.isPositive ? 'text-emerald-300' : 'text-rose-300'}`}>
+            {metrics.isPositive ? '+' : ''}
+            {displayValue(metrics.lifecyclePL, '$', hideValues)}
+          </p>
+          <p className={`mt-1 text-xs ${metrics.isPositive ? 'text-emerald-400/90' : 'text-rose-400/90'}`}>
+            {hideValues ? '****' : `${metrics.isPositive ? '+' : ''}${metrics.lifecyclePLPercent.toFixed(2)}% total return`}
+          </p>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Deposits List */}
-        <div className="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden">
-             <div className="p-4 border-b border-slate-800">
-                <h3 className="text-sm font-semibold text-white">Deposit History (MYR)</h3>
-             </div>
-             <div className="max-h-[400px] overflow-y-auto">
-                <table className="w-full text-left text-sm">
-                    <thead className="bg-slate-950 text-slate-400 sticky top-0">
-                        <tr>
-                            <th className="px-4 py-3 font-medium">Date</th>
-                            <th className="px-4 py-3 font-medium">Amount</th>
-                            <th className="px-4 py-3 font-medium">Reason</th>
-                        </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-800">
-                        {cashFlow.deposits.map((d, i) => (
-                            <tr key={i} className="hover:bg-slate-800/30">
-                                <td className="px-4 py-3 text-slate-300">{d.date}</td>
-                                <td className="px-4 py-3 text-white font-medium">{displayValue(d.amountMYR, 'RM ')}</td>
-                                <td className="px-4 py-3 text-slate-500 text-xs">{d.reason || '-'}</td>
-                            </tr>
-                        ))}
-                    </tbody>
-                </table>
-             </div>
-        </div>
+      <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
+        <section className="panel overflow-hidden rounded-3xl">
+          <div className="border-b border-[var(--border-soft)] px-5 py-4">
+            <h3 className="text-sm font-semibold text-[var(--text-primary)]">Deposit History (MYR)</h3>
+          </div>
+          <div className="max-h-[420px] overflow-y-auto">
+            <table className="w-full text-left text-sm">
+              <thead className="sticky top-0 bg-black/25 text-[var(--text-muted)]">
+                <tr>
+                  <th className="px-5 py-3 font-medium">Date</th>
+                  <th className="px-5 py-3 font-medium">Amount</th>
+                  <th className="px-5 py-3 font-medium">Reason</th>
+                </tr>
+              </thead>
+              <tbody>
+                {cashFlow.deposits.map((deposit, index) => (
+                  <tr key={`${deposit.date}-${index}`} className="border-t border-[var(--border-soft)] text-[var(--text-secondary)]">
+                    <td className="px-5 py-3">{deposit.date}</td>
+                    <td className="px-5 py-3 font-medium text-[var(--text-primary)]">{displayValue(deposit.amountMYR, 'RM ', hideValues)}</td>
+                    <td className="px-5 py-3 text-xs">{deposit.reason || '-'}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </section>
 
-         {/* Conversions List */}
-        <div className="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden">
-             <div className="p-4 border-b border-slate-800">
-                <h3 className="text-sm font-semibold text-white">USD Conversions</h3>
-             </div>
-             <div className="max-h-[400px] overflow-y-auto">
-                <table className="w-full text-left text-sm">
-                    <thead className="bg-slate-950 text-slate-400 sticky top-0">
-                        <tr>
-                            <th className="px-4 py-3 font-medium">Date</th>
-                            <th className="px-4 py-3 font-medium text-right">MYR In</th>
-                            <th className="px-4 py-3 font-medium text-center">Rate</th>
-                            <th className="px-4 py-3 font-medium text-right">USD Out</th>
-                        </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-800">
-                        {cashFlow.conversions.map((c, i) => (
-                            <tr key={i} className="hover:bg-slate-800/30">
-                                <td className="px-4 py-3 text-slate-300">{c.date}</td>
-                                <td className="px-4 py-3 text-slate-400 text-right">{displayValue(c.amountMYR, '')}</td>
-                                <td className="px-4 py-3 text-slate-500 text-center text-xs">{c.rate.toFixed(4)}</td>
-                                <td className="px-4 py-3 text-emerald-400 font-medium text-right">{displayValue(c.amountUSD, '$')}</td>
-                            </tr>
-                        ))}
-                    </tbody>
-                </table>
-             </div>
-        </div>
+        <section className="panel overflow-hidden rounded-3xl">
+          <div className="border-b border-[var(--border-soft)] px-5 py-4">
+            <h3 className="text-sm font-semibold text-[var(--text-primary)]">USD Conversions</h3>
+          </div>
+          <div className="max-h-[420px] overflow-y-auto">
+            <table className="w-full text-left text-sm">
+              <thead className="sticky top-0 bg-black/25 text-[var(--text-muted)]">
+                <tr>
+                  <th className="px-5 py-3 font-medium">Date</th>
+                  <th className="px-5 py-3 text-right font-medium">MYR In</th>
+                  <th className="px-5 py-3 text-center font-medium">Rate</th>
+                  <th className="px-5 py-3 text-right font-medium">USD Out</th>
+                </tr>
+              </thead>
+              <tbody>
+                {cashFlow.conversions.map((conversion, index) => (
+                  <tr key={`${conversion.date}-${index}`} className="border-t border-[var(--border-soft)] text-[var(--text-secondary)]">
+                    <td className="px-5 py-3">{conversion.date}</td>
+                    <td className="px-5 py-3 text-right">{displayValue(conversion.amountMYR, '', hideValues)}</td>
+                    <td className="px-5 py-3 text-center text-xs">{conversion.rate.toFixed(4)}</td>
+                    <td className="px-5 py-3 text-right font-medium text-emerald-300">{displayValue(conversion.amountUSD, '$', hideValues)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </section>
       </div>
 
-      <AddFundingModal 
+      <AddFundingModal
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
-        onSuccess={handleSuccess}
+        onSuccess={() => {
+          setIsModalOpen(false);
+          onRefresh?.();
+        }}
       />
     </div>
   );

@@ -1,7 +1,7 @@
-
 'use client';
-import React, { useState } from 'react';
-import { Wallet, Eye, EyeOff, X, CreditCard, Smartphone, Banknote } from 'lucide-react';
+
+import React, { useEffect, useState } from 'react';
+import { Banknote, CreditCard, Eye, EyeOff, Smartphone, Wallet, X } from 'lucide-react';
 import { MoneyAccount } from '../types';
 import { CountUp } from './ui/CountUp';
 
@@ -12,158 +12,135 @@ interface TotalBalanceCardProps {
   onTogglePrivacy: () => void;
 }
 
-export const TotalBalanceCard: React.FC<TotalBalanceCardProps> = ({ 
-  totalBalance, 
-  accounts, 
-  hideValues, 
-  onTogglePrivacy 
-}) => {
+export const TotalBalanceCard: React.FC<TotalBalanceCardProps> = ({ totalBalance, accounts, hideValues, onTogglePrivacy }) => {
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const activeAccounts = accounts.filter(a => a.currentBalance !== 0);
+  const activeAccounts = accounts.filter((account) => account.currentBalance !== 0);
 
-  // Helper to calculate total assets vs liabilities (Mock logic or derived if data allows)
-  // For visual flair, we assume totalBalance is net.
-  
+  const displayValue = (value: number) =>
+    hideValues ? 'RM ****' : `RM ${value.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+
+  useEffect(() => {
+    if (!isModalOpen) return;
+    const handleKey = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setIsModalOpen(false);
+    };
+    window.addEventListener('keydown', handleKey);
+    return () => window.removeEventListener('keydown', handleKey);
+  }, [isModalOpen]);
+
   const getAccountIcon = (category: string) => {
-    const c = category.toLowerCase();
-    if (c.includes('bank')) return <Smartphone className="w-5 h-5 text-indigo-200" />;
-    if (c.includes('wallet') || c.includes('pay')) return <Smartphone className="w-5 h-5 text-blue-200" />;
-    if (c.includes('card')) return <CreditCard className="w-5 h-5 text-emerald-200" />;
-    if (c.includes('cash')) return <Banknote className="w-5 h-5 text-amber-200" />;
-    return <Wallet className="w-5 h-5 text-slate-200" />;
-  };
-
-  const displayValue = (val: number) => {
-    if (hideValues) return 'RM ****';
-    return `RM ${val.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+    const normalized = category.toLowerCase();
+    if (normalized.includes('bank')) return <Smartphone className="h-5 w-5 text-indigo-200" />;
+    if (normalized.includes('wallet') || normalized.includes('pay')) return <Smartphone className="h-5 w-5 text-blue-200" />;
+    if (normalized.includes('card')) return <CreditCard className="h-5 w-5 text-emerald-200" />;
+    if (normalized.includes('cash')) return <Banknote className="h-5 w-5 text-amber-200" />;
+    return <Wallet className="h-5 w-5 text-slate-200" />;
   };
 
   return (
     <>
-      <div 
+      <section
         onClick={() => setIsModalOpen(true)}
-        className="group relative w-full overflow-hidden rounded-3xl p-1 transition-all hover:scale-[1.01] cursor-pointer mb-8 shadow-2xl shadow-indigo-500/10"
+        className="panel-elevated relative mb-2 cursor-pointer overflow-hidden rounded-3xl p-6 transition hover:-translate-y-0.5 sm:p-8"
       >
-        {/* Gradient Border Background */}
-        <div className="absolute inset-0 bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500 opacity-70 group-hover:opacity-100 transition-opacity blur-[2px]" />
-        
-        {/* Main Card Content */}
-        <div className="relative h-full w-full rounded-[1.3rem] bg-slate-950/90 p-5 md:p-8 backdrop-blur-3xl">
-            {/* Inner ambient glow */}
-            <div className="absolute top-0 right-0 -mt-10 -mr-10 h-64 w-64 rounded-full bg-indigo-500/20 blur-3xl pointer-events-none" />
-            <div className="absolute bottom-0 left-0 -mb-10 -ml-10 h-64 w-64 rounded-full bg-purple-500/10 blur-3xl pointer-events-none" />
+        <div className="pointer-events-none absolute -right-12 -top-14 h-44 w-44 rounded-full bg-[var(--accent-primary)]/25 blur-3xl" />
+        <div className="pointer-events-none absolute -bottom-16 -left-14 h-44 w-44 rounded-full bg-cyan-500/15 blur-3xl" />
 
-            <div className="relative z-10 flex flex-col md:flex-row justify-between items-start md:items-end gap-6">
-                <div className="space-y-4">
-                    <div className="flex items-center gap-3">
-                        <div className="p-2 rounded-xl bg-white/5 border border-white/10 backdrop-blur-md shadow-sm">
-                            <Wallet className="w-5 h-5 text-indigo-400" />
-                        </div>
-                        <span className="text-sm font-medium text-slate-400 tracking-wide uppercase">Total Balance</span>
-                    </div>
-
-                    <div className="flex items-baseline gap-2">
-                         <h1 className="text-3xl sm:text-4xl md:text-5xl font-bold text-white tracking-tight drop-shadow-lg">
-                            {hideValues ? 'RM *******' : <CountUp end={totalBalance} prefix="RM " />}
-                         </h1>
-                    </div>
-
-                    <div className="flex items-center gap-3 text-sm">
-                         <div className="flex -space-x-2">
-                            {activeAccounts.slice(0, 4).map((acc, i) => (
-                                <div key={i} className="w-8 h-8 rounded-full bg-slate-800 border-2 border-slate-900 flex items-center justify-center text-[10px] text-slate-300 font-bold overflow-hidden" title={acc.name}>
-                                    {acc.name.charAt(0)}
-                                </div>
-                            ))}
-                            {activeAccounts.length > 4 && (
-                                <div className="w-8 h-8 rounded-full bg-slate-800 border-2 border-slate-900 flex items-center justify-center text-[10px] text-slate-300 font-bold">
-                                    +{activeAccounts.length - 4}
-                                </div>
-                            )}
-                         </div>
-                         <span className="text-slate-500 font-medium">{activeAccounts.length} Active Accounts</span>
-                    </div>
-                </div>
-
-                <div className="flex items-center justify-between w-full md:w-auto">
-                     {/* Mobile eye button is moved to right via flex justify-between on wrapper if needed, but standard layout puts it next to status on desktop. On mobile, we might want it accessible top right? Currently sits below title on mobile stack. Let's keep it consistent. */}
-                    
-                    <div className="flex items-center gap-4">
-                        <button 
-                            onClick={(e) => {
-                                e.stopPropagation();
-                                onTogglePrivacy();
-                            }}
-                            className="group/btn flex items-center justify-center w-12 h-12 rounded-full bg-white/5 hover:bg-white/10 border border-white/5 backdrop-blur-md transition-all active:scale-95"
-                        >
-                            {hideValues ? <EyeOff className="w-5 h-5 text-slate-400 group-hover/btn:text-white" /> : <Eye className="w-5 h-5 text-slate-400 group-hover/btn:text-white" />}
-                        </button>
-                        <div className="hidden md:block h-12 w-[1px] bg-white/10 mx-2"></div>
-                        <div className="hidden md:flex flex-col items-end">
-                            <span className="text-xs text-slate-500 uppercase tracking-wider mb-1">Status</span>
-                            <div className="flex items-center gap-2">
-                                <span className="relative flex h-2.5 w-2.5">
-                                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                                    <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500"></span>
-                                </span>
-                                <span className="text-sm font-medium text-emerald-400">Synced</span>
-                            </div>
-                        </div>
-                    </div>
-                </div>
+        <div className="relative z-10 flex flex-col gap-6 md:flex-row md:items-end md:justify-between">
+          <div className="space-y-4">
+            <div className="inline-flex items-center gap-2 rounded-full border border-[var(--border-soft)] bg-black/25 px-3 py-1">
+              <Wallet className="h-4 w-4 text-[var(--text-secondary)]" />
+              <span className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--text-muted)]">Total Balance</span>
             </div>
-        </div>
-      </div>
 
-      {/* Active Accounts Modal */}
-      {isModalOpen && (
-        <div 
-            className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-md p-4"
-            onClick={() => setIsModalOpen(false)}
-        >
-          <div 
-            className="bg-slate-900/90 border border-slate-800/50 rounded-3xl w-full max-w-md shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-200 ring-1 ring-white/10"
-            onClick={e => e.stopPropagation()}
-          >
-             <div className="flex justify-between items-center p-6 border-b border-white/5">
-                <h3 className="font-bold text-xl text-white">Your Wallets</h3>
-                <button onClick={() => setIsModalOpen(false)} className="p-2 rounded-full hover:bg-white/5 text-slate-400 hover:text-white transition-colors">
-                    <X className="w-5 h-5" />
-                </button>
-             </div>
-             <div className="p-4 space-y-3 max-h-[60vh] overflow-y-auto custom-scrollbar">
-                {activeAccounts.map((acc) => (
-                    <div key={acc.name} className="flex items-center justify-between p-4 rounded-2xl bg-white/5 border border-white/5 hover:bg-white/10 transition-colors group">
-                        <div className="flex items-center gap-4">
-                             <div className={`p-3 rounded-xl shadow-inner ${
-                                 acc.currentBalance < 0 ? 'bg-rose-500/10' : 'bg-indigo-500/10'
-                             }`}>
-                                {acc.logoUrl ? <img src={acc.logoUrl} className="w-6 h-6 object-contain" /> : getAccountIcon(acc.category)}
-                            </div>
-                            <div>
-                                <div className="text-sm font-bold text-white group-hover:text-indigo-300 transition-colors">{acc.name}</div>
-                                <div className="text-xs text-slate-500 uppercase tracking-wide">{acc.category}</div>
-                            </div>
-                        </div>
-                        <div className={`text-base font-bold ${acc.currentBalance < 0 ? 'text-rose-400' : 'text-emerald-400'}`}>
-                            {displayValue(acc.currentBalance)}
-                        </div>
-                    </div>
+            <h2 className="font-display text-3xl text-[var(--text-primary)] sm:text-4xl md:text-5xl">
+              {hideValues ? 'RM *******' : <CountUp end={totalBalance} prefix="RM " />}
+            </h2>
+
+            <div className="flex items-center gap-3">
+              <div className="flex -space-x-2">
+                {activeAccounts.slice(0, 4).map((account) => (
+                  <div
+                    key={account.name}
+                    className="flex h-8 w-8 items-center justify-center overflow-hidden rounded-full border-2 border-[var(--bg-elevated)] bg-black/30 text-[10px] font-bold text-[var(--text-secondary)]"
+                    title={account.name}
+                  >
+                    {account.name.charAt(0)}
+                  </div>
                 ))}
-                {activeAccounts.length === 0 && (
-                    <div className="text-center text-slate-500 py-12 flex flex-col items-center">
-                        <Wallet className="w-12 h-12 text-slate-700 mb-3" />
-                        No active accounts found.
-                    </div>
-                )}
-             </div>
-             <div className="p-6 bg-slate-950/50 border-t border-white/5 flex justify-between items-center">
-                 <span className="text-sm font-medium text-slate-400">Net Total</span>
-                 <span className="text-white font-bold text-xl tracking-tight">{displayValue(totalBalance)}</span>
-             </div>
+                {activeAccounts.length > 4 ? (
+                  <div className="flex h-8 w-8 items-center justify-center rounded-full border-2 border-[var(--bg-elevated)] bg-black/30 text-[10px] font-bold text-[var(--text-secondary)]">
+                    +{activeAccounts.length - 4}
+                  </div>
+                ) : null}
+              </div>
+              <span className="text-sm text-[var(--text-secondary)]">{activeAccounts.length} active accounts</span>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-4">
+            <button
+              type="button"
+              onClick={(event) => {
+                event.stopPropagation();
+                onTogglePrivacy();
+              }}
+              className="focus-ring rounded-xl border border-[var(--border-soft)] bg-black/20 p-3 text-[var(--text-secondary)] transition hover:text-[var(--text-primary)]"
+            >
+              {hideValues ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+            </button>
+            <div className="hidden items-center gap-2 rounded-xl border border-emerald-500/20 bg-emerald-500/10 px-3 py-2 text-sm text-emerald-300 md:inline-flex">
+              <span className="h-2 w-2 rounded-full bg-emerald-300" />
+              Synced
+            </div>
           </div>
         </div>
-      )}
+      </section>
+
+      {isModalOpen ? (
+        <div className="fixed inset-0 z-[110] flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm" onClick={() => setIsModalOpen(false)}>
+          <div className="panel-elevated w-full max-w-lg overflow-hidden rounded-3xl" onClick={(event) => event.stopPropagation()}>
+            <div className="flex items-center justify-between border-b border-[var(--border-soft)] px-6 py-5">
+              <h3 className="font-display text-2xl text-[var(--text-primary)]">Wallet Snapshot</h3>
+              <button
+                type="button"
+                onClick={() => setIsModalOpen(false)}
+                className="focus-ring rounded-lg p-2 text-[var(--text-muted)] transition hover:bg-white/5 hover:text-[var(--text-primary)]"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            <div className="max-h-[58vh] space-y-3 overflow-y-auto p-5">
+              {activeAccounts.length === 0 ? (
+                <div className="rounded-2xl border border-[var(--border-soft)] bg-black/20 p-8 text-center text-sm text-[var(--text-muted)]">
+                  No active accounts found.
+                </div>
+              ) : (
+                activeAccounts.map((account) => (
+                  <div key={account.name} className="flex items-center justify-between rounded-2xl border border-[var(--border-soft)] bg-black/20 p-4">
+                    <div className="flex items-center gap-3">
+                      <div className="rounded-xl bg-white/5 p-2">{account.logoUrl ? <img src={account.logoUrl} className="h-6 w-6 object-contain" /> : getAccountIcon(account.category)}</div>
+                      <div>
+                        <p className="text-sm font-semibold text-[var(--text-primary)]">{account.name}</p>
+                        <p className="text-xs uppercase tracking-[0.12em] text-[var(--text-muted)]">{account.category}</p>
+                      </div>
+                    </div>
+                    <p className={`text-sm font-semibold ${account.currentBalance < 0 ? 'text-rose-300' : 'text-emerald-300'}`}>
+                      {displayValue(account.currentBalance)}
+                    </p>
+                  </div>
+                ))
+              )}
+            </div>
+
+            <div className="flex items-center justify-between border-t border-[var(--border-soft)] bg-black/20 px-6 py-4">
+              <span className="text-sm text-[var(--text-secondary)]">Net Total</span>
+              <span className="font-display text-xl text-[var(--text-primary)]">{displayValue(totalBalance)}</span>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </>
   );
 };

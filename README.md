@@ -1,39 +1,41 @@
-# 💼 Asset Manager
+# AssetManager
 
-A robust and modern web application designed to streamline asset tracking and management. Built with performance and scalability in mind, this application leverages the power of Next.js and TypeScript to provide a seamless user experience across all devices.
+AssetManager is a Next.js + TypeScript web app for tracking investments, cash flow, and personal money accounts in one workspace.
 
-🔗 **Live Demo:** 
-***
-## 🌟 Features & Functions
+## Features
 
-### 📊 Comprehensive Dashboard
-* **Total Wealth Overview:** Instantly view the aggregated value of all your listed assets in one simple summary card.
-* **Visual Asset List:** Displays all items with clear categorization, allowing you to scan your inventory or portfolio at a glance.
+- Portfolio dashboard with holdings, allocation, and P/L insights
+- Cash flow tracking for MYR deposits and USD conversions
+- Money manager for account balances and transactions
+- Command palette (`Ctrl/Cmd + K`) for fast navigation and actions
+- PWA support with service worker registration
 
-### 🛠️ Asset Control (CRUD)
-* **Add New Assets:** Quickly input new items with details such as Name, Value, Category, and Date of acquisition.
-* **Edit & Update:** Easily modify asset values as they depreciate or appreciate over time.
-* **Delete Capability:** Remove sold or discarded assets to keep your portfolio current.
+## Stack
 
-### ⚡ Progressive Web App (PWA)
-* **Installable App:** Thanks to `sw.js` integration, you can install this directly to your phone's home screen for a native app experience.
-* **Offline Capability:** Access your data even without an internet connection (cached resources allow for offline viewing).
-* **Responsive Layout:** The interface automatically adjusts to fit desktop monitors, tablets, and mobile screens seamlessly.
-***
-## 🛠️ Tech Stack
+- Next.js (App Router)
+- React 18
+- TypeScript
+- Tailwind CSS
+- Recharts
+- Google Sheets integration via server actions
 
-* **Framework:** [Next.js](https://nextjs.org/) (App Router)
-* **Language:** TypeScript (96.7%)
-* **Styling:** Tailwind CSS & PostCSS
-* **Linting:** ESLint
-* **Deployment:** Vercel
-***
-## 📂 Project Structure
+## Run Locally
 
 ```bash
-├── app/             # Main application routes and layouts (Next.js App Router)
-├── components/      # Reusable UI components
-├── lib/             # Utility functions and helper logic
-├── public/          # Static assets and images
-├── sw.js            # Service Worker for PWA functionality
-└── tailwind.config.js # Tailwind CSS configuration
+npm install
+npm run dev
+```
+
+Open `http://localhost:3000`.
+
+## Project Structure
+
+```text
+app/                 Next.js routes and server actions
+components/          Reusable UI and feature components
+components/layout/   Shared app shell (sidebar, topbar, content)
+lib/                 External service integrations
+public/              Static assets
+types.ts             Domain models
+types/ui.ts          UI shell and command palette models
+```

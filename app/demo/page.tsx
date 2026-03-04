@@ -1,26 +1,43 @@
-
 'use client';
 
-import React, { useEffect, useState, useCallback, useMemo } from 'react';
-import { Plus, LayoutDashboard, AlertCircle, RefreshCw, Wallet, LineChart, Eye, EyeOff, Command as CommandIcon, Search, Beaker, LogOut, Landmark } from 'lucide-react';
-import Link from 'next/link';
-
-// Adjust imports for nested directory structure
-import { SummaryCards } from '../../components/SummaryCards';
-import { HoldingsTable } from '../../components/HoldingsTable';
-import { AllocationChart } from '../../components/AllocationChart';
-import { FundingStats } from '../../components/FundingStats';
-import { MoneyManager } from '../../components/MoneyManager';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { AddTradeModal } from '../../components/AddTradeModal';
-import { TotalBalanceCard } from '../../components/TotalBalanceCard';
 import { CommandPalette } from '../../components/CommandPalette';
-import { CardSkeleton, TableSkeleton } from '../../components/ui/Skeleton';
-import { getPortfolioData, getCashFlowData, getMoneyManagerData, checkDatabaseStatus } from '../actions';
-import { PortfolioSummary, CashFlowSummary, MoneyManagerData } from '../../types';
-import { DecryptedText } from '../../components/ui/DecryptedText';
+import { AppWorkspace } from '../../components/layout/AppWorkspace';
+import { getCashFlowData, getMoneyManagerData, getPortfolioData } from '../actions';
+import { CashFlowSummary, MoneyManagerData, PortfolioSummary } from '../../types';
+import { AppModule, CommandSearchItem, InvestmentTab, QuickActionType } from '../../types/ui';
 
-type AppModule = 'manager' | 'investment';
-type InvestmentTab = 'dashboard' | 'funding';
+const fallbackPortfolio: PortfolioSummary = {
+  netWorth: 0,
+  totalCost: 0,
+  totalPL: 0,
+  totalPLPercent: 0,
+  cashBalance: 0,
+  holdings: [],
+};
+
+const fallbackCashFlow: CashFlowSummary = {
+  totalDepositedMYR: 0,
+  totalConvertedMYR: 0,
+  totalConvertedUSD: 0,
+  avgRate: 0,
+  deposits: [],
+  conversions: [],
+};
+
+const fallbackMoneyData: MoneyManagerData = {
+  accounts: [],
+  transactions: [],
+  totalBalance: 0,
+  monthlyStats: { income: 0, expense: 0, incomeGrowth: 0, expenseGrowth: 0 },
+  categorySpending: [],
+  graphData: [],
+  upcomingBills: [],
+  categories: [],
+  incomeCategories: [],
+  expenseCategories: [],
+};
 
 export default function DemoPage() {
   const [data, setData] = useState<PortfolioSummary | null>(null);
@@ -28,282 +45,132 @@ export default function DemoPage() {
   const [moneyData, setMoneyData] = useState<MoneyManagerData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isAddTradeOpen, setIsAddTradeOpen] = useState(false);
   const [isCommandOpen, setIsCommandOpen] = useState(false);
-  
+
   const [activeModule, setActiveModule] = useState<AppModule>('manager');
   const [activeInvTab, setActiveInvTab] = useState<InvestmentTab>('dashboard');
-  
   const [hideBalance, setHideBalance] = useState(false);
   const [hideInvestments, setHideInvestments] = useState(false);
 
-  // Command Palette Items
-  const searchItems = useMemo(() => {
-    const items = [
-        { name: 'Dashboard', type: 'Module', module: 'investment' },
-        { name: 'Wallets', type: 'Module', module: 'manager' },
-        { name: 'Cash Flow', type: 'Module', module: 'investment' }
+  const searchItems = useMemo<CommandSearchItem[]>(() => {
+    const items: CommandSearchItem[] = [
+      { id: 'module-manager', name: 'Money Manager', type: 'module', module: 'manager', keywords: ['wallet', 'expenses'] },
+      { id: 'module-investment', name: 'Investments', type: 'module', module: 'investment', keywords: ['portfolio', 'holdings'] },
+      { id: 'module-funding', name: 'Cash Flow', type: 'module', module: 'investment', keywords: ['funding', 'conversion'] },
+      { id: 'action-add-trade', name: 'Add Trade', type: 'action', action: 'add_trade', module: 'investment' },
+      { id: 'action-add-transaction', name: 'Add Transaction', type: 'action', action: 'add_transaction', module: 'manager' },
+      { id: 'action-refresh', name: 'Refresh Data', type: 'action', action: 'refresh' },
     ];
-    if (data?.holdings) {
-        data.holdings.forEach(h => {
-            items.push({ name: h.ticker, type: 'Asset', module: 'investment' });
-        });
+
+    for (const holding of data?.holdings || []) {
+      items.push({
+        id: `asset-${holding.ticker}`,
+        name: holding.ticker,
+        type: 'asset',
+        module: 'investment',
+        action: 'open_asset',
+        keywords: [holding.sector, holding.assetClass],
+      });
     }
+
     return items;
   }, [data]);
 
   const fetchData = useCallback(async () => {
     setLoading(true);
     setError(null);
+
     try {
-      // FORCE DEMO = TRUE
-      const status = await checkDatabaseStatus(true);
+      const [portfolioResult, cashFlowResult, moneyResult] = await Promise.all([
+        getPortfolioData(true).catch(() => null),
+        getCashFlowData(true).catch(() => null),
+        getMoneyManagerData(true).catch(() => null),
+      ]);
 
-      if (status.configured) {
-         const [portfolioResult, cashFlowResult, moneyResult] = await Promise.all([
-            getPortfolioData(true).catch(() => null),
-            getCashFlowData(true).catch(() => null),
-            getMoneyManagerData(true).catch(() => null)
-         ]);
-
-         setData(portfolioResult || { netWorth: 0, totalCost: 0, totalPL: 0, totalPLPercent: 0, cashBalance: 0, holdings: [] });
-         setCashFlowData(cashFlowResult || { totalDepositedMYR: 0, totalConvertedMYR: 0, totalConvertedUSD: 0, avgRate: 0, deposits: [], conversions: [] });
-         setMoneyData(moneyResult || { accounts: [], transactions: [], totalBalance: 0, monthlyStats: { income: 0, expense: 0, incomeGrowth: 0, expenseGrowth: 0 }, categorySpending: [], graphData: [], upcomingBills: [], categories: [], incomeCategories: [], expenseCategories: [] });
-      } else {
-         setError("Failed to initialize demo.");
-      }
-    } catch (err: any) {
-      setError("Failed to load demo.");
+      setData(portfolioResult || fallbackPortfolio);
+      setCashFlowData(cashFlowResult || fallbackCashFlow);
+      setMoneyData(moneyResult || fallbackMoneyData);
+    } catch (err) {
+      setError('Failed to load demo dataset.');
+      setData(fallbackPortfolio);
+      setCashFlowData(fallbackCashFlow);
+      setMoneyData(fallbackMoneyData);
     } finally {
       setLoading(false);
     }
   }, []);
 
+  const handleAction = useCallback(
+    (action?: QuickActionType) => {
+      if (!action) return;
+
+      if (action === 'add_trade') {
+        setActiveModule('investment');
+        setIsAddTradeOpen(true);
+        return;
+      }
+
+      if (action === 'add_transaction') {
+        setActiveModule('manager');
+        return;
+      }
+
+      if (action === 'refresh') {
+        fetchData();
+      }
+    },
+    [fetchData],
+  );
+
   useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-        if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
-            e.preventDefault();
-            setIsCommandOpen(prev => !prev);
-        }
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'k') {
+        event.preventDefault();
+        setIsCommandOpen((prev) => !prev);
+      }
     };
+
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, []);
 
   useEffect(() => {
     fetchData();
-    // No interval for demo, or less frequent
   }, [fetchData]);
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-200 font-sans selection:bg-indigo-500/30">
-      <nav className="border-b border-white/5 bg-slate-950/50 backdrop-blur-md sticky top-0 z-40">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between h-16 items-center">
-            
-            <div className="flex items-center gap-3">
-              <div className="bg-gradient-to-br from-indigo-500 to-purple-600 p-2 rounded-xl shadow-lg shadow-indigo-500/20">
-                 <LineChart className="w-5 h-5 text-white" />
-              </div>
-              <span className="font-bold text-xl text-white tracking-tight hidden sm:block">
-                <DecryptedText text="AssetManager" speed={60} revealDirection="center" />
-              </span>
-              <span className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-500/10 border border-amber-500/20 text-amber-400 text-[10px] font-bold uppercase tracking-wide">
-                 <Beaker className="w-3 h-3" /> Demo Mode
-              </span>
-            </div>
-
-            <div className="hidden md:flex bg-slate-900/60 p-1 rounded-xl border border-white/5 backdrop-blur-md">
-               <button 
-                  onClick={() => setActiveModule('manager')}
-                  className={`flex items-center gap-2 px-5 py-2 rounded-lg text-sm font-semibold transition-all ${activeModule === 'manager' ? 'bg-white/10 text-white shadow-inner' : 'text-slate-400 hover:text-slate-200'}`}
-               >
-                 <Wallet className="w-4 h-4" />
-                 Money Manager
-               </button>
-               <button 
-                  onClick={() => setActiveModule('investment')}
-                  className={`flex items-center gap-2 px-5 py-2 rounded-lg text-sm font-semibold transition-all ${activeModule === 'investment' ? 'bg-white/10 text-white shadow-inner' : 'text-slate-400 hover:text-slate-200'}`}
-               >
-                 <LineChart className="w-4 h-4" />
-                 Investments
-               </button>
-            </div>
-
-            <div className="flex items-center gap-2">
-               <button
-                 onClick={() => setIsCommandOpen(true)}
-                 className="hidden lg:flex items-center gap-2 px-3 py-2 bg-slate-900/50 border border-white/5 rounded-lg text-slate-500 hover:text-slate-300 transition-colors mr-2 text-sm"
-               >
-                 <Search className="w-4 h-4" />
-                 <span>Search...</span>
-                 <div className="flex items-center gap-1 px-1.5 py-0.5 rounded bg-slate-800 text-[10px] font-bold">
-                    <CommandIcon className="w-3 h-3" /> K
-                 </div>
-               </button>
-
-               <Link
-                href="/"
-                className="p-2.5 text-slate-400 hover:text-white transition-colors bg-rose-500/10 hover:bg-rose-500/20 rounded-xl border border-rose-500/20"
-                title="Exit Demo"
-               >
-                 <LogOut className="w-4 h-4" />
-               </Link>
-
-              {activeModule === 'investment' && (
-                <button
-                  onClick={() => setIsModalOpen(true)}
-                  className="bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-bold px-4 py-2.5 rounded-xl flex items-center gap-2 transition-all shadow-xl shadow-indigo-500/20 ml-2"
-                >
-                  <Plus className="w-5 h-5" />
-                  <span className="hidden sm:inline">Add Trade</span>
-                </button>
-              )}
-            </div>
-          </div>
-        </div>
-      </nav>
-
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        
-        {/* DEMO BANNER */}
-        <div className="mb-6 p-3 bg-indigo-500/10 border border-indigo-500/20 rounded-xl flex items-center justify-between">
-            <div className="flex items-center gap-3">
-                <div className="p-2 bg-indigo-500 rounded-lg">
-                    <Beaker className="w-4 h-4 text-white" />
-                </div>
-                <div>
-                    <h3 className="text-sm font-bold text-white">Preview Environment</h3>
-                    <p className="text-xs text-indigo-300">You are viewing a simulated dataset. Changes here will not affect your real portfolio.</p>
-                </div>
-            </div>
-            <Link href="/" className="text-xs font-bold text-white bg-indigo-600 hover:bg-indigo-700 px-4 py-2 rounded-lg transition-colors">
-                Login to Real App
-            </Link>
-        </div>
-
-        <div className="md:hidden flex bg-slate-900/60 p-1 rounded-xl border border-white/5 mb-6">
-            <button 
-              onClick={() => setActiveModule('manager')}
-              className={`flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg text-sm font-bold transition-all ${activeModule === 'manager' ? 'bg-white/10 text-white shadow-sm' : 'text-slate-400 hover:text-slate-200'}`}
-            >
-              <Wallet className="w-4 h-4" />
-              Manager
-            </button>
-            <button 
-              onClick={() => setActiveModule('investment')}
-              className={`flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg text-sm font-bold transition-all ${activeModule === 'investment' ? 'bg-white/10 text-white shadow-sm' : 'text-slate-400 hover:text-slate-200'}`}
-            >
-              <LineChart className="w-4 h-4" />
-              Investments
-            </button>
-        </div>
-
-        <TotalBalanceCard 
-            totalBalance={moneyData?.totalBalance || 0} 
-            accounts={moneyData?.accounts || []} 
-            hideValues={hideBalance}
-            onTogglePrivacy={() => setHideBalance(!hideBalance)}
-        />
-
-        {activeModule === 'investment' && (
-             <div className="flex space-x-1 bg-slate-900/40 p-1 rounded-xl w-fit mb-8 border border-white/5 backdrop-blur-md">
-                <button
-                    onClick={() => setActiveInvTab('dashboard')}
-                    className={`flex items-center gap-2 px-5 py-2.5 rounded-lg text-sm font-semibold transition-all ${
-                        activeInvTab === 'dashboard' 
-                        ? 'bg-slate-800 text-white shadow-sm' 
-                        : 'text-slate-400 hover:text-slate-200'
-                    }`}
-                >
-                    <LayoutDashboard className="w-4 h-4" />
-                    Portfolio
-                </button>
-                <button
-                    onClick={() => setActiveInvTab('funding')}
-                    className={`flex items-center gap-2 px-5 py-2.5 rounded-lg text-sm font-semibold transition-all ${
-                        activeInvTab === 'funding' 
-                        ? 'bg-slate-800 text-white shadow-sm' 
-                        : 'text-slate-400 hover:text-slate-200'
-                    }`}
-                >
-                    <Landmark className="w-4 h-4" />
-                    Cash Flow
-                </button>
-            </div>
-        )}
-
-        {error && (
-            <div className="mb-8 p-4 bg-rose-500/10 border border-rose-500/20 text-rose-500 rounded-2xl flex items-center gap-3">
-                <AlertCircle className="w-5 h-5" />
-                <p className="font-semibold">{error}</p>
-            </div>
-        )}
-
-        {loading ? (
-            <div className="space-y-8">
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                    <CardSkeleton /> <CardSkeleton /> <CardSkeleton />
-                </div>
-                <TableSkeleton />
-            </div>
-        ) : (
-            <>
-                {activeModule === 'manager' && (
-                    <MoneyManager 
-                        data={moneyData} 
-                        loading={loading} 
-                        onRefresh={fetchData} 
-                        hideValues={hideBalance}
-                    />
-                )}
-
-                {activeModule === 'investment' && activeInvTab === 'funding' && (
-                    <FundingStats 
-                    cashFlow={cashFlowData} 
-                    portfolio={data} 
-                    hideValues={hideInvestments}
-                    />
-                )}
-
-                {activeModule === 'investment' && activeInvTab === 'dashboard' && (
-                    <>
-                        <SummaryCards data={data} loading={loading} hideValues={hideInvestments} />
-                        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                            <div className="lg:col-span-2 space-y-8">
-                                <HoldingsTable data={data} hideValues={hideInvestments} />
-                            </div>
-                            <div className="space-y-8">
-                                <AllocationChart data={data} />
-                                <div className="glass-card rounded-3xl p-6 relative overflow-hidden">
-                                    <div className="absolute top-0 right-0 p-10 opacity-5 -mr-10 -mt-10 bg-indigo-500 rounded-full blur-2xl"></div>
-                                    <h3 className="text-white font-bold mb-3 relative z-10">Market Insights</h3>
-                                    <p className="text-slate-400 text-sm leading-relaxed relative z-10">
-                                        Your portfolio is currently tracking {data?.holdings.length} assets across {new Set(data?.holdings.map(h => h.sector)).size} sectors. 
-                                        Keep an eye on {data?.holdings[0]?.ticker} as it makes up {data?.holdings[0]?.allocation.toFixed(1)}% of your equity value.
-                                    </p>
-                                </div>
-                            </div>
-                        </div>
-                    </>
-                )}
-            </>
-        )}
-      </main>
-
-      <AddTradeModal 
-        isOpen={isModalOpen} 
-        onClose={() => setIsModalOpen(false)}
-        onSuccess={fetchData}
+    <>
+      <AppWorkspace
+        isDemo
+        data={data}
+        cashFlowData={cashFlowData}
+        moneyData={moneyData}
+        loading={loading}
+        error={error}
+        activeModule={activeModule}
+        activeInvTab={activeInvTab}
+        hideBalance={hideBalance}
+        hideInvestments={hideInvestments}
+        onSelectModule={setActiveModule}
+        onSelectInvTab={setActiveInvTab}
+        onToggleHideBalance={() => setHideBalance((prev) => !prev)}
+        onToggleHideInvestments={() => setHideInvestments((prev) => !prev)}
+        onOpenSearch={() => setIsCommandOpen(true)}
+        onOpenAddTrade={() => setIsAddTradeOpen(true)}
+        onRefresh={fetchData}
       />
 
-      <CommandPalette 
+      <AddTradeModal isOpen={isAddTradeOpen} onClose={() => setIsAddTradeOpen(false)} onSuccess={fetchData} />
+
+      <CommandPalette
         isOpen={isCommandOpen}
         onClose={() => setIsCommandOpen(false)}
         onSelectModule={setActiveModule}
-        onAddTrade={() => setIsModalOpen(true)}
+        onSelectInvestmentTab={setActiveInvTab}
+        onRunAction={handleAction}
         searchItems={searchItems}
       />
-    </div>
+    </>
   );
 }
