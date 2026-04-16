@@ -37,13 +37,9 @@ export const AddMoneyModal: React.FC<AddMoneyModalProps> = ({
   const validExpenseAccounts = accounts.filter(acc => {
       const cat = (acc.category || '').toLowerCase();
       const hasBalance = acc.currentBalance > 0;
-      // Allow if category contains 'bank' or 'wallet' (e.g. "TnG eWallet", "E-Wallet")
-      const isBankOrWallet = cat.includes('bank') || cat.includes('wallet') || cat.includes('card') || cat.includes('cash'); 
-      // Note: Originally restricted to Bank/Wallet, but usually Cash/Card are also valid expense sources if they have money (or credit). 
-      // The user specifically asked for "E-wallet accounts with money".
-      // I will restrict to Bank + Wallet + Cash + Card (standard sources), checking specifically for 'wallet' match.
-      const isSource = cat.includes('bank') || cat.includes('wallet') || cat.includes('cash') || cat.includes('card');
-      return hasBalance && isSource;
+      const isCreditCard = cat === 'credit card';
+      const isSource = cat.includes('bank') || cat.includes('wallet') || cat.includes('cash') || cat === 'debit card' || isCreditCard;
+      return isSource && (isCreditCard || hasBalance);
   });
 
   // For Income/Transfer, we generally allow any account.

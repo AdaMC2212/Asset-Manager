@@ -7,6 +7,8 @@ import { CountUp } from '../ui/CountUp';
 interface MoneyStatsRowProps {
   income: number;
   expense: number;
+  charged: number;
+  outstanding: number;
   balance: number;
   isCustomDateMode: boolean;
   hideValues?: boolean;
@@ -37,9 +39,9 @@ const StatTile = ({
   </div>
 );
 
-export const MoneyStatsRow: React.FC<MoneyStatsRowProps> = ({ income, expense, balance, isCustomDateMode, hideValues }) => {
+export const MoneyStatsRow: React.FC<MoneyStatsRowProps> = ({ income, expense, charged, outstanding, balance, isCustomDateMode, hideValues }) => {
   return (
-    <div className="grid grid-cols-3 gap-2 md:gap-4">
+    <div className="grid grid-cols-2 gap-2 md:grid-cols-5 md:gap-4">
       <StatTile
         label={isCustomDateMode ? 'Inc' : 'Income'}
         accentClass="bg-emerald-500/10 text-emerald-400"
@@ -53,6 +55,18 @@ export const MoneyStatsRow: React.FC<MoneyStatsRowProps> = ({ income, expense, b
         dotClass="bg-rose-500"
         icon={<ArrowUpRight className="h-24 w-24 text-rose-500" />}
         value={hideValues ? '****' : <CountUp end={expense} prefix="RM " />}
+      />
+      <StatTile
+        label="Charged"
+        accentClass="bg-amber-500/10 text-amber-400"
+        dotClass="bg-amber-500"
+        value={hideValues ? '****' : <CountUp end={charged} prefix="RM " />}
+      />
+      <StatTile
+        label="Outstanding"
+        accentClass="bg-cyan-500/10 text-cyan-400"
+        dotClass="bg-cyan-500"
+        value={hideValues ? '****' : <CountUp end={outstanding} prefix="RM " />}
       />
       <StatTile
         label="Net"

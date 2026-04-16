@@ -84,6 +84,10 @@ export interface MoneyTransaction {
   fromAccount?: string;
   toAccount?: string;
   note?: string;
+  isCardCharge?: boolean;
+  settlementStatus?: 'Unsettled' | 'Settled';
+  settledAt?: string;
+  settledByAccount?: string;
 }
 
 export interface CategorySpending {
@@ -125,4 +129,5 @@ export interface MoneyManagerData {
   categories: string[]; // Legacy/Derived combined
   incomeCategories?: string[];
   expenseCategories?: string[];
+  creditCardAccounts?: MoneyAccount[];
 }

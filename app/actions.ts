@@ -29,22 +29,26 @@ const MOCK_TRANSACTIONS_RAW = [
 const MOCK_MONEY_DATA = {
     accounts: [
         { name: 'Maybank', category: 'Bank', logoUrl: '', initialBalance: 12000, currentBalance: 8450.50 },
+        { name: 'Maybank Debit', category: 'Debit Card', logoUrl: '', initialBalance: 3200, currentBalance: 2780.15 },
         { name: 'GXBank', category: 'Bank', logoUrl: '', initialBalance: 5000, currentBalance: 5200 },
         { name: 'TnG eWallet', category: 'Wallet', logoUrl: '', initialBalance: 500, currentBalance: 145.20 },
         { name: 'Cash', category: 'Cash', logoUrl: '', initialBalance: 500, currentBalance: 320 },
-        { name: 'Credit Card', category: 'Card', logoUrl: '', initialBalance: 0, currentBalance: -1250 }
+        { name: 'Maybank Visa', category: 'Credit Card', logoUrl: '', initialBalance: 0, currentBalance: -1250 }
     ],
     transactions: [
         { id: '1', date: '2024-03-24', type: 'Expense', category: 'Food', amount: 25.50, fromAccount: 'TnG eWallet', note: 'Lunch' },
         { id: '2', date: '2024-03-23', type: 'Expense', category: 'Transport', amount: 50.00, fromAccount: 'Maybank', note: 'Petrol' },
         { id: '3', date: '2024-03-22', type: 'Income', category: 'Salary', amount: 5500.00, toAccount: 'Maybank', note: 'March Salary' },
-        { id: '4', date: '2024-03-21', type: 'Expense', category: 'Utilities', amount: 180.00, fromAccount: 'Maybank', note: 'Electric Bill' },
+        { id: '4', date: '2024-03-21', type: 'Expense', category: 'Utilities', amount: 180.00, fromAccount: 'Maybank Debit', note: 'Electric Bill' },
         { id: '5', date: '2024-03-20', type: 'Expense', category: 'Fashion', amount: 299.00, fromAccount: 'GXBank', note: 'Uniqlo Haul' },
         { id: '6', date: '2024-03-19', type: 'Expense', category: 'Food', amount: 15.00, fromAccount: 'Cash', note: 'Hawker Stall' },
         { id: '7', date: '2024-03-18', type: 'Transfer', category: 'Transfer', amount: 200.00, fromAccount: 'Maybank', toAccount: 'TnG eWallet', note: 'Topup' },
-        { id: '8', date: '2024-03-15', type: 'Expense', category: 'Entertainment', amount: 45.00, fromAccount: 'Credit Card', note: 'Movie Night' },
-        { id: '9', date: '2024-03-12', type: 'Expense', category: 'Healthcare', amount: 120.00, fromAccount: 'Maybank', note: 'Supplements' },
-        { id: '10', date: '2024-03-10', type: 'Income', category: 'Bonus', amount: 1000.00, toAccount: 'GXBank', note: 'Performance Bonus' }
+        { id: '8', date: '2024-03-15', type: 'Expense', category: 'Entertainment', amount: 45.00, fromAccount: 'Maybank Visa', note: 'Movie Night', isCardCharge: true, settlementStatus: 'Unsettled' },
+        { id: '9', date: '2024-03-14', type: 'Expense', category: 'Bills', amount: 89.90, fromAccount: 'Maybank Visa', note: 'Streaming Bundle', isCardCharge: true, settlementStatus: 'Unsettled' },
+        { id: '10', date: '2024-03-12', type: 'Expense', category: 'Healthcare', amount: 120.00, fromAccount: 'Maybank', note: 'Supplements' },
+        { id: '11', date: '2024-03-10', type: 'Income', category: 'Bonus', amount: 1000.00, toAccount: 'GXBank', note: 'Performance Bonus' },
+        { id: '12', date: '2024-03-29', type: 'Transfer', category: 'Credit Card Settlement', amount: 220.00, fromAccount: 'Maybank', toAccount: 'Maybank Visa', note: 'Settled Maybank Visa bill' },
+        { id: '13', date: '2024-03-05', type: 'Expense', category: 'Electronics', amount: 220.00, fromAccount: 'Maybank Visa', note: 'Keyboard', isCardCharge: true, settlementStatus: 'Settled', settledAt: '2024-03-29', settledByAccount: 'Maybank' }
     ]
 };
 
@@ -70,6 +74,19 @@ const SECTOR_MAP: Record<string, string> = {
 
 const DEFAULT_INCOME_CATS = ['Salary', 'Bonus', 'Allowance', 'Dividend', 'Side Hustle', 'Other'];
 const DEFAULT_EXPENSE_CATS = ['Food', 'Transport', 'Bills', 'Fashion', 'Entertainment', 'Healthcare', 'Electronics', 'Debt', 'Family', 'Other'];
+const MM_TRANSACTION_HEADERS = [
+  'Date',
+  'Type',
+  'Category',
+  'Amount',
+  'From Account',
+  'To Account',
+  'Note',
+  'Card Charge?',
+  'Settlement Status',
+  'Settled At',
+  'Settled By Account'
+];
 
 const getAssetClass = (ticker: string) => {
   const t = ticker.toUpperCase();
@@ -122,6 +139,78 @@ const formatDateDisplay = (date: Date): string => {
   return date.toISOString().split('T')[0];
 };
 
+const normalizeAccountCategory = (category?: string) => (category || '').trim().toLowerCase();
+
+const isCreditCardCategory = (category?: string) => normalizeAccountCategory(category) === 'credit card';
+
+const isDebitLikeCategory = (category?: string) => {
+  const normalized = normalizeAccountCategory(category);
+  return normalized === 'bank' || normalized === 'wallet' || normalized === 'cash' || normalized === 'debit card';
+};
+
+const isTruthySheetValue = (value: any) => ['yes', 'true', '1', 'y'].includes((value || '').toString().trim().toLowerCase());
+
+const getSettlementStatus = (value: any): 'Unsettled' | 'Settled' => {
+  const normalized = (value || '').toString().trim().toLowerCase();
+  return normalized === 'settled' ? 'Settled' : 'Unsettled';
+};
+
+const createCardMetadata = (data: Pick<MoneyTransaction, 'type' | 'fromAccount' | 'settlementStatus' | 'settledAt' | 'settledByAccount'>, accountMap: Record<string, MoneyAccount>) => {
+  const fromAccount = data.fromAccount ? accountMap[data.fromAccount] : undefined;
+  const isCreditCardExpense = data.type === 'Expense' && isCreditCardCategory(fromAccount?.category);
+
+  if (!isCreditCardExpense) {
+    return ['', '', '', ''];
+  }
+
+  const status = data.settlementStatus === 'Settled' ? 'Settled' : 'Unsettled';
+  return ['Yes', status, data.settledAt || '', data.settledByAccount || ''];
+};
+
+const buildMoneyTransactionRow = (data: MoneyTransaction, accountMap: Record<string, MoneyAccount>) => {
+  const [isCardCharge, settlementStatus, settledAt, settledByAccount] = createCardMetadata(data, accountMap);
+  return [
+    data.date,
+    data.type,
+    data.category,
+    data.amount,
+    data.fromAccount || '',
+    data.toAccount || '',
+    data.note || '',
+    isCardCharge,
+    settlementStatus,
+    settledAt,
+    settledByAccount
+  ];
+};
+
+const getMoneyAccounts = async (googleSheets: any) => {
+  const response = await googleSheets.spreadsheets.values.get({
+    spreadsheetId: SPREADSHEET_ID,
+    range: `${MM_ACCOUNTS_SHEET}!A:E`
+  });
+  const rows = response.data.values || [];
+  const accounts: MoneyAccount[] = [];
+  const accountMap: Record<string, MoneyAccount> = {};
+
+  for (let i = 1; i < rows.length; i++) {
+    if (!rows[i][0]) continue;
+
+    const account: MoneyAccount = {
+      name: rows[i][0],
+      category: rows[i][1] || 'General',
+      logoUrl: rows[i][2] || '',
+      initialBalance: parseMoney(rows[i][3]),
+      currentBalance: parseMoney(rows[i][4])
+    };
+
+    accounts.push(account);
+    accountMap[account.name] = account;
+  }
+
+  return { accounts, accountMap };
+};
+
 // ACTIONS
 
 export async function checkDatabaseStatus(forceDemo: boolean = false) {
@@ -162,22 +251,18 @@ export async function initializeDatabase(forceDemo: boolean = false) {
                 requestBody: { requests }
             });
         }
-        if (!existingSheets.includes(MM_ACCOUNTS_SHEET)) {
-             await googleSheets.spreadsheets.values.update({
-                spreadsheetId: SPREADSHEET_ID,
-                range: `${MM_ACCOUNTS_SHEET}!A1:E1`,
-                valueInputOption: 'USER_ENTERED',
-                requestBody: { values: [['Account Name', 'Category', 'Logo URL', 'Initial Balance', 'Current Balance (Calc)']] }
-            });
-        }
-        if (!existingSheets.includes(MM_TRANSACTIONS_SHEET)) {
-             await googleSheets.spreadsheets.values.update({
-                spreadsheetId: SPREADSHEET_ID,
-                range: `${MM_TRANSACTIONS_SHEET}!A1:G1`,
-                valueInputOption: 'USER_ENTERED',
-                requestBody: { values: [['Date', 'Type', 'Category', 'Amount', 'From Account', 'To Account', 'Note']] }
-            });
-        }
+        await googleSheets.spreadsheets.values.update({
+            spreadsheetId: SPREADSHEET_ID,
+            range: `${MM_ACCOUNTS_SHEET}!A1:E1`,
+            valueInputOption: 'USER_ENTERED',
+            requestBody: { values: [['Account Name', 'Category', 'Logo URL', 'Initial Balance', 'Current Balance (Calc)']] }
+        });
+        await googleSheets.spreadsheets.values.update({
+            spreadsheetId: SPREADSHEET_ID,
+            range: `${MM_TRANSACTIONS_SHEET}!A1:K1`,
+            valueInputOption: 'USER_ENTERED',
+            requestBody: { values: [MM_TRANSACTION_HEADERS] }
+        });
         if (!existingSheets.includes(MM_CATEGORIES_SHEET)) {
              const maxLen = Math.max(DEFAULT_EXPENSE_CATS.length, DEFAULT_INCOME_CATS.length);
              const values = [['Expense Categories', 'Income Categories']];
@@ -391,7 +476,7 @@ export async function getCashFlowData(forceDemo: boolean = false): Promise<CashF
 
 export async function getMoneyManagerData(forceDemo: boolean = false): Promise<MoneyManagerData> {
   if (typeof window !== 'undefined') throw new Error("Server Action");
-  const defaultData: MoneyManagerData = { accounts: [], transactions: [], totalBalance: 0, monthlyStats: { income: 0, expense: 0, incomeGrowth: 0, expenseGrowth: 0 }, categorySpending: [], graphData: [], upcomingBills: [], categories: [...DEFAULT_EXPENSE_CATS, ...DEFAULT_INCOME_CATS], incomeCategories: DEFAULT_INCOME_CATS, expenseCategories: DEFAULT_EXPENSE_CATS };
+  const defaultData: MoneyManagerData = { accounts: [], transactions: [], totalBalance: 0, monthlyStats: { income: 0, expense: 0, incomeGrowth: 0, expenseGrowth: 0 }, categorySpending: [], graphData: [], upcomingBills: [], categories: [...DEFAULT_EXPENSE_CATS, ...DEFAULT_INCOME_CATS], incomeCategories: DEFAULT_INCOME_CATS, expenseCategories: DEFAULT_EXPENSE_CATS, creditCardAccounts: [] };
   
   // DEMO MODE CHECK
   if (forceDemo || !process.env.GOOGLE_SERVICE_ACCOUNT_KEY) {
@@ -400,13 +485,18 @@ export async function getMoneyManagerData(forceDemo: boolean = false): Promise<M
       const transactions = txsRaw.map((t, i) => ({ ...t, rowIndex: i + 1, type: t.type as any })) as MoneyTransaction[];
       
       const totalBalance = accs.reduce((sum, a) => sum + a.currentBalance, 0);
+      const creditCardAccounts = accs.filter(acc => isCreditCardCategory(acc.category));
       
       // Basic stats calc
       const income = transactions.filter(t => t.type === 'Income').reduce((sum, t) => sum + t.amount, 0);
-      const expense = transactions.filter(t => t.type === 'Expense').reduce((sum, t) => sum + t.amount, 0);
+      const expense = transactions
+        .filter(t => t.type === 'Expense' && (!t.isCardCharge || t.settlementStatus === 'Settled'))
+        .reduce((sum, t) => sum + t.amount, 0);
 
       const categoryTotals: Record<string, number> = {};
-      transactions.filter(t => t.type === 'Expense').forEach(t => categoryTotals[t.category] = (categoryTotals[t.category] || 0) + t.amount);
+      transactions
+        .filter(t => t.type === 'Expense' && (!t.isCardCharge || t.settlementStatus === 'Settled'))
+        .forEach(t => categoryTotals[t.category] = (categoryTotals[t.category] || 0) + t.amount);
       const categorySpending = Object.entries(categoryTotals).map(([c, val]) => ({
           category: c, spent: val, limit: 1000, percentage: (val / 1000) * 100
       })).sort((a,b) => b.spent - a.spent);
@@ -427,15 +517,16 @@ export async function getMoneyManagerData(forceDemo: boolean = false): Promise<M
           upcomingBills: [],
           categories: [...DEFAULT_EXPENSE_CATS, ...DEFAULT_INCOME_CATS],
           incomeCategories: DEFAULT_INCOME_CATS,
-          expenseCategories: DEFAULT_EXPENSE_CATS
+          expenseCategories: DEFAULT_EXPENSE_CATS,
+          creditCardAccounts
       };
   }
 
   try {
     const { googleSheets } = await getSheetClient();
     const [accResponse, txResponse, catResponse] = await Promise.all([
-        googleSheets.spreadsheets.values.get({ spreadsheetId: SPREADSHEET_ID, range: `${MM_ACCOUNTS_SHEET}!A:F` }), // Extended to F to capture everything
-        googleSheets.spreadsheets.values.get({ spreadsheetId: SPREADSHEET_ID, range: `${MM_TRANSACTIONS_SHEET}!A:G` }),
+        googleSheets.spreadsheets.values.get({ spreadsheetId: SPREADSHEET_ID, range: `${MM_ACCOUNTS_SHEET}!A:E` }),
+        googleSheets.spreadsheets.values.get({ spreadsheetId: SPREADSHEET_ID, range: `${MM_TRANSACTIONS_SHEET}!A:K` }),
         googleSheets.spreadsheets.values.get({ spreadsheetId: SPREADSHEET_ID, range: `${MM_CATEGORIES_SHEET}!A:B` })
     ]);
     
@@ -456,7 +547,6 @@ export async function getMoneyManagerData(forceDemo: boolean = false): Promise<M
     for (let i = 1; i < accRows.length; i++) {
       if (accRows[i][0]) {
         const initialBal = parseMoney(accRows[i][3]);
-        // INTEGRATION: Use Column E (index 4) as the 'final version' source of truth for balances
         const currentBalFromSheet = parseMoney(accRows[i][4]); 
         
         const acc = { 
@@ -471,6 +561,7 @@ export async function getMoneyManagerData(forceDemo: boolean = false): Promise<M
       }
     }
     
+    const creditCardAccounts = accounts.filter(acc => isCreditCardCategory(acc.category));
     const txRows = txResponse.data.values || [];
     const transactions: MoneyTransaction[] = [];
     const categoryTotals: Record<string, number> = {};
@@ -497,27 +588,49 @@ export async function getMoneyManagerData(forceDemo: boolean = false): Promise<M
          const category = row[2] || 'Uncategorized';
          const fromAcc = row[4]?.trim();
          const toAcc = row[5]?.trim();
+         const isCardCharge = isTruthySheetValue(row[7]) || (type === 'Expense' && isCreditCardCategory(accountMap[fromAcc]?.category));
+         const settlementStatus = isCardCharge ? getSettlementStatus(row[8]) : undefined;
+         const settledAt = row[9] ? formatDateDisplay(parseDate(row[9])) : undefined;
+         const settledByAccount = row[10]?.trim() || undefined;
          
          if (category && category !== 'Uncategorized') uniqueCategories.add(category);
-         transactions.push({ id: `mtx-${i}`, rowIndex: i + 1, date: formatDateDisplay(dateObj), type: type as any, category, amount, fromAccount: fromAcc, toAccount: toAcc, note: row[6] });
-         
-         // Note: We no longer modify currentBalance here because we trust the sheet's final version (Column E)
+         transactions.push({
+            id: `mtx-${i}`,
+            rowIndex: i + 1,
+            date: formatDateDisplay(dateObj),
+            type: type as any,
+            category,
+            amount,
+            fromAccount: fromAcc,
+            toAccount: toAcc,
+            note: row[6],
+            isCardCharge,
+            settlementStatus,
+            settledAt,
+            settledByAccount
+         });
          
          if (type === 'Income' || type === 'Expense') {
-            const txMonthKey = `${dateObj.getFullYear()}-${dateObj.getMonth()}`;
+            const recognizedDate = isCardCharge && settlementStatus === 'Settled' && settledAt ? parseDate(settledAt) : dateObj;
+            const shouldCountAsExpense = type === 'Expense' && (!isCardCharge || settlementStatus === 'Settled');
+            const txMonthKey = `${recognizedDate.getFullYear()}-${recognizedDate.getMonth()}`;
             if (txMonthKey === currentMonthKey) {
                 if (type === 'Income') currentMonthIncome += amount;
-                else { currentMonthExpense += amount; categoryTotals[category] = (categoryTotals[category] || 0) + amount; }
+                else if (shouldCountAsExpense) { currentMonthExpense += amount; categoryTotals[category] = (categoryTotals[category] || 0) + amount; }
             } else if (txMonthKey === lastMonthKey) {
                 if (type === 'Income') lastMonthIncome += amount;
-                else lastMonthExpense += amount;
+                else if (shouldCountAsExpense) lastMonthExpense += amount;
             }
-            const graphKey = `${dateObj.getFullYear()}-${String(dateObj.getMonth() + 1).padStart(2, '0')}`;
-            if (!graphMap[graphKey]) graphMap[graphKey] = { income: 0, expense: 0, sortKey: dateObj.getTime() };
-            if (type === 'Income') graphMap[graphKey].income += amount;
-            else graphMap[graphKey].expense += amount;
+            if (type === 'Income' || shouldCountAsExpense) {
+                const graphKey = `${recognizedDate.getFullYear()}-${String(recognizedDate.getMonth() + 1).padStart(2, '0')}`;
+                if (!graphMap[graphKey]) graphMap[graphKey] = { income: 0, expense: 0, sortKey: recognizedDate.getTime() };
+                if (type === 'Income') graphMap[graphKey].income += amount;
+                else graphMap[graphKey].expense += amount;
+            }
          }
-         if (dateObj > today && type === 'Expense') upcomingBills.push({ id: `bill-${i}`, name: row[6] || category, date: formatDateDisplay(dateObj), amount: amount, isPaid: false });
+         if (dateObj > today && type === 'Expense' && !isCardCharge) {
+            upcomingBills.push({ id: `bill-${i}`, name: row[6] || category, date: formatDateDisplay(dateObj), amount: amount, isPaid: false });
+         }
        }
     }
     
@@ -543,7 +656,8 @@ export async function getMoneyManagerData(forceDemo: boolean = false): Promise<M
         monthlyStats: { income: currentMonthIncome, expense: currentMonthExpense, incomeGrowth: calcGrowth(currentMonthIncome, lastMonthIncome), expenseGrowth: calcGrowth(currentMonthExpense, lastMonthExpense) }, 
         categorySpending, graphData, upcomingBills, 
         categories: Array.from(uniqueCategories).sort().length > 0 ? Array.from(uniqueCategories).sort() : expenseCats, 
-        incomeCategories: incomeCats, expenseCategories: expenseCats 
+        incomeCategories: incomeCats, expenseCategories: expenseCats,
+        creditCardAccounts
     };
   } catch (error) { return defaultData; }
 }
@@ -553,7 +667,13 @@ export async function addMoneyTransaction(data: MoneyTransaction, forceDemo: boo
   if (forceDemo || !process.env.GOOGLE_SERVICE_ACCOUNT_KEY) return { success: true };
   try {
     const { googleSheets } = await getSheetClient();
-    await googleSheets.spreadsheets.values.append({ spreadsheetId: SPREADSHEET_ID, range: `${MM_TRANSACTIONS_SHEET}!A:G`, valueInputOption: 'USER_ENTERED', requestBody: { values: [[data.date, data.type, data.category, data.amount, data.fromAccount || '', data.toAccount || '', data.note || '']] } });
+    const { accountMap } = await getMoneyAccounts(googleSheets);
+    await googleSheets.spreadsheets.values.append({
+      spreadsheetId: SPREADSHEET_ID,
+      range: `${MM_TRANSACTIONS_SHEET}!A:K`,
+      valueInputOption: 'USER_ENTERED',
+      requestBody: { values: [buildMoneyTransactionRow(data, accountMap)] }
+    });
     return { success: true };
   } catch (error) { return { success: false, error: 'Failed' }; }
 }
@@ -563,7 +683,13 @@ export async function updateMoneyTransaction(rowIndex: number, data: MoneyTransa
   if (forceDemo || !process.env.GOOGLE_SERVICE_ACCOUNT_KEY) return { success: true };
   try {
     const { googleSheets } = await getSheetClient();
-    await googleSheets.spreadsheets.values.update({ spreadsheetId: SPREADSHEET_ID, range: `${MM_TRANSACTIONS_SHEET}!A${rowIndex}:G${rowIndex}`, valueInputOption: 'USER_ENTERED', requestBody: { values: [[data.date, data.type, data.category, data.amount, data.fromAccount || '', data.toAccount || '', data.note || '']] } });
+    const { accountMap } = await getMoneyAccounts(googleSheets);
+    await googleSheets.spreadsheets.values.update({
+      spreadsheetId: SPREADSHEET_ID,
+      range: `${MM_TRANSACTIONS_SHEET}!A${rowIndex}:K${rowIndex}`,
+      valueInputOption: 'USER_ENTERED',
+      requestBody: { values: [buildMoneyTransactionRow(data, accountMap)] }
+    });
     return { success: true };
   } catch (error) { return { success: false, error: 'Failed' }; }
 }
@@ -573,9 +699,102 @@ export async function deleteMoneyTransaction(rowIndex: number, forceDemo: boolea
   if (forceDemo || !process.env.GOOGLE_SERVICE_ACCOUNT_KEY) return { success: true };
   try {
     const { googleSheets } = await getSheetClient();
-    await googleSheets.spreadsheets.values.clear({ spreadsheetId: SPREADSHEET_ID, range: `${MM_TRANSACTIONS_SHEET}!A${rowIndex}:G${rowIndex}` });
+    await googleSheets.spreadsheets.values.clear({ spreadsheetId: SPREADSHEET_ID, range: `${MM_TRANSACTIONS_SHEET}!A${rowIndex}:K${rowIndex}` });
     return { success: true };
   } catch (error) { return { success: false, error: 'Failed' }; }
+}
+
+export async function settleCreditCardBill(
+  cardAccountName: string,
+  payingAccountName: string,
+  settledAt: string,
+  forceDemo: boolean = false
+) {
+  if (typeof window !== 'undefined') throw new Error("Server Action");
+  if (forceDemo || !process.env.GOOGLE_SERVICE_ACCOUNT_KEY) return { success: true };
+
+  try {
+    const { googleSheets } = await getSheetClient();
+    const [{ accountMap }, txResponse] = await Promise.all([
+      getMoneyAccounts(googleSheets),
+      googleSheets.spreadsheets.values.get({ spreadsheetId: SPREADSHEET_ID, range: `${MM_TRANSACTIONS_SHEET}!A:K` })
+    ]);
+
+    const cardAccount = accountMap[cardAccountName];
+    if (!cardAccount || !isCreditCardCategory(cardAccount.category)) {
+      return { success: false, error: 'Selected account is not a credit card.' };
+    }
+
+    const payingAccount = accountMap[payingAccountName];
+    if (!payingAccount || !isDebitLikeCategory(payingAccount.category)) {
+      return { success: false, error: 'Selected paying account must be Bank, Wallet, Cash, or Debit Card.' };
+    }
+
+    const rows = txResponse.data.values || [];
+    const updates: Array<{ rowIndex: number; amount: number; values: any[] }> = [];
+    let settlementTotal = 0;
+
+    for (let i = 1; i < rows.length; i++) {
+      const row = rows[i];
+      if (!row[0] || !row[3]) continue;
+
+      const type = row[1]?.toString().trim();
+      const fromAccount = row[4]?.toString().trim();
+      const amount = parseMoney(row[3]);
+      const isCardCharge = isTruthySheetValue(row[7]) || (type === 'Expense' && fromAccount === cardAccountName && isCreditCardCategory(accountMap[fromAccount]?.category));
+      const settlementStatus = isCardCharge ? getSettlementStatus(row[8]) : undefined;
+
+      if (type === 'Expense' && fromAccount === cardAccountName && isCardCharge && settlementStatus !== 'Settled') {
+        const nextRow = [...row];
+        nextRow[7] = 'Yes';
+        nextRow[8] = 'Settled';
+        nextRow[9] = settledAt;
+        nextRow[10] = payingAccountName;
+        updates.push({ rowIndex: i + 1, amount, values: nextRow.slice(0, 11) });
+        settlementTotal += amount;
+      }
+    }
+
+    if (updates.length === 0) {
+      return { success: false, error: 'No unpaid credit card charges found for this card.' };
+    }
+
+    await Promise.all(
+      updates.map((update) =>
+        googleSheets.spreadsheets.values.update({
+          spreadsheetId: SPREADSHEET_ID,
+          range: `${MM_TRANSACTIONS_SHEET}!A${update.rowIndex}:K${update.rowIndex}`,
+          valueInputOption: 'USER_ENTERED',
+          requestBody: { values: [update.values] }
+        })
+      )
+    );
+
+    await googleSheets.spreadsheets.values.append({
+      spreadsheetId: SPREADSHEET_ID,
+      range: `${MM_TRANSACTIONS_SHEET}!A:K`,
+      valueInputOption: 'USER_ENTERED',
+      requestBody: {
+        values: [[
+          settledAt,
+          'Transfer',
+          'Credit Card Settlement',
+          settlementTotal,
+          payingAccountName,
+          cardAccountName,
+          `Settled ${cardAccountName} bill`,
+          '',
+          '',
+          '',
+          ''
+        ]]
+      }
+    });
+
+    return { success: true, settledCount: updates.length, settledAmount: settlementTotal };
+  } catch (error) {
+    return { success: false, error: 'Failed to settle credit card bill.' };
+  }
 }
 
 export async function addCategory(category: string, type: 'Income' | 'Expense', forceDemo: boolean = false) {

@@ -140,6 +140,12 @@ export const MoneyActivityList: React.FC<MoneyActivityListProps> = ({
       <div className="space-y-2 md:space-y-3">
         {filteredTransactions.slice(0, 10).map((tx) => {
           const style = getCategoryStyles(tx.category);
+          const cardBadge =
+            tx.isCardCharge && tx.settlementStatus === 'Settled'
+              ? { label: 'Settled', className: 'bg-emerald-500/10 text-emerald-300' }
+              : tx.isCardCharge
+                ? { label: 'Charged', className: 'bg-amber-500/10 text-amber-300' }
+                : null;
           return (
             <div
               key={tx.id}
@@ -150,7 +156,10 @@ export const MoneyActivityList: React.FC<MoneyActivityListProps> = ({
                   {style.icon}
                 </div>
                 <div className="min-w-0">
-                  <div className="truncate pr-2 text-sm font-bold text-white">{tx.category}</div>
+                  <div className="flex items-center gap-2">
+                    <div className="truncate pr-2 text-sm font-bold text-white">{tx.category}</div>
+                    {cardBadge ? <span className={`rounded-full px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider ${cardBadge.className}`}>{cardBadge.label}</span> : null}
+                  </div>
                   <div className="mt-0.5 max-w-[120px] truncate text-[10px] text-slate-400 md:max-w-[200px] md:text-xs">
                     {tx.date} - {tx.note || 'No note'}
                   </div>
