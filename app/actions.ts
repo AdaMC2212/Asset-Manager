@@ -139,6 +139,7 @@ const formatDateDisplay = (date: Date): string => {
   return date.toISOString().split('T')[0];
 };
 
+const normalizeAccountName = (value?: string) => (value || '').trim();
 const normalizeAccountCategory = (category?: string) => (category || '').trim().toLowerCase();
 
 const isCreditCardCategory = (category?: string) => normalizeAccountCategory(category) === 'credit card';
@@ -196,16 +197,19 @@ const getMoneyAccounts = async (googleSheets: any) => {
   for (let i = 1; i < rows.length; i++) {
     if (!rows[i][0]) continue;
 
+    const accountName = normalizeAccountName(rows[i][0]);
+    if (!accountName) continue;
+
     const account: MoneyAccount = {
-      name: rows[i][0],
-      category: rows[i][1] || 'General',
-      logoUrl: rows[i][2] || '',
+      name: accountName,
+      category: normalizeAccountName(rows[i][1]) || 'General',
+      logoUrl: normalizeAccountName(rows[i][2]),
       initialBalance: parseMoney(rows[i][3]),
       currentBalance: parseMoney(rows[i][4])
     };
 
     accounts.push(account);
-    accountMap[account.name] = account;
+    accountMap[accountName] = account;
   }
 
   return { accounts, accountMap };
@@ -546,18 +550,20 @@ export async function getMoneyManagerData(forceDemo: boolean = false): Promise<M
     
     for (let i = 1; i < accRows.length; i++) {
       if (accRows[i][0]) {
+        const accountName = normalizeAccountName(accRows[i][0]);
+        if (!accountName) continue;
         const initialBal = parseMoney(accRows[i][3]);
         const currentBalFromSheet = parseMoney(accRows[i][4]); 
         
         const acc = { 
-            name: accRows[i][0], 
-            category: accRows[i][1] || 'General', 
-            logoUrl: accRows[i][2] || '', 
+            name: accountName, 
+            category: normalizeAccountName(accRows[i][1]) || 'General', 
+            logoUrl: normalizeAccountName(accRows[i][2]), 
             initialBalance: initialBal, 
             currentBalance: currentBalFromSheet 
         };
         accounts.push(acc);
-        accountMap[accRows[i][0]] = acc;
+        accountMap[accountName] = acc;
       }
     }
     
@@ -586,8 +592,8 @@ export async function getMoneyManagerData(forceDemo: boolean = false): Promise<M
          const amount = parseMoney(row[3]);
          const type = row[1]?.trim();
          const category = row[2] || 'Uncategorized';
-         const fromAcc = row[4]?.trim();
-         const toAcc = row[5]?.trim();
+         const fromAcc = normalizeAccountName(row[4]);
+         const toAcc = normalizeAccountName(row[5]);
          const isCardCharge = isTruthySheetValue(row[7]) || (type === 'Expense' && isCreditCardCategory(accountMap[fromAcc]?.category));
          const settlementStatus = isCardCharge ? getSettlementStatus(row[8]) : undefined;
          const settledAt = row[9] ? formatDateDisplay(parseDate(row[9])) : undefined;
@@ -603,7 +609,7 @@ export async function getMoneyManagerData(forceDemo: boolean = false): Promise<M
             amount,
             fromAccount: fromAcc,
             toAccount: toAcc,
-            note: row[6],
+            note: row[6]?.toString().trim(),
             isCardCharge,
             settlementStatus,
             settledAt,
