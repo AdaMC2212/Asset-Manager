@@ -46,6 +46,7 @@ const isUnsettledCardCharge = (tx: MoneyTransaction) => tx.type === 'Expense' &&
 export const MoneyManager: React.FC<MoneyManagerProps> = ({ data, loading, onRefresh, hideValues, registerAddHandler }) => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isHistoryModalOpen, setIsHistoryModalOpen] = useState(false);
+  const [isOutstandingModalOpen, setIsOutstandingModalOpen] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [editingTransaction, setEditingTransaction] = useState<MoneyTransaction | null>(null);
   const [settlingCard, setSettlingCard] = useState<MoneyAccount | null>(null);
@@ -76,12 +77,30 @@ export const MoneyManager: React.FC<MoneyManagerProps> = ({ data, loading, onRef
     return totals;
   }, [data]);
 
+  const outstandingCardDetails = useMemo(() => {
+    if (!data) return [];
+
+    return creditCardAccounts
+      .map((account) => {
+        const transactions = data.transactions.filter(
+          (tx) => isUnsettledCardCharge(tx) && tx.fromAccount === account.name
+        );
+
+        return {
+          account,
+          total: transactions.reduce((sum, tx) => sum + tx.amount, 0),
+          transactions,
+        };
+      })
+      .filter((item) => item.total > 0);
+  }, [creditCardAccounts, data]);
+
   const { filteredTransactions, baseTransactionsForBreakdown, monthlyStats, pieData, fullBreakdown, isCustomDateMode } = useMemo(() => {
     if (!data) {
       return {
         filteredTransactions: [],
         baseTransactionsForBreakdown: [],
-        monthlyStats: { income: 0, expense: 0, charged: 0, outstanding: 0, balance: 0 },
+        monthlyStats: { income: 0, expense: 0, outstanding: 0, balance: 0 },
         pieData: [],
         fullBreakdown: [],
         isCustomDateMode: false
@@ -113,15 +132,12 @@ export const MoneyManager: React.FC<MoneyManagerProps> = ({ data, loading, onRef
 
     let income = 0;
     let expense = 0;
-    let charged = 0;
     const catTotals: Record<string, number> = {};
 
     base.forEach((tx) => {
       if (tx.type === 'Income') {
         income += tx.amount;
         catTotals[tx.category] = (catTotals[tx.category] || 0) - tx.amount;
-      } else if (isUnsettledCardCharge(tx)) {
-        charged += tx.amount;
       } else if (isRecognizedExpense(tx)) {
         expense += tx.amount;
         catTotals[tx.category] = (catTotals[tx.category] || 0) + tx.amount;
@@ -140,7 +156,7 @@ export const MoneyManager: React.FC<MoneyManagerProps> = ({ data, loading, onRef
     return {
       filteredTransactions: activityFiltered,
       baseTransactionsForBreakdown: base,
-      monthlyStats: { income, expense, charged, outstanding, balance: income - expense },
+      monthlyStats: { income, expense, outstanding, balance: income - expense },
       pieData: breakdown.filter((item) => item.value > 0),
       fullBreakdown: breakdown,
       isCustomDateMode: useCustomDate
@@ -235,11 +251,11 @@ export const MoneyManager: React.FC<MoneyManagerProps> = ({ data, loading, onRef
         <MoneyStatsRow
           income={monthlyStats.income}
           expense={monthlyStats.expense}
-          charged={monthlyStats.charged}
           outstanding={monthlyStats.outstanding}
           balance={monthlyStats.balance}
           isCustomDateMode={isCustomDateMode}
           hideValues={hideValues}
+          onOpenOutstandingDetails={() => setIsOutstandingModalOpen(true)}
         />
 
         <MoneyActivityList
@@ -277,7 +293,7 @@ export const MoneyManager: React.FC<MoneyManagerProps> = ({ data, loading, onRef
               </div>
               <div>
                 <h3 className="text-lg font-bold text-white">Credit Cards</h3>
-                <p className="text-xs text-slate-400">Unpaid charges stay in Charged until you settle the bill.</p>
+                <p className="text-xs text-slate-400">Outstanding shows every unpaid credit-card charge until you settle the bill.</p>
               </div>
             </div>
 
@@ -306,6 +322,98 @@ export const MoneyManager: React.FC<MoneyManagerProps> = ({ data, loading, onRef
           </div>
         ) : null}
       </div>
+
+      {isOutstandingModalOpen ? (
+        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/80 p-4 backdrop-blur-md animate-in fade-in duration-300">
+          <div className="flex max-h-[85vh] w-full max-w-4xl flex-col overflow-hidden rounded-3xl border border-slate-800 bg-slate-900 shadow-2xl animate-in zoom-in-95 duration-200">
+            <div className="flex items-start justify-between border-b border-slate-800 bg-slate-900/80 p-6">
+              <div>
+                <div className="mb-2 inline-flex items-center gap-2 rounded-full bg-cyan-500/10 px-3 py-1 text-[11px] font-bold uppercase tracking-[0.18em] text-cyan-300">
+                  <CreditCard className="h-4 w-4" />
+                  Outstanding
+                </div>
+                <h2 className="text-2xl font-bold text-white">Unpaid card balances</h2>
+                <p className="mt-1 text-sm text-slate-400">All unsettled credit-card charges grouped by card.</p>
+              </div>
+              <button onClick={() => setIsOutstandingModalOpen(false)} className="rounded-full p-2 text-slate-400 transition-all hover:bg-slate-800 hover:text-white">
+                <X className="h-6 w-6" />
+              </button>
+            </div>
+
+            <div className="grid gap-4 border-b border-slate-800 bg-slate-950/30 px-6 py-4 md:grid-cols-[minmax(0,1fr)_220px]">
+              <div>
+                <div className="text-[11px] font-bold uppercase tracking-[0.18em] text-slate-500">Cards with balance</div>
+                <div className="mt-1 text-2xl font-bold text-white">{hideValues ? '****' : outstandingCardDetails.length}</div>
+              </div>
+              <div className="md:border-l md:border-white/5 md:pl-6">
+                <div className="text-[11px] font-bold uppercase tracking-[0.18em] text-slate-500">Total outstanding</div>
+                <div className="mt-1 text-2xl font-bold text-cyan-300">{displayValue(monthlyStats.outstanding)}</div>
+              </div>
+            </div>
+
+            <div className="custom-scrollbar flex-1 overflow-y-auto p-4 md:p-6">
+              {outstandingCardDetails.length > 0 ? (
+                <div className="space-y-4">
+                  {outstandingCardDetails.map(({ account, total, transactions }) => (
+                    <div key={account.name} className="overflow-hidden rounded-3xl border border-white/5 bg-slate-950/50">
+                      <div className="flex flex-col gap-3 border-b border-white/5 px-4 py-4 md:flex-row md:items-center md:justify-between md:px-5">
+                        <div>
+                          <div className="text-lg font-bold text-white">{account.name}</div>
+                          <div className="mt-1 text-xs uppercase tracking-[0.16em] text-slate-500">{transactions.length} unsettled charge{transactions.length === 1 ? '' : 's'}</div>
+                        </div>
+                        <div className="flex items-center gap-3">
+                          <div className="text-right">
+                            <div className="text-[11px] font-bold uppercase tracking-[0.18em] text-slate-500">Amount due</div>
+                            <div className="text-lg font-bold text-cyan-300">{displayValue(total)}</div>
+                          </div>
+                          <button
+                            onClick={() => {
+                              setIsOutstandingModalOpen(false);
+                              setSettlingCard(account);
+                            }}
+                            className="rounded-xl bg-emerald-600 px-3 py-2 text-xs font-bold text-white transition-colors hover:bg-emerald-500"
+                          >
+                            Settle Bill
+                          </button>
+                        </div>
+                      </div>
+
+                      <div className="divide-y divide-white/5">
+                        {transactions.map((tx) => (
+                          <div key={tx.id} className="flex flex-col gap-3 px-4 py-3 md:flex-row md:items-center md:justify-between md:px-5">
+                            <div className="min-w-0">
+                              <div className="flex items-center gap-2">
+                                <span className="truncate text-sm font-semibold text-white">{tx.note || tx.category}</span>
+                                <span className="rounded-full bg-amber-500/10 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider text-amber-300">Unpaid</span>
+                              </div>
+                              <div className="mt-1 text-xs text-slate-500">{tx.date} - {tx.category}</div>
+                            </div>
+                            <div className="text-right">
+                              <div className="text-sm font-bold text-amber-300">- {displayValue(tx.amount)}</div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="flex flex-col items-center justify-center py-16 text-center text-slate-500">
+                  <CreditCard className="mb-3 h-10 w-10 text-slate-700" />
+                  <div className="text-base font-semibold text-slate-300">No unpaid card balances</div>
+                  <p className="mt-2 max-w-md text-sm text-slate-500">All credit-card charges are settled right now, so there is nothing outstanding.</p>
+                </div>
+              )}
+            </div>
+
+            <div className="flex justify-center border-t border-slate-800 bg-slate-950 p-6">
+              <button onClick={() => setIsOutstandingModalOpen(false)} className="w-full rounded-2xl bg-slate-800 py-3 font-bold text-white transition-all hover:bg-slate-700 active:scale-95">
+                Close Details
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
 
       {selectedCategory ? (
         <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/80 p-4 backdrop-blur-md animate-in fade-in duration-300">
