@@ -1,8 +1,8 @@
 
 'use server';
 
-import { getSheetClient, SPREADSHEET_ID, SHEET_NAME, CASH_FLOW_SHEET_NAME, PORTFOLIO_SHEET_NAME, MM_ACCOUNTS_SHEET, MM_TRANSACTIONS_SHEET, MM_CATEGORIES_SHEET } from '../lib/googleSheets';
-import { PortfolioSummary, Holding, CashFlowSummary, Deposit, Conversion, MoneyManagerData, MoneyAccount, MoneyTransaction, Bill } from '../types';
+import { getSheetClient, SPREADSHEET_ID, SHEET_NAME, CASH_FLOW_SHEET_NAME, PORTFOLIO_SHEET_NAME, MM_ACCOUNTS_SHEET, MM_TRANSACTIONS_SHEET, MM_CATEGORIES_SHEET, MM_AUTODEBITS_SHEET } from '../lib/googleSheets';
+import { PortfolioSummary, Holding, CashFlowSummary, Deposit, Conversion, MoneyManagerData, MoneyAccount, MoneyTransaction, Bill, RecurringDebitRule } from '../types';
 import yahooFinance from 'yahoo-finance2';
 
 // --- MOCK DATA FOR DEMO MODE ---
@@ -49,7 +49,22 @@ const MOCK_MONEY_DATA = {
         { id: '11', date: '2024-03-10', type: 'Income', category: 'Bonus', amount: 1000.00, toAccount: 'GXBank', note: 'Performance Bonus' },
         { id: '12', date: '2024-03-29', type: 'Transfer', category: 'Credit Card Settlement', amount: 220.00, fromAccount: 'Maybank', toAccount: 'Maybank Visa', note: 'Settled Maybank Visa bill' },
         { id: '13', date: '2024-03-05', type: 'Expense', category: 'Electronics', amount: 220.00, fromAccount: 'Maybank Visa', note: 'Keyboard', isCardCharge: true, settlementStatus: 'Settled', settledAt: '2024-03-29', settledByAccount: 'Maybank' }
-    ]
+    ],
+    autoDebitRules: [
+        {
+            id: 'demo-rule-1',
+            name: 'Netflix',
+            amount: 55.9,
+            category: 'Bills',
+            fromAccount: 'Maybank Visa',
+            scheduleType: 'Monthly' as const,
+            dayOfMonth: 14,
+            startDate: '2024-03-14',
+            isActive: true,
+            lastProcessedOccurrence: '2024-03-14',
+            notes: 'Streaming subscription'
+        }
+    ] as RecurringDebitRule[]
 };
 
 // --- Helper Functions for Categorization ---
@@ -85,7 +100,28 @@ const MM_TRANSACTION_HEADERS = [
   'Card Charge?',
   'Settlement Status',
   'Settled At',
-  'Settled By Account'
+  'Settled By Account',
+  'Auto Rule ID',
+  'Auto Occurrence Date',
+  'Auto Generated'
+];
+
+const MM_AUTODEBIT_HEADERS = [
+  'Rule ID',
+  'Name',
+  'Amount',
+  'Category',
+  'From Account',
+  'To Account',
+  'Schedule Type',
+  'Day Of Month',
+  'Start Date',
+  'End Date',
+  'Is Active',
+  'Last Processed Occurrence',
+  'Notes',
+  'Created At',
+  'Updated At'
 ];
 
 const getAssetClass = (ticker: string) => {
@@ -139,6 +175,15 @@ const formatDateDisplay = (date: Date): string => {
   return date.toISOString().split('T')[0];
 };
 
+const createId = (prefix: string) => `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+
+const getLastDayOfMonth = (year: number, monthIndex: number) => new Date(year, monthIndex + 1, 0).getDate();
+
+const getMonthlyOccurrenceDate = (year: number, monthIndex: number, dayOfMonth: number) => {
+  const safeDay = Math.min(Math.max(dayOfMonth, 1), getLastDayOfMonth(year, monthIndex));
+  return new Date(year, monthIndex, safeDay, 12, 0, 0);
+};
+
 const normalizeAccountName = (value?: string) => (value || '').trim();
 const normalizeAccountCategory = (category?: string) => (category || '').trim().toLowerCase();
 
@@ -154,6 +199,58 @@ const isTruthySheetValue = (value: any) => ['yes', 'true', '1', 'y'].includes((v
 const getSettlementStatus = (value: any): 'Unsettled' | 'Settled' => {
   const normalized = (value || '').toString().trim().toLowerCase();
   return normalized === 'settled' ? 'Settled' : 'Unsettled';
+};
+
+const isActiveSheetValue = (value: any) => {
+  const normalized = (value || '').toString().trim().toLowerCase();
+  return normalized === '' ? true : ['yes', 'true', '1', 'y', 'active'].includes(normalized);
+};
+
+const buildRecurringRuleRow = (rule: RecurringDebitRule) => [
+  rule.id,
+  rule.name,
+  rule.amount,
+  rule.category,
+  rule.fromAccount,
+  rule.toAccount || '',
+  rule.scheduleType,
+  rule.dayOfMonth,
+  rule.startDate,
+  rule.endDate || '',
+  rule.isActive ? 'Yes' : 'No',
+  rule.lastProcessedOccurrence || '',
+  rule.notes || '',
+  rule.createdAt || '',
+  rule.updatedAt || ''
+];
+
+const ensureAutoDebitInfrastructure = async (googleSheets: any) => {
+  const meta = await googleSheets.spreadsheets.get({ spreadsheetId: SPREADSHEET_ID });
+  const existingSheets = meta.data.sheets?.map((sheet: any) => sheet.properties?.title) || [];
+
+  if (!existingSheets.includes(MM_AUTODEBITS_SHEET)) {
+    await googleSheets.spreadsheets.batchUpdate({
+      spreadsheetId: SPREADSHEET_ID,
+      requestBody: {
+        requests: [{ addSheet: { properties: { title: MM_AUTODEBITS_SHEET } } }]
+      }
+    });
+  }
+
+  await Promise.all([
+    googleSheets.spreadsheets.values.update({
+      spreadsheetId: SPREADSHEET_ID,
+      range: `${MM_TRANSACTIONS_SHEET}!A1:N1`,
+      valueInputOption: 'USER_ENTERED',
+      requestBody: { values: [MM_TRANSACTION_HEADERS] }
+    }),
+    googleSheets.spreadsheets.values.update({
+      spreadsheetId: SPREADSHEET_ID,
+      range: `${MM_AUTODEBITS_SHEET}!A1:O1`,
+      valueInputOption: 'USER_ENTERED',
+      requestBody: { values: [MM_AUTODEBIT_HEADERS] }
+    })
+  ]);
 };
 
 const createCardMetadata = (data: Pick<MoneyTransaction, 'type' | 'fromAccount' | 'settlementStatus' | 'settledAt' | 'settledByAccount'>, accountMap: Record<string, MoneyAccount>) => {
@@ -181,8 +278,186 @@ const buildMoneyTransactionRow = (data: MoneyTransaction, accountMap: Record<str
     isCardCharge,
     settlementStatus,
     settledAt,
-    settledByAccount
+    settledByAccount,
+    data.autoRuleId || '',
+    data.autoOccurrenceDate || '',
+    data.isAutoGenerated ? 'Yes' : ''
   ];
+};
+
+const mapMoneyTransactionRow = (row: any[], rowIndex: number, accountMap: Record<string, MoneyAccount>): MoneyTransaction | null => {
+  if (!row[0] || !row[3]) return null;
+
+  const dateObj = parseDate(row[0]);
+  const amount = parseMoney(row[3]);
+  const type = row[1]?.toString().trim();
+  const fromAcc = normalizeAccountName(row[4]);
+  const isCardCharge = isTruthySheetValue(row[7]) || (type === 'Expense' && isCreditCardCategory(accountMap[fromAcc]?.category));
+  const settlementStatus = isCardCharge ? getSettlementStatus(row[8]) : undefined;
+
+  return {
+    id: `mtx-${rowIndex - 1}`,
+    rowIndex,
+    date: formatDateDisplay(dateObj),
+    type: type as any,
+    category: row[2] || 'Uncategorized',
+    amount,
+    fromAccount: fromAcc,
+    toAccount: normalizeAccountName(row[5]),
+    note: row[6]?.toString().trim(),
+    isCardCharge,
+    settlementStatus,
+    settledAt: row[9] ? formatDateDisplay(parseDate(row[9])) : undefined,
+    settledByAccount: row[10]?.toString().trim() || undefined,
+    autoRuleId: row[11]?.toString().trim() || undefined,
+    autoOccurrenceDate: row[12] ? formatDateDisplay(parseDate(row[12])) : undefined,
+    isAutoGenerated: isTruthySheetValue(row[13]),
+  };
+};
+
+const getRecurringRules = async (googleSheets: any): Promise<RecurringDebitRule[]> => {
+  const response = await googleSheets.spreadsheets.values.get({
+    spreadsheetId: SPREADSHEET_ID,
+    range: `${MM_AUTODEBITS_SHEET}!A:O`
+  });
+  const rows = response.data.values || [];
+  const rules: RecurringDebitRule[] = [];
+
+  for (let i = 1; i < rows.length; i++) {
+    const row = rows[i];
+    if (!row[0] || !row[1] || !row[2] || !row[3] || !row[4] || !row[8]) continue;
+
+    rules.push({
+      id: row[0].toString().trim(),
+      rowIndex: i + 1,
+      name: row[1].toString().trim(),
+      amount: parseMoney(row[2]),
+      category: row[3].toString().trim(),
+      fromAccount: normalizeAccountName(row[4]),
+      toAccount: normalizeAccountName(row[5]),
+      scheduleType: 'Monthly',
+      dayOfMonth: Math.max(1, Math.min(31, parseMoney(row[7]) || parseDate(row[8]).getDate())),
+      startDate: formatDateDisplay(parseDate(row[8])),
+      endDate: row[9] ? formatDateDisplay(parseDate(row[9])) : undefined,
+      isActive: isActiveSheetValue(row[10]),
+      lastProcessedOccurrence: row[11] ? formatDateDisplay(parseDate(row[11])) : undefined,
+      notes: row[12]?.toString().trim() || '',
+      createdAt: row[13] ? formatDateDisplay(parseDate(row[13])) : undefined,
+      updatedAt: row[14] ? formatDateDisplay(parseDate(row[14])) : undefined,
+    });
+  }
+
+  return rules;
+};
+
+const getDueOccurrences = (rule: RecurringDebitRule, today: Date) => {
+  const startDate = parseDate(rule.startDate);
+  const endDate = rule.endDate ? parseDate(rule.endDate) : null;
+  const occurrences: string[] = [];
+  const cursor = new Date(startDate.getFullYear(), startDate.getMonth(), 1, 12, 0, 0);
+  const limit = new Date(today.getFullYear(), today.getMonth(), 1, 12, 0, 0);
+
+  while (cursor <= limit) {
+    const occurrence = getMonthlyOccurrenceDate(cursor.getFullYear(), cursor.getMonth(), rule.dayOfMonth);
+    if (occurrence >= startDate && occurrence <= today && (!endDate || occurrence <= endDate)) {
+      occurrences.push(formatDateDisplay(occurrence));
+    }
+    cursor.setMonth(cursor.getMonth() + 1);
+  }
+
+  return occurrences;
+};
+
+const processAutoDebitOccurrences = async (
+  googleSheets: any,
+  accountMap: Record<string, MoneyAccount>,
+  txRows: any[] = [],
+  rules: RecurringDebitRule[]
+) => {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  const existingKeys = new Set<string>();
+  for (let i = 1; i < txRows.length; i++) {
+    const row = txRows[i];
+    const ruleId = row[11]?.toString().trim();
+    const occurrenceDate = row[12] ? formatDateDisplay(parseDate(row[12])) : '';
+    if (ruleId && occurrenceDate) existingKeys.add(`${ruleId}::${occurrenceDate}`);
+  }
+
+  const generatedRows: any[][] = [];
+  const ruleUpdates: Array<{ rowIndex: number; values: any[] }> = [];
+
+  for (const rule of rules) {
+    const account = accountMap[rule.fromAccount];
+    if (!rule.isActive || !account || (!isDebitLikeCategory(account.category) && !isCreditCardCategory(account.category))) {
+      continue;
+    }
+
+    const dueOccurrences = getDueOccurrences(rule, today);
+    let lastProcessed = rule.lastProcessedOccurrence || '';
+
+    for (const occurrenceDate of dueOccurrences) {
+      const dedupeKey = `${rule.id}::${occurrenceDate}`;
+      if (existingKeys.has(dedupeKey)) {
+        lastProcessed = occurrenceDate;
+        continue;
+      }
+
+      const tx: MoneyTransaction = {
+        id: createId('auto-tx'),
+        date: occurrenceDate,
+        type: 'Expense',
+        category: rule.category,
+        amount: rule.amount,
+        fromAccount: rule.fromAccount,
+        toAccount: rule.toAccount || '',
+        note: rule.name,
+        autoRuleId: rule.id,
+        autoOccurrenceDate: occurrenceDate,
+        isAutoGenerated: true,
+      };
+
+      generatedRows.push(buildMoneyTransactionRow(tx, accountMap));
+      existingKeys.add(dedupeKey);
+      lastProcessed = occurrenceDate;
+    }
+
+    if (rule.rowIndex && lastProcessed && lastProcessed !== rule.lastProcessedOccurrence) {
+      ruleUpdates.push({
+        rowIndex: rule.rowIndex,
+        values: [buildRecurringRuleRow({ ...rule, lastProcessedOccurrence: lastProcessed, updatedAt: formatDateDisplay(today) })]
+      });
+    }
+  }
+
+  if (generatedRows.length > 0) {
+    await googleSheets.spreadsheets.values.append({
+      spreadsheetId: SPREADSHEET_ID,
+      range: `${MM_TRANSACTIONS_SHEET}!A:N`,
+      valueInputOption: 'USER_ENTERED',
+      requestBody: { values: generatedRows }
+    });
+  }
+
+  await Promise.all(
+    ruleUpdates.map((update) =>
+      googleSheets.spreadsheets.values.update({
+        spreadsheetId: SPREADSHEET_ID,
+        range: `${MM_AUTODEBITS_SHEET}!A${update.rowIndex}:O${update.rowIndex}`,
+        valueInputOption: 'USER_ENTERED',
+        requestBody: { values: update.values }
+      })
+    )
+  );
+
+  if (generatedRows.length === 0) return txRows;
+
+  const refreshed = await googleSheets.spreadsheets.values.get({
+    spreadsheetId: SPREADSHEET_ID,
+    range: `${MM_TRANSACTIONS_SHEET}!A:N`
+  });
+  return refreshed.data.values || [];
 };
 
 const getMoneyAccounts = async (googleSheets: any) => {
@@ -249,6 +524,7 @@ export async function initializeDatabase(forceDemo: boolean = false) {
         if (!existingSheets.includes(MM_ACCOUNTS_SHEET)) requests.push({ addSheet: { properties: { title: MM_ACCOUNTS_SHEET } } });
         if (!existingSheets.includes(MM_TRANSACTIONS_SHEET)) requests.push({ addSheet: { properties: { title: MM_TRANSACTIONS_SHEET } } });
         if (!existingSheets.includes(MM_CATEGORIES_SHEET)) requests.push({ addSheet: { properties: { title: MM_CATEGORIES_SHEET } } });
+        if (!existingSheets.includes(MM_AUTODEBITS_SHEET)) requests.push({ addSheet: { properties: { title: MM_AUTODEBITS_SHEET } } });
         if (requests.length > 0) {
             await googleSheets.spreadsheets.batchUpdate({
                 spreadsheetId: SPREADSHEET_ID,
@@ -263,9 +539,15 @@ export async function initializeDatabase(forceDemo: boolean = false) {
         });
         await googleSheets.spreadsheets.values.update({
             spreadsheetId: SPREADSHEET_ID,
-            range: `${MM_TRANSACTIONS_SHEET}!A1:K1`,
+            range: `${MM_TRANSACTIONS_SHEET}!A1:N1`,
             valueInputOption: 'USER_ENTERED',
             requestBody: { values: [MM_TRANSACTION_HEADERS] }
+        });
+        await googleSheets.spreadsheets.values.update({
+            spreadsheetId: SPREADSHEET_ID,
+            range: `${MM_AUTODEBITS_SHEET}!A1:O1`,
+            valueInputOption: 'USER_ENTERED',
+            requestBody: { values: [MM_AUTODEBIT_HEADERS] }
         });
         if (!existingSheets.includes(MM_CATEGORIES_SHEET)) {
              const maxLen = Math.max(DEFAULT_EXPENSE_CATS.length, DEFAULT_INCOME_CATS.length);
@@ -480,7 +762,7 @@ export async function getCashFlowData(forceDemo: boolean = false): Promise<CashF
 
 export async function getMoneyManagerData(forceDemo: boolean = false): Promise<MoneyManagerData> {
   if (typeof window !== 'undefined') throw new Error("Server Action");
-  const defaultData: MoneyManagerData = { accounts: [], transactions: [], totalBalance: 0, monthlyStats: { income: 0, expense: 0, incomeGrowth: 0, expenseGrowth: 0 }, categorySpending: [], graphData: [], upcomingBills: [], categories: [...DEFAULT_EXPENSE_CATS, ...DEFAULT_INCOME_CATS], incomeCategories: DEFAULT_INCOME_CATS, expenseCategories: DEFAULT_EXPENSE_CATS, creditCardAccounts: [] };
+  const defaultData: MoneyManagerData = { accounts: [], transactions: [], totalBalance: 0, monthlyStats: { income: 0, expense: 0, incomeGrowth: 0, expenseGrowth: 0 }, categorySpending: [], graphData: [], upcomingBills: [], categories: [...DEFAULT_EXPENSE_CATS, ...DEFAULT_INCOME_CATS], incomeCategories: DEFAULT_INCOME_CATS, expenseCategories: DEFAULT_EXPENSE_CATS, creditCardAccounts: [], autoDebitRules: [] };
   
   // DEMO MODE CHECK
   if (forceDemo || !process.env.GOOGLE_SERVICE_ACCOUNT_KEY) {
@@ -522,15 +804,17 @@ export async function getMoneyManagerData(forceDemo: boolean = false): Promise<M
           categories: [...DEFAULT_EXPENSE_CATS, ...DEFAULT_INCOME_CATS],
           incomeCategories: DEFAULT_INCOME_CATS,
           expenseCategories: DEFAULT_EXPENSE_CATS,
-          creditCardAccounts
+          creditCardAccounts,
+          autoDebitRules: MOCK_MONEY_DATA.autoDebitRules
       };
   }
 
   try {
     const { googleSheets } = await getSheetClient();
+    await ensureAutoDebitInfrastructure(googleSheets);
     const [accResponse, txResponse, catResponse] = await Promise.all([
         googleSheets.spreadsheets.values.get({ spreadsheetId: SPREADSHEET_ID, range: `${MM_ACCOUNTS_SHEET}!A:E` }),
-        googleSheets.spreadsheets.values.get({ spreadsheetId: SPREADSHEET_ID, range: `${MM_TRANSACTIONS_SHEET}!A:K` }),
+        googleSheets.spreadsheets.values.get({ spreadsheetId: SPREADSHEET_ID, range: `${MM_TRANSACTIONS_SHEET}!A:N` }),
         googleSheets.spreadsheets.values.get({ spreadsheetId: SPREADSHEET_ID, range: `${MM_CATEGORIES_SHEET}!A:B` })
     ]);
     
@@ -568,7 +852,9 @@ export async function getMoneyManagerData(forceDemo: boolean = false): Promise<M
     }
     
     const creditCardAccounts = accounts.filter(acc => isCreditCardCategory(acc.category));
-    const txRows = txResponse.data.values || [];
+    const autoDebitRules = await getRecurringRules(googleSheets);
+    const txRows = await processAutoDebitOccurrences(googleSheets, accountMap, txResponse.data.values || [], autoDebitRules);
+    const hydratedAutoDebitRules = txRows === (txResponse.data.values || []) ? autoDebitRules : await getRecurringRules(googleSheets);
     const transactions: MoneyTransaction[] = [];
     const categoryTotals: Record<string, number> = {};
     const graphMap: Record<string, { income: number, expense: number, sortKey: number }> = {};
@@ -588,33 +874,19 @@ export async function getMoneyManagerData(forceDemo: boolean = false): Promise<M
     for (let i = 1; i < txRows.length; i++) {
        const row = txRows[i];
        if (row[0] && row[3]) {
-         const dateObj = parseDate(row[0]);
-         const amount = parseMoney(row[3]);
-         const type = row[1]?.trim();
-         const category = row[2] || 'Uncategorized';
-         const fromAcc = normalizeAccountName(row[4]);
-         const toAcc = normalizeAccountName(row[5]);
-         const isCardCharge = isTruthySheetValue(row[7]) || (type === 'Expense' && isCreditCardCategory(accountMap[fromAcc]?.category));
-         const settlementStatus = isCardCharge ? getSettlementStatus(row[8]) : undefined;
-         const settledAt = row[9] ? formatDateDisplay(parseDate(row[9])) : undefined;
-         const settledByAccount = row[10]?.trim() || undefined;
+         const tx = mapMoneyTransactionRow(row, i + 1, accountMap);
+         if (!tx) continue;
+         const dateObj = parseDate(tx.date);
+         const amount = tx.amount;
+         const type = tx.type;
+         const category = tx.category;
+         const isCardCharge = tx.isCardCharge;
+         const settlementStatus = tx.settlementStatus;
+         const settledAt = tx.settledAt;
+         const fromAcc = tx.fromAccount || '';
          
          if (category && category !== 'Uncategorized') uniqueCategories.add(category);
-         transactions.push({
-            id: `mtx-${i}`,
-            rowIndex: i + 1,
-            date: formatDateDisplay(dateObj),
-            type: type as any,
-            category,
-            amount,
-            fromAccount: fromAcc,
-            toAccount: toAcc,
-            note: row[6]?.toString().trim(),
-            isCardCharge,
-            settlementStatus,
-            settledAt,
-            settledByAccount
-         });
+         transactions.push(tx);
          
          if (type === 'Income' || type === 'Expense') {
             const recognizedDate = isCardCharge && settlementStatus === 'Settled' && settledAt ? parseDate(settledAt) : dateObj;
@@ -663,7 +935,8 @@ export async function getMoneyManagerData(forceDemo: boolean = false): Promise<M
         categorySpending, graphData, upcomingBills, 
         categories: Array.from(uniqueCategories).sort().length > 0 ? Array.from(uniqueCategories).sort() : expenseCats, 
         incomeCategories: incomeCats, expenseCategories: expenseCats,
-        creditCardAccounts
+        creditCardAccounts,
+        autoDebitRules: hydratedAutoDebitRules
     };
   } catch (error) { return defaultData; }
 }
@@ -676,7 +949,7 @@ export async function addMoneyTransaction(data: MoneyTransaction, forceDemo: boo
     const { accountMap } = await getMoneyAccounts(googleSheets);
     await googleSheets.spreadsheets.values.append({
       spreadsheetId: SPREADSHEET_ID,
-      range: `${MM_TRANSACTIONS_SHEET}!A:K`,
+      range: `${MM_TRANSACTIONS_SHEET}!A:N`,
       valueInputOption: 'USER_ENTERED',
       requestBody: { values: [buildMoneyTransactionRow(data, accountMap)] }
     });
@@ -692,7 +965,7 @@ export async function updateMoneyTransaction(rowIndex: number, data: MoneyTransa
     const { accountMap } = await getMoneyAccounts(googleSheets);
     await googleSheets.spreadsheets.values.update({
       spreadsheetId: SPREADSHEET_ID,
-      range: `${MM_TRANSACTIONS_SHEET}!A${rowIndex}:K${rowIndex}`,
+      range: `${MM_TRANSACTIONS_SHEET}!A${rowIndex}:N${rowIndex}`,
       valueInputOption: 'USER_ENTERED',
       requestBody: { values: [buildMoneyTransactionRow(data, accountMap)] }
     });
@@ -705,7 +978,7 @@ export async function deleteMoneyTransaction(rowIndex: number, forceDemo: boolea
   if (forceDemo || !process.env.GOOGLE_SERVICE_ACCOUNT_KEY) return { success: true };
   try {
     const { googleSheets } = await getSheetClient();
-    await googleSheets.spreadsheets.values.clear({ spreadsheetId: SPREADSHEET_ID, range: `${MM_TRANSACTIONS_SHEET}!A${rowIndex}:K${rowIndex}` });
+    await googleSheets.spreadsheets.values.clear({ spreadsheetId: SPREADSHEET_ID, range: `${MM_TRANSACTIONS_SHEET}!A${rowIndex}:N${rowIndex}` });
     return { success: true };
   } catch (error) { return { success: false, error: 'Failed' }; }
 }
@@ -723,7 +996,7 @@ export async function settleCreditCardBill(
     const { googleSheets } = await getSheetClient();
     const [{ accountMap }, txResponse] = await Promise.all([
       getMoneyAccounts(googleSheets),
-      googleSheets.spreadsheets.values.get({ spreadsheetId: SPREADSHEET_ID, range: `${MM_TRANSACTIONS_SHEET}!A:K` })
+      googleSheets.spreadsheets.values.get({ spreadsheetId: SPREADSHEET_ID, range: `${MM_TRANSACTIONS_SHEET}!A:N` })
     ]);
 
     const cardAccount = accountMap[cardAccountName];
@@ -756,7 +1029,7 @@ export async function settleCreditCardBill(
         nextRow[8] = 'Settled';
         nextRow[9] = settledAt;
         nextRow[10] = payingAccountName;
-        updates.push({ rowIndex: i + 1, amount, values: nextRow.slice(0, 11) });
+        updates.push({ rowIndex: i + 1, amount, values: nextRow.slice(0, 14) });
         settlementTotal += amount;
       }
     }
@@ -769,7 +1042,7 @@ export async function settleCreditCardBill(
       updates.map((update) =>
         googleSheets.spreadsheets.values.update({
           spreadsheetId: SPREADSHEET_ID,
-          range: `${MM_TRANSACTIONS_SHEET}!A${update.rowIndex}:K${update.rowIndex}`,
+          range: `${MM_TRANSACTIONS_SHEET}!A${update.rowIndex}:N${update.rowIndex}`,
           valueInputOption: 'USER_ENTERED',
           requestBody: { values: [update.values] }
         })
@@ -778,7 +1051,7 @@ export async function settleCreditCardBill(
 
     await googleSheets.spreadsheets.values.append({
       spreadsheetId: SPREADSHEET_ID,
-      range: `${MM_TRANSACTIONS_SHEET}!A:K`,
+      range: `${MM_TRANSACTIONS_SHEET}!A:N`,
       valueInputOption: 'USER_ENTERED',
       requestBody: {
         values: [[
@@ -792,6 +1065,9 @@ export async function settleCreditCardBill(
           '',
           '',
           '',
+          '',
+          '',
+          '',
           ''
         ]]
       }
@@ -800,6 +1076,146 @@ export async function settleCreditCardBill(
     return { success: true, settledCount: updates.length, settledAmount: settlementTotal };
   } catch (error) {
     return { success: false, error: 'Failed to settle credit card bill.' };
+  }
+}
+
+export async function addAutoDebitRule(data: RecurringDebitRule, forceDemo: boolean = false) {
+  if (typeof window !== 'undefined') throw new Error("Server Action");
+  if (forceDemo || !process.env.GOOGLE_SERVICE_ACCOUNT_KEY) return { success: true };
+
+  try {
+    const { googleSheets } = await getSheetClient();
+    await ensureAutoDebitInfrastructure(googleSheets);
+    const today = formatDateDisplay(new Date());
+    const rule: RecurringDebitRule = {
+      ...data,
+      id: data.id || createId('rule'),
+      scheduleType: 'Monthly',
+      createdAt: data.createdAt || today,
+      updatedAt: today,
+    };
+
+    await googleSheets.spreadsheets.values.append({
+      spreadsheetId: SPREADSHEET_ID,
+      range: `${MM_AUTODEBITS_SHEET}!A:O`,
+      valueInputOption: 'USER_ENTERED',
+      requestBody: { values: [buildRecurringRuleRow(rule)] }
+    });
+
+    return { success: true };
+  } catch (error) {
+    return { success: false, error: 'Failed to add auto-debit rule.' };
+  }
+}
+
+export async function updateAutoDebitRule(rowIndex: number, data: RecurringDebitRule, forceDemo: boolean = false) {
+  if (typeof window !== 'undefined') throw new Error("Server Action");
+  if (forceDemo || !process.env.GOOGLE_SERVICE_ACCOUNT_KEY) return { success: true };
+
+  try {
+    const { googleSheets } = await getSheetClient();
+    await ensureAutoDebitInfrastructure(googleSheets);
+    const currentRow = await googleSheets.spreadsheets.values.get({
+      spreadsheetId: SPREADSHEET_ID,
+      range: `${MM_AUTODEBITS_SHEET}!A${rowIndex}:O${rowIndex}`
+    });
+    const existing = currentRow.data.values?.[0] || [];
+    const rule: RecurringDebitRule = {
+      ...data,
+      createdAt: data.createdAt || existing[13] || formatDateDisplay(new Date()),
+      updatedAt: formatDateDisplay(new Date()),
+      scheduleType: 'Monthly',
+    };
+
+    await googleSheets.spreadsheets.values.update({
+      spreadsheetId: SPREADSHEET_ID,
+      range: `${MM_AUTODEBITS_SHEET}!A${rowIndex}:O${rowIndex}`,
+      valueInputOption: 'USER_ENTERED',
+      requestBody: { values: [buildRecurringRuleRow(rule)] }
+    });
+
+    return { success: true };
+  } catch (error) {
+    return { success: false, error: 'Failed to update auto-debit rule.' };
+  }
+}
+
+export async function toggleAutoDebitRule(rowIndex: number, isActive: boolean, forceDemo: boolean = false) {
+  if (typeof window !== 'undefined') throw new Error("Server Action");
+  if (forceDemo || !process.env.GOOGLE_SERVICE_ACCOUNT_KEY) return { success: true };
+
+  try {
+    const { googleSheets } = await getSheetClient();
+    await ensureAutoDebitInfrastructure(googleSheets);
+    const rules = await getRecurringRules(googleSheets);
+    const target = rules.find((rule) => rule.rowIndex === rowIndex);
+    if (!target) return { success: false, error: 'Rule not found.' };
+
+    return updateAutoDebitRule(rowIndex, { ...target, isActive }, forceDemo);
+  } catch (error) {
+    return { success: false, error: 'Failed to update auto-debit rule status.' };
+  }
+}
+
+export async function deleteAutoDebitRule(rowIndex: number, forceDemo: boolean = false) {
+  if (typeof window !== 'undefined') throw new Error("Server Action");
+  if (forceDemo || !process.env.GOOGLE_SERVICE_ACCOUNT_KEY) return { success: true };
+
+  try {
+    const { googleSheets } = await getSheetClient();
+    await ensureAutoDebitInfrastructure(googleSheets);
+    await googleSheets.spreadsheets.values.clear({
+      spreadsheetId: SPREADSHEET_ID,
+      range: `${MM_AUTODEBITS_SHEET}!A${rowIndex}:O${rowIndex}`
+    });
+    return { success: true };
+  } catch (error) {
+    return { success: false, error: 'Failed to delete auto-debit rule.' };
+  }
+}
+
+export async function syncAutoDebitRuleFromTransaction(autoRuleId: string, data: MoneyTransaction, forceDemo: boolean = false) {
+  if (typeof window !== 'undefined') throw new Error("Server Action");
+  if (forceDemo || !process.env.GOOGLE_SERVICE_ACCOUNT_KEY) return { success: true };
+
+  try {
+    const { googleSheets } = await getSheetClient();
+    await ensureAutoDebitInfrastructure(googleSheets);
+    const rules = await getRecurringRules(googleSheets);
+    const target = rules.find((rule) => rule.id === autoRuleId);
+    if (!target || !target.rowIndex) return { success: false, error: 'Auto-debit rule not found.' };
+
+    const updatedRule: RecurringDebitRule = {
+      ...target,
+      name: data.note || target.name,
+      amount: data.amount,
+      category: data.category,
+      fromAccount: data.fromAccount || target.fromAccount,
+      toAccount: data.toAccount || '',
+      dayOfMonth: parseDate(data.date).getDate(),
+      updatedAt: formatDateDisplay(new Date()),
+    };
+
+    return updateAutoDebitRule(target.rowIndex, updatedRule, forceDemo);
+  } catch (error) {
+    return { success: false, error: 'Failed to sync auto-debit rule.' };
+  }
+}
+
+export async function deactivateAutoDebitRuleById(autoRuleId: string, forceDemo: boolean = false) {
+  if (typeof window !== 'undefined') throw new Error("Server Action");
+  if (forceDemo || !process.env.GOOGLE_SERVICE_ACCOUNT_KEY) return { success: true };
+
+  try {
+    const { googleSheets } = await getSheetClient();
+    await ensureAutoDebitInfrastructure(googleSheets);
+    const rules = await getRecurringRules(googleSheets);
+    const target = rules.find((rule) => rule.id === autoRuleId);
+    if (!target || !target.rowIndex) return { success: false, error: 'Auto-debit rule not found.' };
+
+    return updateAutoDebitRule(target.rowIndex, { ...target, isActive: false }, forceDemo);
+  } catch (error) {
+    return { success: false, error: 'Failed to deactivate auto-debit rule.' };
   }
 }
 
