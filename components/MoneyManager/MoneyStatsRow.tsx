@@ -74,8 +74,6 @@ const CreditCardBalanceTile = ({
   const touchStartX = useRef<number | null>(null);
   const didSwipe = useRef(false);
 
-  const currentValue = activeView === 'statement' ? statement : outstanding;
-  const label = activeView === 'statement' ? 'Statement' : 'Outstanding';
   const helperText = activeView === 'statement' ? 'Swipe for outstanding' : 'Swipe for statement';
   const ctaText = activeView === 'statement' ? 'View statement' : 'View cards';
 
@@ -109,26 +107,28 @@ const CreditCardBalanceTile = ({
       <div className="absolute right-0 top-0 hidden p-8 opacity-5 transition duration-500 group-hover:scale-110 group-hover:opacity-10 md:block">
         <CreditCard className="h-24 w-24 text-cyan-500" />
       </div>
-      <div
-        className="relative z-10 flex transition-transform duration-300 ease-out"
-        style={{ transform: `translateX(${activeView === 'outstanding' ? '0%' : '-50%'})`, width: '200%' }}
-      >
-        {(['outstanding', 'statement'] as CreditCardSettlementScope[]).map((scope) => {
-          const isStatement = scope === 'statement';
-          const scopeValue = isStatement ? statement : outstanding;
-          return (
-            <div key={scope} className="w-1/2 pr-3">
-              <span className="mb-2 inline-flex items-center gap-1.5 rounded-full bg-cyan-500/10 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-cyan-400 md:mb-3 md:px-3 md:py-1 md:text-xs">
-                <span className="h-1 w-1 rounded-full bg-cyan-500 md:h-1.5 md:w-1.5" />
-                {isStatement ? 'Statement' : 'Outstanding'}
-              </span>
-              <div className="break-words text-lg font-bold leading-tight text-white sm:text-xl md:text-2xl xl:text-[1.75rem]">
-                {hideValues ? '****' : <CountUp end={scopeValue} prefix="RM " />}
+      <div className="relative z-10 overflow-hidden">
+        <div
+          className="flex w-full transition-transform duration-300 ease-out"
+          style={{ transform: `translateX(${activeView === 'outstanding' ? '0%' : '-100%'})` }}
+        >
+          {(['outstanding', 'statement'] as CreditCardSettlementScope[]).map((scope) => {
+            const isStatement = scope === 'statement';
+            const scopeValue = isStatement ? statement : outstanding;
+            return (
+              <div key={scope} className="min-w-full pr-2">
+                <span className="mb-2 inline-flex items-center gap-1.5 rounded-full bg-cyan-500/10 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-cyan-400 md:mb-3 md:px-3 md:py-1 md:text-xs">
+                  <span className="h-1 w-1 rounded-full bg-cyan-500 md:h-1.5 md:w-1.5" />
+                  {isStatement ? 'Statement' : 'Outstanding'}
+                </span>
+                <div className="break-words text-lg font-bold leading-tight text-white sm:text-xl md:text-2xl xl:text-[1.75rem]">
+                  {hideValues ? '****' : <CountUp end={scopeValue} prefix="RM " />}
+                </div>
+                <div className="mt-1 text-[11px] uppercase tracking-[0.18em] text-cyan-300/70">{isStatement ? 'Current cycle due' : 'All unpaid charges'}</div>
               </div>
-              <div className="mt-1 text-[11px] uppercase tracking-[0.18em] text-cyan-300/70">{isStatement ? 'Current cycle due' : 'All unpaid charges'}</div>
-            </div>
-          );
-        })}
+            );
+          })}
+        </div>
       </div>
 
       <div className="relative z-10 mt-3 flex items-center justify-between gap-3">
