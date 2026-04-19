@@ -149,7 +149,7 @@ export const SettleCreditCardModal: React.FC<SettleCreditCardModalProps> = ({
           </div>
 
           <div className="rounded-2xl border border-amber-500/20 bg-amber-500/10 p-4 text-sm text-amber-100">
-            This will mark {settlementScope === 'statement' ? 'the current statement charges' : 'all unpaid charges'} on {cardAccount.name} as settled and create one transfer row from the selected paying account for RM {selectedAmount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}.
+            This will mark {settlementScope === 'statement' ? 'the current statement charges' : 'all unpaid charges'} on {cardAccount.name} as settled and record one payment transfer from the selected paying account for RM {selectedAmount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}. Your expense totals still come from the original card charges, so this payment record is not counted as a second expense.
           </div>
 
           <button

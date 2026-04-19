@@ -1075,7 +1075,7 @@ export async function settleCreditCardBill(
           settlementTotal,
           payingAccountName,
           cardAccountName,
-          `Settled ${settlementScope === 'statement' ? 'statement' : 'outstanding'} for ${cardAccountName}`,
+          `Recorded ${settlementScope === 'statement' ? 'statement' : 'outstanding'} payment for ${cardAccountName}`,
           '',
           '',
           '',

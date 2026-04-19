@@ -50,6 +50,7 @@ const getTransactionBadge = (tx: MoneyTransaction) => {
 
 const isRecognizedExpense = (tx: MoneyTransaction) => tx.type === 'Expense' && (!tx.isCardCharge || tx.settlementStatus === 'Settled');
 const isUnsettledCardCharge = (tx: MoneyTransaction) => tx.type === 'Expense' && tx.isCardCharge && tx.settlementStatus !== 'Settled';
+const isCreditCardSettlementTransfer = (tx: MoneyTransaction) => tx.type === 'Transfer' && tx.category === 'Credit Card Settlement';
 
 interface CreditCardDetail {
   account: MoneyAccount;
@@ -226,6 +227,26 @@ export const MoneyManager: React.FC<MoneyManagerProps> = ({ data, loading, onRef
     return `${prefix}${val.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
   };
 
+  const getTransactionDisplay = (tx: MoneyTransaction) => {
+    if (tx.type === 'Income') {
+      return { colorClass: 'text-emerald-400', prefix: '+', label: 'Income' };
+    }
+
+    if (isCreditCardSettlementTransfer(tx)) {
+      return { colorClass: 'text-cyan-300', prefix: '-', label: 'Payment' };
+    }
+
+    if (tx.type === 'Transfer') {
+      return { colorClass: 'text-blue-400', prefix: '', label: 'Transfer' };
+    }
+
+    return {
+      colorClass: isUnsettledCardCharge(tx) ? 'text-amber-300' : 'text-slate-200',
+      prefix: '-',
+      label: tx.settlementStatus === 'Settled' ? 'Settled' : tx.type,
+    };
+  };
+
   const prevMonth = () => setSelectedDate((prev) => new Date(prev.getFullYear(), prev.getMonth() - 1, 1));
   const nextMonth = () => setSelectedDate((prev) => new Date(prev.getFullYear(), prev.getMonth() + 1, 1));
   const monthLabel = selectedDate.toLocaleString('default', { month: 'long', year: 'numeric' });
@@ -351,6 +372,7 @@ export const MoneyManager: React.FC<MoneyManagerProps> = ({ data, loading, onRef
           onViewAll={() => setIsHistoryModalOpen(true)}
           displayValue={displayValue}
           getCategoryStyles={getCategoryStyles}
+          getTransactionDisplay={getTransactionDisplay}
         />
       </div>
 
@@ -695,6 +717,7 @@ export const MoneyManager: React.FC<MoneyManagerProps> = ({ data, loading, onRef
             <div className="flex-1 space-y-2 overflow-y-auto p-4">
               {filteredTransactions.map((tx) => {
                 const badges = getTransactionBadge(tx);
+                const txDisplay = getTransactionDisplay(tx);
                 return (
                   <div key={tx.id} className="group flex items-center justify-between rounded-xl border border-transparent p-3 hover:border-white/5 hover:bg-white/5">
                     <div className="flex flex-col">
@@ -705,8 +728,8 @@ export const MoneyManager: React.FC<MoneyManagerProps> = ({ data, loading, onRef
                       <span className="text-xs text-slate-500">{tx.date} - {tx.note}</span>
                     </div>
                     <div className="flex items-center gap-4 text-right">
-                      <span className={`font-bold ${tx.type === 'Income' ? 'text-emerald-400' : tx.type === 'Transfer' ? 'text-blue-400' : isUnsettledCardCharge(tx) ? 'text-amber-300' : 'text-slate-200'}`}>
-                        {tx.type === 'Income' ? '+' : tx.type === 'Transfer' ? '' : '-'} {displayValue(tx.amount, 'RM ')}
+                      <span className={`font-bold ${txDisplay.colorClass}`}>
+                        {txDisplay.prefix} {displayValue(tx.amount, 'RM ')}
                       </span>
                       <div className="flex gap-1 opacity-0 transition-opacity group-hover:opacity-100">
                         <button onClick={() => { setIsHistoryModalOpen(false); handleEdit(tx); }} className="p-2 text-slate-500 hover:text-indigo-400">
