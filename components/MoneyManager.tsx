@@ -2,7 +2,7 @@
 
 import React, { useEffect, useMemo, useState } from 'react';
 import { Wallet, ShoppingBag, Car, Zap, Utensils, Smartphone, Banknote, Calendar, X, Pencil, Trash2, TrendingUp, TrendingDown, CreditCard } from 'lucide-react';
-import { MoneyAccount, MoneyManagerData, MoneyTransaction, RecurringDebitRule } from '../types';
+import { CreditCardSettlementScope, MoneyAccount, MoneyManagerData, MoneyTransaction, RecurringDebitRule } from '../types';
 import { AddMoneyModal } from './MoneyManager/AddMoneyModal';
 import { AutoDebitModal } from './MoneyManager/AutoDebitModal';
 import { AutoDebitPanel } from './MoneyManager/AutoDebitPanel';
@@ -11,7 +11,8 @@ import { MoneyBreakdownPanel } from './MoneyManager/MoneyBreakdownPanel';
 import { MoneyHeader } from './MoneyManager/MoneyHeader';
 import { MoneyStatsRow } from './MoneyManager/MoneyStatsRow';
 import { SettleCreditCardModal } from './MoneyManager/SettleCreditCardModal';
-import { deactivateAutoDebitRuleById, deleteMoneyTransaction } from '../app/actions';
+import { deactivateAutoDebitRuleById, deleteMoneyTransaction, updateCreditCardBillingDay } from '../app/actions';
+import { getActiveBillingCycle, getBillingDayOfMonth, isTransactionInActiveStatement } from '../lib/creditCard';
 
 interface MoneyManagerProps {
   data: MoneyManagerData | null;
@@ -50,6 +51,16 @@ const getTransactionBadge = (tx: MoneyTransaction) => {
 const isRecognizedExpense = (tx: MoneyTransaction) => tx.type === 'Expense' && (!tx.isCardCharge || tx.settlementStatus === 'Settled');
 const isUnsettledCardCharge = (tx: MoneyTransaction) => tx.type === 'Expense' && tx.isCardCharge && tx.settlementStatus !== 'Settled';
 
+interface CreditCardDetail {
+  account: MoneyAccount;
+  outstandingTotal: number;
+  statementTotal: number;
+  outstandingTransactions: MoneyTransaction[];
+  statementTransactions: MoneyTransaction[];
+  cycleLabel: string;
+  billingDayOfMonth: number;
+}
+
 export const MoneyManager: React.FC<MoneyManagerProps> = ({ data, loading, onRefresh, hideValues, registerAddHandler }) => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isHistoryModalOpen, setIsHistoryModalOpen] = useState(false);
@@ -57,10 +68,13 @@ export const MoneyManager: React.FC<MoneyManagerProps> = ({ data, loading, onRef
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [editingTransaction, setEditingTransaction] = useState<MoneyTransaction | null>(null);
   const [editingRule, setEditingRule] = useState<RecurringDebitRule | null>(null);
-  const [settlingCard, setSettlingCard] = useState<MoneyAccount | null>(null);
+  const [settlingCard, setSettlingCard] = useState<CreditCardDetail | null>(null);
+  const [creditCardTileView, setCreditCardTileView] = useState<CreditCardSettlementScope>('outstanding');
   const [isAutoDebitModalOpen, setIsAutoDebitModalOpen] = useState(false);
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [showFilters, setShowFilters] = useState(false);
+  const [billingDayDrafts, setBillingDayDrafts] = useState<Record<string, string>>({});
+  const [savingBillingDay, setSavingBillingDay] = useState<string | null>(null);
   const [filters, setFilters] = useState<MoneyFilters>({
     type: 'All',
     account: 'All',
@@ -73,43 +87,41 @@ export const MoneyManager: React.FC<MoneyManagerProps> = ({ data, loading, onRef
     [data]
   );
 
-  const creditCardOutstandingMap = useMemo(() => {
-    const totals: Record<string, number> = {};
-    if (!data) return totals;
-
-    data.transactions.forEach((tx) => {
-      if (isUnsettledCardCharge(tx) && tx.fromAccount) {
-        totals[tx.fromAccount] = (totals[tx.fromAccount] || 0) + tx.amount;
-      }
-    });
-
-    return totals;
-  }, [data]);
-
-  const outstandingCardDetails = useMemo(() => {
+  const creditCardDetails = useMemo<CreditCardDetail[]>(() => {
     if (!data) return [];
 
     return creditCardAccounts
       .map((account) => {
-        const transactions = data.transactions.filter(
+        const outstandingTransactions = data.transactions.filter(
           (tx) => isUnsettledCardCharge(tx) && tx.fromAccount === account.name
         );
+        const statementTransactions = outstandingTransactions.filter((tx) => isTransactionInActiveStatement(tx, account));
+        const cycle = getActiveBillingCycle(account.billingDayOfMonth);
 
         return {
           account,
-          total: transactions.reduce((sum, tx) => sum + tx.amount, 0),
-          transactions,
+          billingDayOfMonth: getBillingDayOfMonth(account),
+          cycleLabel: cycle.label,
+          outstandingTransactions,
+          statementTransactions,
+          outstandingTotal: outstandingTransactions.reduce((sum, tx) => sum + tx.amount, 0),
+          statementTotal: statementTransactions.reduce((sum, tx) => sum + tx.amount, 0),
         };
       })
-      .filter((item) => item.total > 0);
+      .filter((item) => item.outstandingTotal > 0 || item.statementTotal > 0);
   }, [creditCardAccounts, data]);
+
+  const creditCardDetailMap = useMemo(
+    () => Object.fromEntries(creditCardDetails.map((detail) => [detail.account.name, detail])),
+    [creditCardDetails]
+  );
 
   const { filteredTransactions, baseTransactionsForBreakdown, monthlyStats, pieData, fullBreakdown, isCustomDateMode } = useMemo(() => {
     if (!data) {
       return {
         filteredTransactions: [],
         baseTransactionsForBreakdown: [],
-        monthlyStats: { income: 0, expense: 0, outstanding: 0, balance: 0 },
+        monthlyStats: { income: 0, expense: 0, outstanding: 0, statement: 0, balance: 0 },
         pieData: [],
         fullBreakdown: [],
         isCustomDateMode: false
@@ -157,6 +169,13 @@ export const MoneyManager: React.FC<MoneyManagerProps> = ({ data, loading, onRef
       const matchesAccount = filters.account === 'All' || tx.fromAccount === filters.account;
       return matchesAccount && isUnsettledCardCharge(tx) ? sum + tx.amount : sum;
     }, 0);
+    const statement = data.transactions.reduce((sum, tx) => {
+      if (!isUnsettledCardCharge(tx) || !tx.fromAccount) return sum;
+      const matchesAccount = filters.account === 'All' || tx.fromAccount === filters.account;
+      if (!matchesAccount) return sum;
+      const cardAccount = creditCardAccounts.find((account) => account.name === tx.fromAccount);
+      return cardAccount && isTransactionInActiveStatement(tx, cardAccount) ? sum + tx.amount : sum;
+    }, 0);
 
     const breakdown = Object.entries(catTotals)
       .map(([name, value]) => ({ name, value }))
@@ -165,12 +184,12 @@ export const MoneyManager: React.FC<MoneyManagerProps> = ({ data, loading, onRef
     return {
       filteredTransactions: activityFiltered,
       baseTransactionsForBreakdown: base,
-      monthlyStats: { income, expense, outstanding, balance: income - expense },
+      monthlyStats: { income, expense, outstanding, statement, balance: income - expense },
       pieData: breakdown.filter((item) => item.value > 0),
       fullBreakdown: breakdown,
       isCustomDateMode: useCustomDate
     };
-  }, [data, selectedDate, filters]);
+  }, [creditCardAccounts, data, selectedDate, filters]);
 
   const { categoryTransactions, categorySummary } = useMemo(() => {
     if (!selectedCategory) return { categoryTransactions: [], categorySummary: { income: 0, expense: 0, charged: 0, net: 0 } };
@@ -258,6 +277,39 @@ export const MoneyManager: React.FC<MoneyManagerProps> = ({ data, loading, onRef
     });
   }, [registerAddHandler]);
 
+  useEffect(() => {
+    const nextDrafts: Record<string, string> = {};
+    creditCardAccounts.forEach((account) => {
+      nextDrafts[account.name] = String(getBillingDayOfMonth(account));
+    });
+    setBillingDayDrafts(nextDrafts);
+  }, [creditCardAccounts]);
+
+  const openSettleModal = (account: MoneyAccount, scope: CreditCardSettlementScope) => {
+    const detail = creditCardDetailMap[account.name];
+    if (!detail) return;
+    setSettlingCard(detail);
+    setCreditCardTileView(scope);
+  };
+
+  const saveBillingDay = async (account: MoneyAccount) => {
+    const rawValue = billingDayDrafts[account.name];
+    const parsed = Number(rawValue);
+    if (!Number.isFinite(parsed) || parsed < 1 || parsed > 31) {
+      alert('Billing day must be a number between 1 and 31.');
+      return;
+    }
+
+    setSavingBillingDay(account.name);
+    const result = await updateCreditCardBillingDay(account.name, parsed);
+    setSavingBillingDay(null);
+    if (!result.success) {
+      alert(result.error || 'Failed to update billing day.');
+      return;
+    }
+    onRefresh();
+  };
+
   return (
     <div className="grid grid-cols-1 gap-8 xl:grid-cols-3">
       <div className="space-y-4 md:space-y-8 xl:col-span-2">
@@ -276,9 +328,12 @@ export const MoneyManager: React.FC<MoneyManagerProps> = ({ data, loading, onRef
           income={monthlyStats.income}
           expense={monthlyStats.expense}
           outstanding={monthlyStats.outstanding}
+          statement={monthlyStats.statement}
           balance={monthlyStats.balance}
           isCustomDateMode={isCustomDateMode}
           hideValues={hideValues}
+          creditCardView={creditCardTileView}
+          onChangeCreditCardView={setCreditCardTileView}
           onOpenOutstandingDetails={() => setIsOutstandingModalOpen(true)}
         />
 
@@ -331,27 +386,62 @@ export const MoneyManager: React.FC<MoneyManagerProps> = ({ data, loading, onRef
               </div>
               <div>
                 <h3 className="text-lg font-bold text-white">Credit Cards</h3>
-                <p className="text-xs text-slate-400">Outstanding shows every unpaid credit-card charge until you settle the bill.</p>
+                <p className="text-xs text-slate-400">Outstanding shows all unpaid charges. Statement only includes the current billing cycle for each card.</p>
               </div>
             </div>
 
             <div className="space-y-3">
               {creditCardAccounts.map((account) => {
-                const outstanding = creditCardOutstandingMap[account.name] || 0;
+                const detail = creditCardDetailMap[account.name];
+                const outstanding = detail?.outstandingTotal || 0;
+                const statement = detail?.statementTotal || 0;
                 return (
                   <div key={account.name} className="rounded-2xl border border-white/5 bg-slate-950/50 p-4">
-                    <div className="flex items-center justify-between gap-3">
+                    <div className="flex flex-col gap-4">
                       <div>
                         <div className="text-sm font-bold text-white">{account.name}</div>
                         <div className="mt-1 text-xs text-slate-500">Outstanding {displayValue(outstanding)}</div>
+                        <div className="mt-1 text-xs text-slate-500">Statement {displayValue(statement)}{detail ? ` • ${detail.cycleLabel}` : ''}</div>
                       </div>
-                      <button
-                        onClick={() => setSettlingCard(account)}
-                        disabled={outstanding <= 0}
-                        className="rounded-xl bg-emerald-600 px-3 py-2 text-xs font-bold text-white transition-colors hover:bg-emerald-500 disabled:cursor-not-allowed disabled:bg-slate-800 disabled:text-slate-500"
-                      >
-                        Settle Bill
-                      </button>
+                      <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
+                        <div>
+                          <label className="mb-1 block text-[11px] font-bold uppercase tracking-[0.18em] text-slate-500">Billing day</label>
+                          <div className="flex items-center gap-2">
+                            <input
+                              type="number"
+                              min={1}
+                              max={31}
+                              value={billingDayDrafts[account.name] || ''}
+                              onChange={(event) => setBillingDayDrafts((prev) => ({ ...prev, [account.name]: event.target.value }))}
+                              className="w-24 rounded-xl border border-slate-800 bg-slate-900 px-3 py-2 text-sm text-white"
+                            />
+                            <button
+                              type="button"
+                              onClick={() => saveBillingDay(account)}
+                              disabled={savingBillingDay === account.name}
+                              className="rounded-xl border border-white/10 px-3 py-2 text-xs font-bold uppercase tracking-[0.14em] text-slate-200 transition hover:border-cyan-400/40 hover:text-white disabled:cursor-not-allowed disabled:text-slate-500"
+                            >
+                              {savingBillingDay === account.name ? 'Saving' : 'Save'}
+                            </button>
+                          </div>
+                        </div>
+                        <div className="flex flex-wrap items-center gap-2">
+                          <button
+                            onClick={() => openSettleModal(account, 'statement')}
+                            disabled={statement <= 0}
+                            className="rounded-xl border border-cyan-400/20 bg-cyan-500/10 px-3 py-2 text-xs font-bold text-cyan-100 transition-colors hover:bg-cyan-500/20 disabled:cursor-not-allowed disabled:border-slate-800 disabled:bg-slate-900 disabled:text-slate-500"
+                          >
+                            Pay Statement
+                          </button>
+                          <button
+                            onClick={() => openSettleModal(account, 'outstanding')}
+                            disabled={outstanding <= 0}
+                            className="rounded-xl bg-emerald-600 px-3 py-2 text-xs font-bold text-white transition-colors hover:bg-emerald-500 disabled:cursor-not-allowed disabled:bg-slate-800 disabled:text-slate-500"
+                          >
+                            Settle Outstanding
+                          </button>
+                        </div>
+                      </div>
                     </div>
                   </div>
                 );
@@ -368,10 +458,10 @@ export const MoneyManager: React.FC<MoneyManagerProps> = ({ data, loading, onRef
               <div>
                 <div className="mb-2 inline-flex items-center gap-2 rounded-full bg-cyan-500/10 px-3 py-1 text-[11px] font-bold uppercase tracking-[0.18em] text-cyan-300">
                   <CreditCard className="h-4 w-4" />
-                  Outstanding
+                  {creditCardTileView === 'statement' ? 'Statement' : 'Outstanding'}
                 </div>
                 <h2 className="text-2xl font-bold text-white">Unpaid card balances</h2>
-                <p className="mt-1 text-sm text-slate-400">All unsettled credit-card charges grouped by card.</p>
+                <p className="mt-1 text-sm text-slate-400">Review each card’s full outstanding balance and the current statement cycle from one place.</p>
               </div>
               <button onClick={() => setIsOutstandingModalOpen(false)} className="rounded-full p-2 text-slate-400 transition-all hover:bg-slate-800 hover:text-white">
                 <X className="h-6 w-6" />
@@ -381,43 +471,83 @@ export const MoneyManager: React.FC<MoneyManagerProps> = ({ data, loading, onRef
             <div className="grid gap-4 border-b border-slate-800 bg-slate-950/30 px-6 py-4 md:grid-cols-[minmax(0,1fr)_220px]">
               <div>
                 <div className="text-[11px] font-bold uppercase tracking-[0.18em] text-slate-500">Cards with balance</div>
-                <div className="mt-1 text-2xl font-bold text-white">{hideValues ? '****' : outstandingCardDetails.length}</div>
+                <div className="mt-1 text-2xl font-bold text-white">{hideValues ? '****' : creditCardDetails.length}</div>
               </div>
               <div className="md:border-l md:border-white/5 md:pl-6">
                 <div className="text-[11px] font-bold uppercase tracking-[0.18em] text-slate-500">Total outstanding</div>
                 <div className="mt-1 text-2xl font-bold text-cyan-300">{displayValue(monthlyStats.outstanding)}</div>
               </div>
+              <div className="md:border-l md:border-white/5 md:pl-6">
+                <div className="text-[11px] font-bold uppercase tracking-[0.18em] text-slate-500">Current statement</div>
+                <div className="mt-1 text-2xl font-bold text-sky-300">{displayValue(monthlyStats.statement)}</div>
+              </div>
             </div>
 
             <div className="custom-scrollbar flex-1 overflow-y-auto p-4 md:p-6">
-              {outstandingCardDetails.length > 0 ? (
+              {creditCardDetails.length > 0 ? (
                 <div className="space-y-4">
-                  {outstandingCardDetails.map(({ account, total, transactions }) => (
+                  {creditCardDetails.map(({ account, outstandingTotal, statementTotal, outstandingTransactions, statementTransactions, cycleLabel, billingDayOfMonth }) => (
                     <div key={account.name} className="overflow-hidden rounded-3xl border border-white/5 bg-slate-950/50">
                       <div className="flex flex-col gap-3 border-b border-white/5 px-4 py-4 md:flex-row md:items-center md:justify-between md:px-5">
                         <div>
                           <div className="text-lg font-bold text-white">{account.name}</div>
-                          <div className="mt-1 text-xs uppercase tracking-[0.16em] text-slate-500">{transactions.length} unsettled charge{transactions.length === 1 ? '' : 's'}</div>
+                          <div className="mt-1 text-xs uppercase tracking-[0.16em] text-slate-500">
+                            {outstandingTransactions.length} unsettled charge{outstandingTransactions.length === 1 ? '' : 's'} • Billing day {billingDayOfMonth}
+                          </div>
+                          <div className="mt-1 text-xs text-slate-500">Current statement cycle: {cycleLabel}</div>
                         </div>
-                        <div className="flex items-center gap-3">
+                        <div className="flex flex-wrap items-center gap-3">
                           <div className="text-right">
-                            <div className="text-[11px] font-bold uppercase tracking-[0.18em] text-slate-500">Amount due</div>
-                            <div className="text-lg font-bold text-cyan-300">{displayValue(total)}</div>
+                            <div className="text-[11px] font-bold uppercase tracking-[0.18em] text-slate-500">Outstanding</div>
+                            <div className="text-lg font-bold text-cyan-300">{displayValue(outstandingTotal)}</div>
+                          </div>
+                          <div className="text-right">
+                            <div className="text-[11px] font-bold uppercase tracking-[0.18em] text-slate-500">Statement</div>
+                            <div className="text-lg font-bold text-sky-300">{displayValue(statementTotal)}</div>
                           </div>
                           <button
                             onClick={() => {
                               setIsOutstandingModalOpen(false);
-                              setSettlingCard(account);
+                              openSettleModal(account, creditCardTileView);
                             }}
-                            className="rounded-xl bg-emerald-600 px-3 py-2 text-xs font-bold text-white transition-colors hover:bg-emerald-500"
+                            disabled={(creditCardTileView === 'statement' ? statementTotal : outstandingTotal) <= 0}
+                            className="rounded-xl bg-emerald-600 px-3 py-2 text-xs font-bold text-white transition-colors hover:bg-emerald-500 disabled:cursor-not-allowed disabled:bg-slate-800 disabled:text-slate-500"
                           >
-                            Settle Bill
+                            {creditCardTileView === 'statement' ? 'Pay Statement' : 'Settle Outstanding'}
                           </button>
                         </div>
                       </div>
 
-                      <div className="divide-y divide-white/5">
-                        {transactions.map((tx) => (
+                      <div className="grid gap-4 p-4 md:grid-cols-2 md:p-5">
+                        <div className="overflow-hidden rounded-2xl border border-white/5 bg-slate-900/40">
+                          <div className="border-b border-white/5 px-4 py-3">
+                            <div className="text-sm font-bold text-white">Statement Charges</div>
+                            <div className="mt-1 text-xs uppercase tracking-[0.16em] text-slate-500">{statementTransactions.length} charge{statementTransactions.length === 1 ? '' : 's'} in current cycle</div>
+                          </div>
+                          <div className="divide-y divide-white/5">
+                            {statementTransactions.length > 0 ? statementTransactions.map((tx) => (
+                              <div key={`statement-${tx.id}`} className="flex flex-col gap-3 px-4 py-3 md:flex-row md:items-center md:justify-between">
+                                <div className="min-w-0">
+                                  <div className="flex items-center gap-2">
+                                    <span className="truncate text-sm font-semibold text-white">{tx.note || tx.category}</span>
+                                    <span className="rounded-full bg-sky-500/10 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider text-sky-300">Statement</span>
+                                  </div>
+                                  <div className="mt-1 text-xs text-slate-500">{tx.date} - {tx.category}</div>
+                                </div>
+                                <div className="text-right">
+                                  <div className="text-sm font-bold text-sky-300">- {displayValue(tx.amount)}</div>
+                                </div>
+                              </div>
+                            )) : <div className="px-4 py-6 text-sm text-slate-500">No unsettled charges in the current statement cycle.</div>}
+                          </div>
+                        </div>
+                        <div className="overflow-hidden rounded-2xl border border-white/5 bg-slate-900/40">
+                          <div className="border-b border-white/5 px-4 py-3">
+                            <div className="text-sm font-bold text-white">All Outstanding Charges</div>
+                            <div className="mt-1 text-xs uppercase tracking-[0.16em] text-slate-500">{outstandingTransactions.length} unpaid charge{outstandingTransactions.length === 1 ? '' : 's'}</div>
+                          </div>
+                          <div className="divide-y divide-white/5">
+                            {outstandingTransactions.map((tx) => (
                           <div key={tx.id} className="flex flex-col gap-3 px-4 py-3 md:flex-row md:items-center md:justify-between md:px-5">
                             <div className="min-w-0">
                               <div className="flex items-center gap-2">
@@ -430,7 +560,9 @@ export const MoneyManager: React.FC<MoneyManagerProps> = ({ data, loading, onRef
                               <div className="text-sm font-bold text-amber-300">- {displayValue(tx.amount)}</div>
                             </div>
                           </div>
-                        ))}
+                            ))}
+                          </div>
+                        </div>
                       </div>
                     </div>
                   ))}
@@ -614,8 +746,12 @@ export const MoneyManager: React.FC<MoneyManagerProps> = ({ data, loading, onRef
 
       <SettleCreditCardModal
         isOpen={Boolean(settlingCard)}
-        cardAccount={settlingCard}
+        cardAccount={settlingCard?.account || null}
         accounts={data.accounts}
+        initialScope={creditCardTileView}
+        statementAmount={settlingCard?.statementTotal || 0}
+        outstandingAmount={settlingCard?.outstandingTotal || 0}
+        cycleLabel={settlingCard?.cycleLabel}
         onClose={() => setSettlingCard(null)}
         onSuccess={onRefresh}
       />

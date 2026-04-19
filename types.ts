@@ -72,7 +72,10 @@ export interface MoneyAccount {
   logoUrl: string;
   initialBalance: number;
   currentBalance: number;
+  billingDayOfMonth?: number;
 }
+
+export type CreditCardSettlementScope = 'outstanding' | 'statement';
 
 export interface MoneyTransaction {
   id: string;

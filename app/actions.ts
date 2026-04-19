@@ -2,8 +2,9 @@
 'use server';
 
 import { getSheetClient, SPREADSHEET_ID, SHEET_NAME, CASH_FLOW_SHEET_NAME, PORTFOLIO_SHEET_NAME, MM_ACCOUNTS_SHEET, MM_TRANSACTIONS_SHEET, MM_CATEGORIES_SHEET, MM_AUTODEBITS_SHEET } from '../lib/googleSheets';
-import { PortfolioSummary, Holding, CashFlowSummary, Deposit, Conversion, MoneyManagerData, MoneyAccount, MoneyTransaction, Bill, RecurringDebitRule } from '../types';
+import { PortfolioSummary, Holding, CashFlowSummary, Deposit, Conversion, MoneyManagerData, MoneyAccount, MoneyTransaction, Bill, RecurringDebitRule, CreditCardSettlementScope } from '../types';
 import yahooFinance from 'yahoo-finance2';
+import { DEFAULT_CREDIT_CARD_BILLING_DAY, getActiveBillingCycle, getBillingDayOfMonth, isTransactionInActiveStatement } from '../lib/creditCard';
 
 // --- MOCK DATA FOR DEMO MODE ---
 const MOCK_PRICES: Record<string, number> = {
@@ -33,7 +34,7 @@ const MOCK_MONEY_DATA = {
         { name: 'GXBank', category: 'Bank', logoUrl: '', initialBalance: 5000, currentBalance: 5200 },
         { name: 'TnG eWallet', category: 'Wallet', logoUrl: '', initialBalance: 500, currentBalance: 145.20 },
         { name: 'Cash', category: 'Cash', logoUrl: '', initialBalance: 500, currentBalance: 320 },
-        { name: 'Maybank Visa', category: 'Credit Card', logoUrl: '', initialBalance: 0, currentBalance: -1250 }
+        { name: 'Maybank Visa', category: 'Credit Card', logoUrl: '', initialBalance: 0, currentBalance: -1250, billingDayOfMonth: DEFAULT_CREDIT_CARD_BILLING_DAY }
     ],
     transactions: [
         { id: '1', date: '2024-03-24', type: 'Expense', category: 'Food', amount: 25.50, fromAccount: 'TnG eWallet', note: 'Lunch' },
@@ -195,6 +196,11 @@ const isDebitLikeCategory = (category?: string) => {
 };
 
 const isTruthySheetValue = (value: any) => ['yes', 'true', '1', 'y'].includes((value || '').toString().trim().toLowerCase());
+const parseBillingDay = (value: any, fallback: number = DEFAULT_CREDIT_CARD_BILLING_DAY) => {
+  const parsed = Math.trunc(parseMoney(value));
+  if (!parsed) return fallback;
+  return Math.min(31, Math.max(1, parsed));
+};
 
 const getSettlementStatus = (value: any): 'Unsettled' | 'Settled' => {
   const normalized = (value || '').toString().trim().toLowerCase();
@@ -463,7 +469,7 @@ const processAutoDebitOccurrences = async (
 const getMoneyAccounts = async (googleSheets: any) => {
   const response = await googleSheets.spreadsheets.values.get({
     spreadsheetId: SPREADSHEET_ID,
-    range: `${MM_ACCOUNTS_SHEET}!A:E`
+    range: `${MM_ACCOUNTS_SHEET}!A:F`
   });
   const rows = response.data.values || [];
   const accounts: MoneyAccount[] = [];
@@ -480,7 +486,8 @@ const getMoneyAccounts = async (googleSheets: any) => {
       category: normalizeAccountName(rows[i][1]) || 'General',
       logoUrl: normalizeAccountName(rows[i][2]),
       initialBalance: parseMoney(rows[i][3]),
-      currentBalance: parseMoney(rows[i][4])
+      currentBalance: parseMoney(rows[i][4]),
+      billingDayOfMonth: isCreditCardCategory(rows[i][1]) ? parseBillingDay(rows[i][5]) : undefined
     };
 
     accounts.push(account);
@@ -533,9 +540,9 @@ export async function initializeDatabase(forceDemo: boolean = false) {
         }
         await googleSheets.spreadsheets.values.update({
             spreadsheetId: SPREADSHEET_ID,
-            range: `${MM_ACCOUNTS_SHEET}!A1:E1`,
+            range: `${MM_ACCOUNTS_SHEET}!A1:F1`,
             valueInputOption: 'USER_ENTERED',
-            requestBody: { values: [['Account Name', 'Category', 'Logo URL', 'Initial Balance', 'Current Balance (Calc)']] }
+            requestBody: { values: [['Account Name', 'Category', 'Logo URL', 'Initial Balance', 'Current Balance (Calc)', 'Billing Day Of Month']] }
         });
         await googleSheets.spreadsheets.values.update({
             spreadsheetId: SPREADSHEET_ID,
@@ -813,7 +820,7 @@ export async function getMoneyManagerData(forceDemo: boolean = false): Promise<M
     const { googleSheets } = await getSheetClient();
     await ensureAutoDebitInfrastructure(googleSheets);
     const [accResponse, txResponse, catResponse] = await Promise.all([
-        googleSheets.spreadsheets.values.get({ spreadsheetId: SPREADSHEET_ID, range: `${MM_ACCOUNTS_SHEET}!A:E` }),
+        googleSheets.spreadsheets.values.get({ spreadsheetId: SPREADSHEET_ID, range: `${MM_ACCOUNTS_SHEET}!A:F` }),
         googleSheets.spreadsheets.values.get({ spreadsheetId: SPREADSHEET_ID, range: `${MM_TRANSACTIONS_SHEET}!A:N` }),
         googleSheets.spreadsheets.values.get({ spreadsheetId: SPREADSHEET_ID, range: `${MM_CATEGORIES_SHEET}!A:B` })
     ]);
@@ -844,7 +851,8 @@ export async function getMoneyManagerData(forceDemo: boolean = false): Promise<M
             category: normalizeAccountName(accRows[i][1]) || 'General', 
             logoUrl: normalizeAccountName(accRows[i][2]), 
             initialBalance: initialBal, 
-            currentBalance: currentBalFromSheet 
+            currentBalance: currentBalFromSheet,
+            billingDayOfMonth: isCreditCardCategory(accRows[i][1]) ? parseBillingDay(accRows[i][5]) : undefined
         };
         accounts.push(acc);
         accountMap[accountName] = acc;
@@ -987,6 +995,7 @@ export async function settleCreditCardBill(
   cardAccountName: string,
   payingAccountName: string,
   settledAt: string,
+  settlementScope: CreditCardSettlementScope,
   forceDemo: boolean = false
 ) {
   if (typeof window !== 'undefined') throw new Error("Server Action");
@@ -1012,6 +1021,7 @@ export async function settleCreditCardBill(
     const rows = txResponse.data.values || [];
     const updates: Array<{ rowIndex: number; amount: number; values: any[] }> = [];
     let settlementTotal = 0;
+    const activeCycle = getActiveBillingCycle(cardAccount.billingDayOfMonth);
 
     for (let i = 1; i < rows.length; i++) {
       const row = rows[i];
@@ -1023,7 +1033,11 @@ export async function settleCreditCardBill(
       const isCardCharge = isTruthySheetValue(row[7]) || (type === 'Expense' && fromAccount === cardAccountName && isCreditCardCategory(accountMap[fromAccount]?.category));
       const settlementStatus = isCardCharge ? getSettlementStatus(row[8]) : undefined;
 
-      if (type === 'Expense' && fromAccount === cardAccountName && isCardCharge && settlementStatus !== 'Settled') {
+      const isEligibleStatementCharge =
+        settlementScope === 'outstanding' ||
+        isTransactionInActiveStatement({ date: formatDateDisplay(parseDate(row[0])) }, cardAccount, activeCycle.startDate);
+
+      if (type === 'Expense' && fromAccount === cardAccountName && isCardCharge && settlementStatus !== 'Settled' && isEligibleStatementCharge) {
         const nextRow = [...row];
         nextRow[7] = 'Yes';
         nextRow[8] = 'Settled';
@@ -1035,7 +1049,7 @@ export async function settleCreditCardBill(
     }
 
     if (updates.length === 0) {
-      return { success: false, error: 'No unpaid credit card charges found for this card.' };
+      return { success: false, error: settlementScope === 'statement' ? 'No unpaid statement charges found for this card.' : 'No unpaid credit card charges found for this card.' };
     }
 
     await Promise.all(
@@ -1061,7 +1075,7 @@ export async function settleCreditCardBill(
           settlementTotal,
           payingAccountName,
           cardAccountName,
-          `Settled ${cardAccountName} bill`,
+          `Settled ${settlementScope === 'statement' ? 'statement' : 'outstanding'} for ${cardAccountName}`,
           '',
           '',
           '',
@@ -1076,6 +1090,45 @@ export async function settleCreditCardBill(
     return { success: true, settledCount: updates.length, settledAmount: settlementTotal };
   } catch (error) {
     return { success: false, error: 'Failed to settle credit card bill.' };
+  }
+}
+
+export async function updateCreditCardBillingDay(
+  cardAccountName: string,
+  billingDayOfMonth: number,
+  forceDemo: boolean = false
+) {
+  if (typeof window !== 'undefined') throw new Error("Server Action");
+  if (forceDemo || !process.env.GOOGLE_SERVICE_ACCOUNT_KEY) return { success: true };
+
+  try {
+    const { googleSheets } = await getSheetClient();
+    const response = await googleSheets.spreadsheets.values.get({
+      spreadsheetId: SPREADSHEET_ID,
+      range: `${MM_ACCOUNTS_SHEET}!A:F`
+    });
+    const rows = response.data.values || [];
+    const safeBillingDay = getBillingDayOfMonth({ billingDayOfMonth });
+
+    for (let i = 1; i < rows.length; i++) {
+      const row = rows[i];
+      if (normalizeAccountName(row[0]) !== cardAccountName) continue;
+      if (!isCreditCardCategory(row[1])) {
+        return { success: false, error: 'Selected account is not a credit card.' };
+      }
+
+      await googleSheets.spreadsheets.values.update({
+        spreadsheetId: SPREADSHEET_ID,
+        range: `${MM_ACCOUNTS_SHEET}!F${i + 1}`,
+        valueInputOption: 'USER_ENTERED',
+        requestBody: { values: [[safeBillingDay]] }
+      });
+      return { success: true };
+    }
+
+    return { success: false, error: 'Credit card account not found.' };
+  } catch (error) {
+    return { success: false, error: 'Failed to update credit card billing day.' };
   }
 }
 
