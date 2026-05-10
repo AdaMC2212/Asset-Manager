@@ -168,9 +168,9 @@ export const AddMoneyModal: React.FC<AddMoneyModalProps> = ({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-[110] flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm" onClick={onClose}>
-      <div className="panel-elevated max-h-[85vh] w-full max-w-2xl overflow-y-auto rounded-3xl" onClick={(event) => event.stopPropagation()}>
-        <div className="flex justify-between items-center p-6 border-b border-slate-800">
+    <div className="fixed inset-0 z-[110] overflow-y-auto bg-black/70 px-4 pb-6 pt-4 backdrop-blur-sm sm:flex sm:items-center sm:justify-center sm:p-4" onClick={onClose}>
+      <div className="panel-elevated mx-auto w-full max-w-2xl rounded-3xl sm:max-h-[85vh] sm:overflow-y-auto" onClick={(event) => event.stopPropagation()}>
+        <div className="sticky top-0 flex items-center justify-between rounded-t-3xl border-b border-slate-800 bg-[rgba(15,23,42,0.96)] p-5 backdrop-blur-sm sm:p-6">
           <h2 className="text-xl font-bold text-white">
             {initialData ? 'Edit Transaction' : 'New Transaction'}
           </h2>
@@ -204,13 +204,13 @@ export const AddMoneyModal: React.FC<AddMoneyModalProps> = ({
             ))}
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div>
               <label className="block text-sm font-medium text-slate-400 mb-1">Date</label>
               <input
                 type="date"
                 required
-                className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-white"
+                className="h-11 w-full rounded-lg border border-slate-800 bg-slate-950 px-3 py-2 text-white"
                 value={formData.date}
                 onChange={e => setFormData({...formData, date: e.target.value})}
               />
@@ -221,7 +221,7 @@ export const AddMoneyModal: React.FC<AddMoneyModalProps> = ({
                 type="number"
                 step="0.01"
                 required
-                className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-white font-bold"
+                className="h-11 w-full rounded-lg border border-slate-800 bg-slate-950 px-3 py-2 text-white font-bold"
                 value={formData.amount || ''}
                 onChange={e => setFormData({...formData, amount: parseFloat(e.target.value)})}
               />
@@ -230,12 +230,12 @@ export const AddMoneyModal: React.FC<AddMoneyModalProps> = ({
 
           <div className="space-y-4">
              {formData.type === 'Transfer' ? (
-                <div className="flex items-center gap-2">
+                <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:gap-2">
                     <div className="flex-1">
                         <label className="block text-sm font-medium text-slate-400 mb-1">From</label>
                         <select
                             required
-                            className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-white"
+                            className="h-11 w-full rounded-lg border border-slate-800 bg-slate-950 px-3 py-2 text-white"
                             value={formData.fromAccount}
                             onChange={e => setFormData({...formData, fromAccount: e.target.value})}
                         >
@@ -244,12 +244,12 @@ export const AddMoneyModal: React.FC<AddMoneyModalProps> = ({
                             {accounts.map(a => <option key={a.name} value={a.name}>{a.name} ({displayValue(a.currentBalance)})</option>)}
                         </select>
                     </div>
-                    <div className="pt-6 text-slate-500"><ArrowRight className="w-5 h-5"/></div>
+                    <div className="flex justify-center text-slate-500 sm:pt-6"><ArrowRight className="h-5 w-5 sm:w-5"/></div>
                     <div className="flex-1">
                         <label className="block text-sm font-medium text-slate-400 mb-1">To</label>
                         <select
                             required
-                            className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-white"
+                            className="h-11 w-full rounded-lg border border-slate-800 bg-slate-950 px-3 py-2 text-white"
                             value={formData.toAccount}
                             onChange={e => setFormData({...formData, toAccount: e.target.value})}
                         >
@@ -259,14 +259,14 @@ export const AddMoneyModal: React.FC<AddMoneyModalProps> = ({
                     </div>
                 </div>
              ) : (
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                     <div>
                         <label className="block text-sm font-medium text-slate-400 mb-1">
                             {formData.type === 'Expense' ? 'Pay With' : 'Deposit To'}
                         </label>
                         <select
                             required
-                            className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-white"
+                            className="h-11 w-full rounded-lg border border-slate-800 bg-slate-950 px-3 py-2 text-white"
                             value={formData.type === 'Expense' ? formData.fromAccount : formData.toAccount}
                             onChange={e => {
                                 if (formData.type === 'Expense') setFormData({...formData, fromAccount: e.target.value});
@@ -284,7 +284,7 @@ export const AddMoneyModal: React.FC<AddMoneyModalProps> = ({
                         <label className="block text-sm font-medium text-slate-400 mb-1">Category</label>
                         <select
                             required
-                            className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-white appearance-none"
+                            className="h-11 w-full appearance-none rounded-lg border border-slate-800 bg-slate-950 px-3 py-2 text-white"
                             value={formData.category}
                             onChange={e => setFormData({...formData, category: e.target.value})}
                         >
@@ -309,7 +309,7 @@ export const AddMoneyModal: React.FC<AddMoneyModalProps> = ({
                         required
                         autoFocus
                         placeholder="Enter custom category..."
-                        className="w-full bg-slate-900 border border-indigo-500/50 rounded-lg px-3 py-2 text-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                        className="h-11 w-full rounded-lg border border-indigo-500/50 bg-slate-900 px-3 py-2 text-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
                         value={customCategory}
                         onChange={e => setCustomCategory(e.target.value)}
                     />
@@ -320,7 +320,7 @@ export const AddMoneyModal: React.FC<AddMoneyModalProps> = ({
                 <label className="block text-sm font-medium text-slate-400 mb-1">Note (Optional)</label>
                 <input
                     type="text"
-                    className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-white"
+                    className="h-11 w-full rounded-lg border border-slate-800 bg-slate-950 px-3 py-2 text-white"
                     value={formData.note}
                     onChange={e => setFormData({...formData, note: e.target.value})}
                 />
