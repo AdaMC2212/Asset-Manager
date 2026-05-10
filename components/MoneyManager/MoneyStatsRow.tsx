@@ -39,18 +39,18 @@ const StatTile = ({
     <TileTag
       type={onClick ? 'button' : undefined}
       onClick={onClick}
-      className={`group relative overflow-hidden rounded-2xl border border-white/5 bg-slate-900/50 p-3 text-left shadow-lg transition md:rounded-3xl md:p-5 ${
+      className={`group relative overflow-hidden rounded-2xl border border-white/5 bg-slate-900/50 p-2.5 text-left shadow-lg transition md:rounded-3xl md:p-5 ${
         onClick ? 'cursor-pointer hover:border-cyan-400/30 hover:bg-slate-900/70 focus:outline-none focus:ring-2 focus:ring-cyan-400/40' : ''
       }`}
     >
       {icon ? <div className="absolute right-0 top-0 hidden p-8 opacity-5 transition duration-500 group-hover:scale-110 group-hover:opacity-10 md:block">{icon}</div> : null}
       <div className="relative z-10">
-        <span className={`mb-2 inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider md:mb-3 md:px-3 md:py-1 md:text-xs ${accentClass}`}>
+        <span className={`mb-1.5 inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider md:mb-3 md:px-3 md:py-1 md:text-xs ${accentClass}`}>
           <span className={`h-1 w-1 rounded-full md:h-1.5 md:w-1.5 ${dotClass}`} />
           {label}
         </span>
-        <div className="break-words text-lg font-bold leading-tight text-white sm:text-xl md:text-2xl xl:text-[1.75rem]">{value}</div>
-        {onClick ? <div className="mt-2 text-[11px] font-medium uppercase tracking-[0.18em] text-cyan-300/70">View cards</div> : null}
+        <div className="break-words text-base font-bold leading-tight text-white sm:text-xl md:text-2xl xl:text-[1.75rem]">{value}</div>
+        {onClick ? <div className="mt-1.5 text-[10px] font-medium uppercase tracking-[0.18em] text-cyan-300/70 md:mt-2 md:text-[11px]">View cards</div> : null}
       </div>
     </TileTag>
   );
@@ -102,7 +102,7 @@ const CreditCardBalanceTile = ({
           didSwipe.current = false;
         }, 180);
       }}
-      className="group relative overflow-hidden rounded-2xl border border-white/5 bg-slate-900/50 p-3 text-left shadow-lg transition hover:border-cyan-400/30 hover:bg-slate-900/70 focus:outline-none focus:ring-2 focus:ring-cyan-400/40 md:rounded-3xl md:p-5"
+      className="group relative overflow-hidden rounded-2xl border border-white/5 bg-slate-900/50 p-2.5 text-left shadow-lg transition hover:border-cyan-400/30 hover:bg-slate-900/70 focus:outline-none focus:ring-2 focus:ring-cyan-400/40 md:rounded-3xl md:p-5"
     >
       <div className="absolute right-0 top-0 hidden p-8 opacity-5 transition duration-500 group-hover:scale-110 group-hover:opacity-10 md:block">
         <CreditCard className="h-24 w-24 text-cyan-500" />
@@ -117,11 +117,11 @@ const CreditCardBalanceTile = ({
             const scopeValue = isStatement ? statement : outstanding;
             return (
               <div key={scope} className="min-w-full pr-2">
-                <span className="mb-2 inline-flex items-center gap-1.5 rounded-full bg-cyan-500/10 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-cyan-400 md:mb-3 md:px-3 md:py-1 md:text-xs">
+                <span className="mb-1.5 inline-flex items-center gap-1.5 rounded-full bg-cyan-500/10 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-cyan-400 md:mb-3 md:px-3 md:py-1 md:text-xs">
                   <span className="h-1 w-1 rounded-full bg-cyan-500 md:h-1.5 md:w-1.5" />
                   {isStatement ? 'Statement' : 'Outstanding'}
                 </span>
-                <div className="break-words text-lg font-bold leading-tight text-white sm:text-xl md:text-2xl xl:text-[1.75rem]">
+                <div className="break-words text-base font-bold leading-tight text-white sm:text-xl md:text-2xl xl:text-[1.75rem]">
                   {hideValues ? '****' : <CountUp end={scopeValue} prefix="RM " />}
                 </div>
                 <div className="mt-1 text-[11px] uppercase tracking-[0.18em] text-cyan-300/70">{isStatement ? 'Current cycle due' : 'All unpaid charges'}</div>
@@ -131,7 +131,7 @@ const CreditCardBalanceTile = ({
         </div>
       </div>
 
-      <div className="relative z-10 mt-3 flex items-center justify-between gap-3">
+      <div className="relative z-10 mt-2.5 flex items-center justify-between gap-3 md:mt-3">
         <div className="text-[11px] font-medium uppercase tracking-[0.18em] text-cyan-300/70">{ctaText}</div>
         <div className="flex items-center gap-2" onClick={(event) => event.stopPropagation()}>
           <div className="hidden rounded-full border border-white/10 bg-slate-950/70 p-1 md:flex">
@@ -179,7 +179,7 @@ export const MoneyStatsRow: React.FC<MoneyStatsRowProps> = ({
   onChangeCreditCardView,
 }) => {
   return (
-    <div className="grid grid-cols-2 gap-2 lg:grid-cols-4 md:gap-4">
+    <div className="grid grid-cols-2 gap-2 md:gap-4 lg:grid-cols-4">
       <StatTile
         label={isCustomDateMode ? 'Inc' : 'Income'}
         accentClass="bg-emerald-500/10 text-emerald-400"

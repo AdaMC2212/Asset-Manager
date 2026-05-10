@@ -332,8 +332,8 @@ export const MoneyManager: React.FC<MoneyManagerProps> = ({ data, loading, onRef
   };
 
   return (
-    <div className="grid grid-cols-1 gap-8 xl:grid-cols-3">
-      <div className="space-y-4 md:space-y-8 xl:col-span-2">
+    <div className="grid grid-cols-1 gap-5 md:gap-8 xl:grid-cols-3">
+      <div className="space-y-3 md:space-y-8 xl:col-span-2">
         <MoneyHeader
           monthLabel={monthLabel}
           isCustomDateMode={isCustomDateMode}
@@ -376,7 +376,7 @@ export const MoneyManager: React.FC<MoneyManagerProps> = ({ data, loading, onRef
         />
       </div>
 
-      <div className="space-y-6">
+      <div className="space-y-4 md:space-y-6">
         <MoneyBreakdownPanel
           pieData={pieData}
           fullBreakdown={fullBreakdown}

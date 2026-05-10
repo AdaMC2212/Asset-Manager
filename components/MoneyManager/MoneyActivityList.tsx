@@ -51,8 +51,8 @@ export const MoneyActivityList: React.FC<MoneyActivityListProps> = ({
   getTransactionDisplay,
 }) => {
   return (
-    <div className="rounded-3xl border border-white/5 bg-slate-900/40 p-4 shadow-xl backdrop-blur-md md:p-6">
-      <div className="mb-4 flex items-center justify-between px-1 md:mb-6">
+    <div className="rounded-3xl border border-white/5 bg-slate-900/40 p-3 shadow-xl backdrop-blur-md md:p-6">
+      <div className="mb-3 flex items-center justify-between px-1 md:mb-6">
         <div className="flex items-center gap-2 md:gap-3">
           <h3 className="text-lg font-bold text-white md:text-xl">Activity</h3>
           <span className="rounded-full bg-slate-800/50 px-2 py-0.5 text-[10px] font-medium text-slate-500 md:px-3 md:py-1 md:text-xs">
@@ -73,7 +73,7 @@ export const MoneyActivityList: React.FC<MoneyActivityListProps> = ({
       </div>
 
       {(showFilters || hasActiveFilters) && (
-        <div className="animate-in slide-in-from-top-2 fade-in mb-6 space-y-4 rounded-2xl border border-white/5 bg-slate-900/60 p-4">
+        <div className="animate-in slide-in-from-top-2 fade-in mb-4 space-y-3 rounded-2xl border border-white/5 bg-slate-900/60 p-3 md:mb-6 md:space-y-4 md:p-4">
           <div className="flex items-center justify-between">
             <h4 className="text-xs font-bold uppercase tracking-widest text-slate-500">Filter Options</h4>
             {hasActiveFilters ? (
@@ -139,7 +139,7 @@ export const MoneyActivityList: React.FC<MoneyActivityListProps> = ({
         </div>
       )}
 
-      <div className="space-y-2 md:space-y-3">
+      <div className="space-y-1.5 md:space-y-3">
         {filteredTransactions.slice(0, 10).map((tx) => {
           const style = getCategoryStyles(tx.category);
           const txDisplay = getTransactionDisplay(tx);
@@ -159,27 +159,27 @@ export const MoneyActivityList: React.FC<MoneyActivityListProps> = ({
               key={tx.id}
               className="group flex items-center justify-between rounded-2xl border border-transparent p-2 transition-all hover:border-white/5 hover:bg-white/5 md:p-3"
             >
-              <div className="flex items-center gap-3 md:gap-4">
-                <div className={`flex h-10 w-10 items-center justify-center rounded-xl shadow-lg shadow-black/20 md:h-12 md:w-12 md:rounded-2xl ${style.color} ${style.text}`}>
+              <div className="flex min-w-0 items-center gap-2.5 md:gap-4">
+                <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl shadow-lg shadow-black/20 md:h-12 md:w-12 md:rounded-2xl ${style.color} ${style.text}`}>
                   {style.icon}
                 </div>
                 <div className="min-w-0">
-                  <div className="flex items-center gap-2">
-                    <div className="truncate pr-2 text-sm font-bold text-white">{tx.category}</div>
+                  <div className="flex flex-wrap items-center gap-1.5 md:gap-2">
+                    <div className="truncate pr-1 text-sm font-bold text-white">{tx.category}</div>
                     {badges.map((badge) => <span key={badge.label} className={`rounded-full px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider ${badge.className}`}>{badge.label}</span>)}
                   </div>
-                  <div className="mt-0.5 max-w-[120px] truncate text-[10px] text-slate-400 md:max-w-[200px] md:text-xs">
+                  <div className="mt-0.5 max-w-[140px] truncate text-[10px] text-slate-400 md:max-w-[200px] md:text-xs">
                     {tx.date} - {tx.note || 'No note'}
                   </div>
                 </div>
               </div>
 
-              <div className="flex items-center gap-4 text-right">
+              <div className="flex shrink-0 items-center gap-2 text-right md:gap-4">
                 <div>
                   <div className={`text-sm font-bold ${txDisplay.colorClass}`}>
                     {txDisplay.prefix} {displayValue(tx.amount, 'RM ')}
                   </div>
-                  <div className="text-[10px] font-medium uppercase tracking-wide text-slate-500">
+                  <div className="max-w-[92px] truncate text-[10px] font-medium uppercase tracking-wide text-slate-500 md:max-w-none">
                     {txDisplay.label} • {tx.fromAccount} {tx.toAccount ? '->' : ''}
                   </div>
                 </div>

@@ -41,51 +41,51 @@ export const TotalBalanceCard: React.FC<TotalBalanceCardProps> = ({ totalBalance
     <>
       <section
         onClick={() => setIsModalOpen(true)}
-        className="panel-elevated relative mb-2 cursor-pointer overflow-hidden rounded-3xl p-6 transition hover:-translate-y-0.5 sm:p-8"
+        className="panel-elevated relative mb-2 cursor-pointer overflow-hidden rounded-3xl p-4 transition hover:-translate-y-0.5 sm:p-8"
       >
         <div className="pointer-events-none absolute -right-12 -top-14 h-44 w-44 rounded-full bg-[var(--accent-primary)]/25 blur-3xl" />
         <div className="pointer-events-none absolute -bottom-16 -left-14 h-44 w-44 rounded-full bg-cyan-500/15 blur-3xl" />
 
-        <div className="relative z-10 flex flex-col gap-6 md:flex-row md:items-end md:justify-between">
-          <div className="space-y-4">
+        <div className="relative z-10 flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
+          <div className="space-y-3 sm:space-y-4">
             <div className="inline-flex items-center gap-2 rounded-full border border-[var(--border-soft)] bg-black/25 px-3 py-1">
               <Wallet className="h-4 w-4 text-[var(--text-secondary)]" />
               <span className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--text-muted)]">Total Balance</span>
             </div>
 
-            <h2 className="font-display text-3xl text-[var(--text-primary)] sm:text-4xl md:text-5xl">
+            <h2 className="font-display text-2xl text-[var(--text-primary)] sm:text-4xl md:text-5xl">
               {hideValues ? 'RM *******' : <CountUp end={totalBalance} prefix="RM " />}
             </h2>
 
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2 sm:gap-3">
               <div className="flex -space-x-2">
                 {activeAccounts.slice(0, 4).map((account) => (
                   <div
                     key={account.name}
-                    className="flex h-8 w-8 items-center justify-center overflow-hidden rounded-full border-2 border-[var(--bg-elevated)] bg-black/30 text-[10px] font-bold text-[var(--text-secondary)]"
+                    className="flex h-7 w-7 items-center justify-center overflow-hidden rounded-full border-2 border-[var(--bg-elevated)] bg-black/30 text-[10px] font-bold text-[var(--text-secondary)] sm:h-8 sm:w-8"
                     title={account.name}
                   >
                     {account.name.charAt(0)}
                   </div>
                 ))}
                 {activeAccounts.length > 4 ? (
-                  <div className="flex h-8 w-8 items-center justify-center rounded-full border-2 border-[var(--bg-elevated)] bg-black/30 text-[10px] font-bold text-[var(--text-secondary)]">
+                  <div className="flex h-7 w-7 items-center justify-center rounded-full border-2 border-[var(--bg-elevated)] bg-black/30 text-[10px] font-bold text-[var(--text-secondary)] sm:h-8 sm:w-8">
                     +{activeAccounts.length - 4}
                   </div>
                 ) : null}
               </div>
-              <span className="text-sm text-[var(--text-secondary)]">{activeAccounts.length} active accounts</span>
+              <span className="text-xs text-[var(--text-secondary)] sm:text-sm">{activeAccounts.length} active accounts</span>
             </div>
           </div>
 
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-3">
             <button
               type="button"
               onClick={(event) => {
                 event.stopPropagation();
                 onTogglePrivacy();
               }}
-              className="focus-ring rounded-xl border border-[var(--border-soft)] bg-black/20 p-3 text-[var(--text-secondary)] transition hover:text-[var(--text-primary)]"
+              className="focus-ring rounded-xl border border-[var(--border-soft)] bg-black/20 p-2.5 text-[var(--text-secondary)] transition hover:text-[var(--text-primary)] sm:p-3"
             >
               {hideValues ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
             </button>
