@@ -98,8 +98,8 @@ export const TotalBalanceCard: React.FC<TotalBalanceCardProps> = ({ totalBalance
       </section>
 
       {isModalOpen ? (
-        <div className="fixed inset-0 z-[110] flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm" onClick={() => setIsModalOpen(false)}>
-          <div className="panel-elevated w-full max-w-lg overflow-hidden rounded-3xl" onClick={(event) => event.stopPropagation()}>
+        <div className="fixed inset-0 z-[110] overflow-y-auto bg-black/70 px-4 pb-6 pt-4 backdrop-blur-sm sm:flex sm:items-center sm:justify-center sm:p-4" onClick={() => setIsModalOpen(false)}>
+          <div className="panel-elevated mx-auto w-full max-w-lg overflow-hidden rounded-3xl" onClick={(event) => event.stopPropagation()}>
             <div className="flex items-center justify-between border-b border-[var(--border-soft)] px-6 py-5">
               <h3 className="font-display text-2xl text-[var(--text-primary)]">Wallet Snapshot</h3>
               <button

@@ -168,8 +168,11 @@ export default function Home() {
     return items;
   }, [data]);
 
-  const fetchData = useCallback(async () => {
-    setLoading(true);
+  const fetchData = useCallback(async (options?: { silent?: boolean }) => {
+    const silent = options?.silent ?? false;
+    if (!silent) {
+      setLoading(true);
+    }
     setError(null);
 
     try {
@@ -199,7 +202,9 @@ export default function Home() {
       setCashFlowData(fallbackCashFlow);
       setMoneyData(fallbackMoneyData);
     } finally {
-      setLoading(false);
+      if (!silent) {
+        setLoading(false);
+      }
     }
   }, []);
 
@@ -241,7 +246,9 @@ export default function Home() {
     if (isLocked) return;
 
     fetchData();
-    const interval = setInterval(fetchData, 60_000);
+    const interval = setInterval(() => {
+      fetchData({ silent: true });
+    }, 60_000);
     return () => clearInterval(interval);
   }, [fetchData, isLocked]);
 

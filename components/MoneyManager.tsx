@@ -608,8 +608,8 @@ export const MoneyManager: React.FC<MoneyManagerProps> = ({ data, loading, onRef
       ) : null}
 
       {selectedCategory ? (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/80 p-4 backdrop-blur-md animate-in fade-in duration-300">
-          <div className="flex max-h-[85vh] w-full max-w-2xl flex-col overflow-hidden rounded-3xl border border-slate-800 bg-slate-900 shadow-2xl animate-in zoom-in-95 duration-200">
+        <div className="fixed inset-0 z-[60] overflow-y-auto bg-black/80 px-4 pb-6 pt-4 backdrop-blur-md animate-in fade-in duration-300 sm:flex sm:items-center sm:justify-center sm:p-4">
+          <div className="mx-auto flex w-full max-w-2xl flex-col overflow-hidden rounded-3xl border border-slate-800 bg-slate-900 shadow-2xl animate-in zoom-in-95 duration-200 sm:max-h-[85vh]">
             <div className="flex items-start justify-between border-b border-slate-800 bg-slate-900/50 p-6">
               <div>
                 <div className="mb-1 flex items-center gap-3">
@@ -703,8 +703,8 @@ export const MoneyManager: React.FC<MoneyManagerProps> = ({ data, loading, onRef
       ) : null}
 
       {isHistoryModalOpen ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 backdrop-blur-md">
-          <div className="flex max-h-[85vh] w-full max-w-2xl flex-col overflow-hidden rounded-3xl border border-slate-800 bg-slate-900 shadow-2xl">
+        <div className="fixed inset-0 z-50 overflow-y-auto bg-black/80 px-4 pb-6 pt-4 backdrop-blur-md sm:flex sm:items-center sm:justify-center sm:p-4">
+          <div className="mx-auto flex w-full max-w-2xl flex-col overflow-hidden rounded-3xl border border-slate-800 bg-slate-900 shadow-2xl sm:max-h-[85vh]">
             <div className="flex items-center justify-between border-b border-slate-800 bg-slate-900 p-6">
               <div>
                 <h2 className="text-xl font-bold text-white">Full Transaction List</h2>
