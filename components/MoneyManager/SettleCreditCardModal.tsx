@@ -13,6 +13,7 @@ interface SettleCreditCardModalProps {
   statementAmount: number;
   outstandingAmount: number;
   cycleLabel?: string;
+  closeDateLabel?: string;
   onClose: () => void;
   onSuccess: () => void;
 }
@@ -25,6 +26,7 @@ export const SettleCreditCardModal: React.FC<SettleCreditCardModalProps> = ({
   statementAmount,
   outstandingAmount,
   cycleLabel,
+  closeDateLabel,
   onClose,
   onSuccess
 }) => {
@@ -117,7 +119,7 @@ export const SettleCreditCardModal: React.FC<SettleCreditCardModalProps> = ({
                 </button>
               ))}
             </div>
-            {settlementScope === 'statement' && cycleLabel ? <div className="mt-2 text-xs text-slate-500">Current statement cycle: {cycleLabel}</div> : null}
+            {settlementScope === 'statement' && closeDateLabel ? <div className="mt-2 text-xs text-slate-500">Charges billed on or before {closeDateLabel}</div> : null}
           </div>
 
           <div>
@@ -149,7 +151,7 @@ export const SettleCreditCardModal: React.FC<SettleCreditCardModalProps> = ({
           </div>
 
           <div className="rounded-2xl border border-amber-500/20 bg-amber-500/10 p-4 text-sm text-amber-100">
-            This will mark {settlementScope === 'statement' ? 'the current statement charges' : 'all unpaid charges'} on {cardAccount.name} as settled and record one payment transfer from the selected paying account for RM {selectedAmount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}. Your expense totals still come from the original card charges, so this payment record is not counted as a second expense.
+            This will mark {settlementScope === 'statement' ? `charges billed on or before ${closeDateLabel || 'the statement close date'}` : 'all unpaid charges'} on {cardAccount.name} as settled and record one payment transfer from the selected paying account for RM {selectedAmount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}. Your expense totals still come from the original card charges, so this payment record is not counted as a second expense.
           </div>
 
           <button

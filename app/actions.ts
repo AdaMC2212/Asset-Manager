@@ -4,7 +4,7 @@
 import { getSheetClient, SPREADSHEET_ID, SHEET_NAME, CASH_FLOW_SHEET_NAME, PORTFOLIO_SHEET_NAME, MM_ACCOUNTS_SHEET, MM_TRANSACTIONS_SHEET, MM_CATEGORIES_SHEET, MM_AUTODEBITS_SHEET } from '../lib/googleSheets';
 import { PortfolioSummary, Holding, CashFlowSummary, Deposit, Conversion, MoneyManagerData, MoneyAccount, MoneyTransaction, Bill, RecurringDebitRule, CreditCardSettlementScope } from '../types';
 import yahooFinance from 'yahoo-finance2';
-import { DEFAULT_CREDIT_CARD_BILLING_DAY, getActiveBillingCycle, getBillingDayOfMonth, isTransactionInActiveStatement } from '../lib/creditCard';
+import { DEFAULT_CREDIT_CARD_BILLING_DAY, getBillingDayOfMonth, getStatementCycle } from '../lib/creditCard';
 
 // --- MOCK DATA FOR DEMO MODE ---
 const MOCK_PRICES: Record<string, number> = {
@@ -1021,7 +1021,7 @@ export async function settleCreditCardBill(
     const rows = txResponse.data.values || [];
     const updates: Array<{ rowIndex: number; amount: number; values: any[] }> = [];
     let settlementTotal = 0;
-    const activeCycle = getActiveBillingCycle(cardAccount.billingDayOfMonth);
+    const cycle = getStatementCycle(cardAccount.billingDayOfMonth);
 
     for (let i = 1; i < rows.length; i++) {
       const row = rows[i];
@@ -1035,7 +1035,7 @@ export async function settleCreditCardBill(
 
       const isEligibleStatementCharge =
         settlementScope === 'outstanding' ||
-        isTransactionInActiveStatement({ date: formatDateDisplay(parseDate(row[0])) }, cardAccount, activeCycle.startDate);
+        parseDate(row[0]).getTime() <= cycle.closeDate.getTime();
 
       if (type === 'Expense' && fromAccount === cardAccountName && isCardCharge && settlementStatus !== 'Settled' && isEligibleStatementCharge) {
         const nextRow = [...row];
@@ -1075,7 +1075,7 @@ export async function settleCreditCardBill(
           settlementTotal,
           payingAccountName,
           cardAccountName,
-          `Recorded ${settlementScope === 'statement' ? 'statement' : 'outstanding'} payment for ${cardAccountName}`,
+          `Recorded ${settlementScope === 'statement' ? `statement (closed ${cycle.close}) ` : 'outstanding '}payment for ${cardAccountName}`,
           '',
           '',
           '',

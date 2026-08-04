@@ -124,7 +124,7 @@ const CreditCardBalanceTile = ({
                 <div className="break-words text-base font-bold leading-tight text-white sm:text-xl md:text-2xl xl:text-[1.75rem]">
                   {hideValues ? '****' : <CountUp end={scopeValue} prefix="RM " />}
                 </div>
-                <div className="mt-1 text-[11px] uppercase tracking-[0.18em] text-cyan-300/70">{isStatement ? 'Current cycle due' : 'All unpaid charges'}</div>
+                <div className="mt-1 text-[11px] uppercase tracking-[0.18em] text-cyan-300/70">{isStatement ? 'Billed & unpaid' : 'All unpaid charges'}</div>
               </div>
             );
           })}
