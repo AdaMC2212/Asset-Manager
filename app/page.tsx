@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { AlertCircle, ArrowRight, Lock, ShieldCheck } from 'lucide-react';
 import { AddTradeModal } from '../components/AddTradeModal';
@@ -10,37 +10,7 @@ import { DecryptedText } from '../components/ui/DecryptedText';
 import { getCashFlowData, getMoneyManagerData, getPortfolioData, checkDatabaseStatus } from './actions';
 import { CashFlowSummary, MoneyManagerData, PortfolioSummary } from '../types';
 import { AppModule, CommandSearchItem, InvestmentTab, QuickActionType } from '../types/ui';
-
-const fallbackPortfolio: PortfolioSummary = {
-  netWorth: 0,
-  totalCost: 0,
-  totalPL: 0,
-  totalPLPercent: 0,
-  cashBalance: 0,
-  holdings: [],
-};
-
-const fallbackCashFlow: CashFlowSummary = {
-  totalDepositedMYR: 0,
-  totalConvertedMYR: 0,
-  totalConvertedUSD: 0,
-  avgRate: 0,
-  deposits: [],
-  conversions: [],
-};
-
-const fallbackMoneyData: MoneyManagerData = {
-  accounts: [],
-  transactions: [],
-  totalBalance: 0,
-  monthlyStats: { income: 0, expense: 0, incomeGrowth: 0, expenseGrowth: 0 },
-  categorySpending: [],
-  graphData: [],
-  upcomingBills: [],
-  categories: [],
-  incomeCategories: [],
-  expenseCategories: [],
-};
+import { WorkspaceModeProvider } from '../components/WorkspaceMode';
 
 const LockScreen = ({ onUnlock }: { onUnlock: () => void }) => {
   const [pin, setPin] = useState('');
@@ -83,8 +53,8 @@ const LockScreen = ({ onUnlock }: { onUnlock: () => void }) => {
               <div className="relative">
                 <input
                   type="password"
-                  inputMode="numeric"
-                  pattern="[0-9]*"
+                  inputMode={/^\d+$/.test(process.env.NEXT_PUBLIC_APP_PASSWORD || 'admin') ? 'numeric' : 'text'}
+                  autoComplete="current-password"
                   value={pin}
                   onChange={(event) => {
                     setPin(event.target.value);
@@ -138,6 +108,9 @@ export default function Home() {
   const [isAddTradeOpen, setIsAddTradeOpen] = useState(false);
   const [isCommandOpen, setIsCommandOpen] = useState(false);
   const [dbStatus, setDbStatus] = useState<{ configured: boolean; initialized: boolean; isDemo?: boolean } | null>(null);
+  const fetchInFlight = useRef(false);
+  const hasLoaded = useRef(false);
+  const readOnly = dbStatus?.isDemo !== false;
 
   const [activeModule, setActiveModule] = useState<AppModule>('manager');
   const [activeInvTab, setActiveInvTab] = useState<InvestmentTab>('dashboard');
@@ -165,46 +138,46 @@ export default function Home() {
       });
     }
 
-    return items;
-  }, [data]);
+    return readOnly ? items.filter((item) => item.action !== 'add_trade' && item.action !== 'add_transaction') : items;
+  }, [data, readOnly]);
 
   const fetchData = useCallback(async (options?: { silent?: boolean }) => {
+    if (fetchInFlight.current) return;
+    fetchInFlight.current = true;
     const silent = options?.silent ?? false;
-    if (!silent) {
+    if (!silent && !hasLoaded.current) {
       setLoading(true);
     }
-    setError(null);
 
     try {
       const status = await checkDatabaseStatus();
       setDbStatus(status);
 
-      if (!status.configured) {
-        setError('Database connection is missing. Configure GOOGLE_SERVICE_ACCOUNT_KEY before loading data.');
-        setData(fallbackPortfolio);
-        setCashFlowData(fallbackCashFlow);
-        setMoneyData(fallbackMoneyData);
-        return;
+      if (!status.configured || !status.initialized || status.error) {
+        throw new Error('Database is unavailable.');
       }
 
-      const [portfolioResult, cashFlowResult, moneyResult] = await Promise.all([
-        getPortfolioData().catch(() => null),
-        getCashFlowData().catch(() => null),
-        getMoneyManagerData().catch(() => null),
+      const [portfolioResult, cashFlowResult, moneyResult] = await Promise.allSettled([
+        getPortfolioData(),
+        getCashFlowData(),
+        getMoneyManagerData(),
       ]);
 
-      setData(portfolioResult || fallbackPortfolio);
-      setCashFlowData(cashFlowResult || fallbackCashFlow);
-      setMoneyData(moneyResult || fallbackMoneyData);
+      if (portfolioResult.status === 'fulfilled') setData(portfolioResult.value);
+      if (cashFlowResult.status === 'fulfilled') setCashFlowData(cashFlowResult.value);
+      if (moneyResult.status === 'fulfilled') setMoneyData(moneyResult.value);
+      const failed = [
+        portfolioResult.status === 'rejected' ? 'investments' : '',
+        cashFlowResult.status === 'rejected' ? 'cash flow' : '',
+        moneyResult.status === 'rejected' ? 'money accounts' : '',
+      ].filter(Boolean);
+      setError(failed.length ? `Sync failed for ${failed.join(', ')}. Last available data is shown; refresh to retry.` : null);
+      hasLoaded.current = true;
     } catch (err) {
-      setError('Failed to initialize the workspace.');
-      setData(fallbackPortfolio);
-      setCashFlowData(fallbackCashFlow);
-      setMoneyData(fallbackMoneyData);
+      setError('Sync failed. Last available data is shown; check the connection and refresh to retry.');
     } finally {
-      if (!silent) {
-        setLoading(false);
-      }
+      fetchInFlight.current = false;
+      setLoading(false);
     }
   }, []);
 
@@ -213,12 +186,14 @@ export default function Home() {
       if (!action) return;
 
       if (action === 'add_trade') {
+        if (readOnly) return;
         setActiveModule('investment');
         setIsAddTradeOpen(true);
         return;
       }
 
       if (action === 'add_transaction') {
+        if (readOnly) return;
         setActiveModule('manager');
         return;
       }
@@ -227,7 +202,7 @@ export default function Home() {
         fetchData();
       }
     },
-    [fetchData],
+    [fetchData, readOnly],
   );
 
   useEffect(() => {
@@ -257,7 +232,7 @@ export default function Home() {
   }
 
   return (
-    <>
+    <WorkspaceModeProvider value={readOnly}>
       <AppWorkspace
         isDemo={dbStatus?.isDemo}
         data={data}
@@ -274,7 +249,7 @@ export default function Home() {
         onToggleHideBalance={() => setHideBalance((prev) => !prev)}
         onToggleHideInvestments={() => setHideInvestments((prev) => !prev)}
         onOpenSearch={() => setIsCommandOpen(true)}
-        onOpenAddTrade={() => setIsAddTradeOpen(true)}
+        onOpenAddTrade={() => { if (!readOnly) setIsAddTradeOpen(true); }}
         onRefresh={fetchData}
       />
 
@@ -288,7 +263,7 @@ export default function Home() {
         onRunAction={handleAction}
         searchItems={searchItems}
       />
-    </>
+    </WorkspaceModeProvider>
   );
 }
  

@@ -3,6 +3,8 @@
 import React from 'react';
 import { Calendar, Filter, Pencil, Trash2, XCircle } from 'lucide-react';
 import { MoneyAccount, MoneyTransaction } from '../../types';
+import { useReadOnly } from '../WorkspaceMode';
+import { isSettlementLocked } from '../../lib/money';
 
 export interface MoneyFilters {
   type: string;
@@ -50,6 +52,7 @@ export const MoneyActivityList: React.FC<MoneyActivityListProps> = ({
   getCategoryStyles,
   getTransactionDisplay,
 }) => {
+  const readOnly = useReadOnly();
   return (
     <div className="rounded-3xl border border-white/5 bg-slate-900/40 p-3 shadow-xl backdrop-blur-md md:p-6">
       <div className="mb-3 flex items-center justify-between px-1 md:mb-6">
@@ -185,10 +188,10 @@ export const MoneyActivityList: React.FC<MoneyActivityListProps> = ({
                 </div>
 
                 <div className="hidden translate-x-2 gap-1 opacity-0 transition-opacity group-hover:translate-x-0 group-hover:opacity-100 md:flex">
-                  <button onClick={() => onEdit(tx)} className="rounded-lg p-2 text-slate-400 hover:bg-slate-800 hover:text-indigo-400">
+                  <button disabled={readOnly || isSettlementLocked(tx)} title={readOnly ? 'Demo is read-only' : isSettlementLocked(tx) ? 'Settlement record is protected' : 'Edit transaction'} onClick={() => onEdit(tx)} className="rounded-lg p-2 text-slate-400 hover:bg-slate-800 hover:text-indigo-400">
                     <Pencil className="h-4 w-4" />
                   </button>
-                  <button onClick={() => onDelete(tx)} className="rounded-lg p-2 text-slate-400 hover:bg-slate-800 hover:text-rose-400">
+                  <button disabled={readOnly || isSettlementLocked(tx)} title={readOnly ? 'Demo is read-only' : isSettlementLocked(tx) ? 'Settlement record is protected' : 'Delete transaction'} onClick={() => onDelete(tx)} className="rounded-lg p-2 text-slate-400 hover:bg-slate-800 hover:text-rose-400">
                     <Trash2 className="h-4 w-4" />
                   </button>
                 </div>

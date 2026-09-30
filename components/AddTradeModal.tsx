@@ -4,6 +4,9 @@ import React, { useEffect, useState } from 'react';
 import { Loader2, X } from 'lucide-react';
 import { Transaction, TradeAction } from '../types';
 import { addTrade } from '../app/actions';
+import { localISODate } from '../lib/dates';
+import { useReadOnly } from './WorkspaceMode';
+import { useFormSession } from './useFormSession';
 
 interface AddTradeModalProps {
   isOpen: boolean;
@@ -87,13 +90,18 @@ const SECTOR_LOOKUP: Record<string, string> = {
 };
 
 export const AddTradeModal: React.FC<AddTradeModalProps> = ({ isOpen, onClose, onSuccess }) => {
+  const readOnly = useReadOnly();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [formData, setFormData] = useState<Partial<Transaction>>({
-    date: new Date().toISOString().split('T')[0],
+    date: localISODate(),
     action: TradeAction.BUY,
     assetClass: 'Equity',
     sector: 'Technology',
     ticker: '',
+  });
+
+  useFormSession(isOpen, 'new', () => {
+    setFormData({ date: localISODate(), action: TradeAction.BUY, assetClass: 'Equity', sector: 'Technology', ticker: '', fees: 0 });
   });
 
   useEffect(() => {
@@ -123,6 +131,7 @@ export const AddTradeModal: React.FC<AddTradeModalProps> = ({ isOpen, onClose, o
 
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
+    if (readOnly || isSubmitting) return;
     if (!formData.ticker || !formData.quantity || !formData.price) return;
 
     setIsSubmitting(true);
@@ -136,7 +145,7 @@ export const AddTradeModal: React.FC<AddTradeModalProps> = ({ isOpen, onClose, o
         fees: Number(formData.fees || 0),
         assetClass: formData.assetClass,
         sector: formData.sector,
-      });
+      }, readOnly);
 
       if (!result.success) {
         alert(`Failed to add trade: ${result.error}`);
@@ -146,7 +155,7 @@ export const AddTradeModal: React.FC<AddTradeModalProps> = ({ isOpen, onClose, o
       onSuccess();
       onClose();
       setFormData({
-        date: new Date().toISOString().split('T')[0],
+        date: localISODate(),
         action: TradeAction.BUY,
         assetClass: 'Equity',
         sector: 'Technology',
@@ -160,7 +169,7 @@ export const AddTradeModal: React.FC<AddTradeModalProps> = ({ isOpen, onClose, o
     }
   };
 
-  if (!isOpen) return null;
+  if (!isOpen || readOnly) return null;
 
   return (
     <div className="fixed inset-0 z-[110] flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm" onClick={onClose}>

@@ -2,6 +2,7 @@
 
 import React from 'react';
 import { ChevronLeft, ChevronRight, Plus } from 'lucide-react';
+import { useReadOnly } from '../WorkspaceMode';
 
 interface MoneyHeaderProps {
   monthLabel: string;
@@ -18,6 +19,7 @@ export const MoneyHeader: React.FC<MoneyHeaderProps> = ({
   onNextMonth,
   onAddNew,
 }) => {
+  const readOnly = useReadOnly();
   const [monthName, year] = monthLabel.split(' ');
 
   return (
@@ -41,6 +43,8 @@ export const MoneyHeader: React.FC<MoneyHeaderProps> = ({
 
       <button
         onClick={onAddNew}
+        disabled={readOnly}
+        title={readOnly ? 'Demo is read-only' : 'Add transaction'}
         className="flex items-center justify-center gap-1.5 rounded-2xl bg-indigo-600 px-3 py-2 text-sm font-bold text-white shadow-xl shadow-indigo-500/20 transition-all hover:scale-105 hover:bg-indigo-500 active:scale-95 md:gap-2 md:px-6 md:py-3"
       >
         <Plus className="h-5 w-5" />

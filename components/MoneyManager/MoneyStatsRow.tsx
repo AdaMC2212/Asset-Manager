@@ -78,15 +78,7 @@ const CreditCardBalanceTile = ({
   const ctaText = activeView === 'statement' ? 'View statement' : 'View cards';
 
   return (
-    <button
-      type="button"
-      onClick={() => {
-        if (didSwipe.current) {
-          didSwipe.current = false;
-          return;
-        }
-        onClick?.();
-      }}
+    <div
       onTouchStart={(event) => {
         touchStartX.current = event.changedTouches[0]?.clientX ?? null;
       }}
@@ -104,10 +96,22 @@ const CreditCardBalanceTile = ({
       }}
       className="group relative overflow-hidden rounded-2xl border border-white/5 bg-slate-900/50 p-2.5 text-left shadow-lg transition hover:border-cyan-400/30 hover:bg-slate-900/70 focus:outline-none focus:ring-2 focus:ring-cyan-400/40 md:rounded-3xl md:p-5"
     >
-      <div className="absolute right-0 top-0 hidden p-8 opacity-5 transition duration-500 group-hover:scale-110 group-hover:opacity-10 md:block">
+      <button
+        type="button"
+        aria-label={ctaText}
+        className="absolute inset-0 rounded-[inherit] focus:outline-none focus:ring-2 focus:ring-inset focus:ring-cyan-400/40"
+        onClick={() => {
+          if (didSwipe.current) {
+            didSwipe.current = false;
+            return;
+          }
+          onClick?.();
+        }}
+      />
+      <div className="pointer-events-none absolute right-0 top-0 hidden p-8 opacity-5 transition duration-500 group-hover:scale-110 group-hover:opacity-10 md:block">
         <CreditCard className="h-24 w-24 text-cyan-500" />
       </div>
-      <div className="relative z-10 overflow-hidden">
+      <div className="pointer-events-none relative z-10 overflow-hidden">
         <div
           className="flex w-full transition-transform duration-300 ease-out"
           style={{ transform: `translateX(${activeView === 'outstanding' ? '0%' : '-100%'})` }}
@@ -131,9 +135,9 @@ const CreditCardBalanceTile = ({
         </div>
       </div>
 
-      <div className="relative z-10 mt-2.5 flex items-center justify-between gap-3 md:mt-3">
+      <div className="pointer-events-none relative z-10 mt-2.5 flex items-center justify-between gap-3 md:mt-3">
         <div className="text-[11px] font-medium uppercase tracking-[0.18em] text-cyan-300/70">{ctaText}</div>
-        <div className="flex items-center gap-2" onClick={(event) => event.stopPropagation()}>
+        <div className="pointer-events-auto flex items-center gap-2" onClick={(event) => event.stopPropagation()}>
           <div className="hidden rounded-full border border-white/10 bg-slate-950/70 p-1 md:flex">
             {(['outstanding', 'statement'] as CreditCardSettlementScope[]).map((scope) => (
               <button
@@ -161,8 +165,8 @@ const CreditCardBalanceTile = ({
           </div>
         </div>
       </div>
-      <div className="relative z-10 mt-1 text-[10px] uppercase tracking-[0.16em] text-slate-500 md:hidden">{helperText}</div>
-    </button>
+      <div className="pointer-events-none relative z-10 mt-1 text-[10px] uppercase tracking-[0.16em] text-slate-500 md:hidden">{helperText}</div>
+    </div>
   );
 };
 

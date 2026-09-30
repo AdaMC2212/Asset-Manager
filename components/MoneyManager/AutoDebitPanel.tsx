@@ -4,6 +4,8 @@ import React from 'react';
 import { Pause, Pencil, Play, Plus, Repeat, Trash2 } from 'lucide-react';
 import { deleteAutoDebitRule, toggleAutoDebitRule } from '../../app/actions';
 import { RecurringDebitRule } from '../../types';
+import { localISODate } from '../../lib/dates';
+import { useReadOnly } from '../WorkspaceMode';
 
 interface AutoDebitPanelProps {
   rules: RecurringDebitRule[];
@@ -17,15 +19,22 @@ const displayValue = (value: number, hideValues?: boolean) =>
   hideValues ? 'RM ****' : `RM ${value.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
 const getNextDueDate = (rule: RecurringDebitRule) => {
+  if (!rule.isActive) return '';
   const today = new Date();
-  const startDate = new Date(rule.startDate);
+  const startDate = new Date(`${[rule.startDate, rule.scheduleEffectiveFrom || ''].sort().pop()}T12:00:00`);
   const cursor = new Date(today.getFullYear(), today.getMonth(), 1, 12, 0, 0);
 
   for (let i = 0; i < 24; i++) {
     const lastDay = new Date(cursor.getFullYear(), cursor.getMonth() + 1, 0).getDate();
     const dueDate = new Date(cursor.getFullYear(), cursor.getMonth(), Math.min(rule.dayOfMonth, lastDay), 12, 0, 0);
-    if (dueDate >= startDate && dueDate >= new Date(today.getFullYear(), today.getMonth(), today.getDate(), 0, 0, 0)) {
-      return dueDate.toISOString().split('T')[0];
+    const due = localISODate(dueDate);
+    if (rule.endDate && due > rule.endDate) return '';
+    if (rule.lastProcessedOccurrence && due.slice(0, 7) <= rule.lastProcessedOccurrence.slice(0, 7)) {
+      cursor.setMonth(cursor.getMonth() + 1);
+      continue;
+    }
+    if (dueDate >= startDate && due >= localISODate(today)) {
+      return due;
     }
     cursor.setMonth(cursor.getMonth() + 1);
   }
@@ -34,11 +43,12 @@ const getNextDueDate = (rule: RecurringDebitRule) => {
 };
 
 export const AutoDebitPanel: React.FC<AutoDebitPanelProps> = ({ rules, hideValues, onAdd, onEdit, onRefresh }) => {
+  const readOnly = useReadOnly();
   const sortedRules = [...rules].sort((a, b) => Number(b.isActive) - Number(a.isActive) || a.name.localeCompare(b.name));
 
   const handleToggle = async (rule: RecurringDebitRule) => {
-    if (!rule.rowIndex) return;
-    const result = await toggleAutoDebitRule(rule.rowIndex, !rule.isActive);
+    if (readOnly || !rule.rowIndex) return;
+    const result = await toggleAutoDebitRule(rule.rowIndex, !rule.isActive, readOnly);
     if (!result.success) {
       alert(result.error || 'Failed to update auto-debit rule.');
       return;
@@ -47,10 +57,10 @@ export const AutoDebitPanel: React.FC<AutoDebitPanelProps> = ({ rules, hideValue
   };
 
   const handleDelete = async (rule: RecurringDebitRule) => {
-    if (!rule.rowIndex) return;
+    if (readOnly || !rule.rowIndex) return;
     if (!confirm(`Delete auto-debit rule "${rule.name}"?`)) return;
 
-    const result = await deleteAutoDebitRule(rule.rowIndex);
+    const result = await deleteAutoDebitRule(rule.rowIndex, readOnly);
     if (!result.success) {
       alert(result.error || 'Failed to delete auto-debit rule.');
       return;
@@ -71,7 +81,7 @@ export const AutoDebitPanel: React.FC<AutoDebitPanelProps> = ({ rules, hideValue
           </div>
         </div>
 
-        <button onClick={onAdd} className="inline-flex items-center gap-2 rounded-xl bg-cyan-600 px-3 py-2 text-xs font-bold text-white transition-colors hover:bg-cyan-500">
+        <button disabled={readOnly} title={readOnly ? 'Demo is read-only' : 'Add rule'} onClick={onAdd} className="inline-flex items-center gap-2 rounded-xl bg-cyan-600 px-3 py-2 text-xs font-bold text-white transition-colors hover:bg-cyan-500">
           <Plus className="h-4 w-4" />
           Add Rule
         </button>
@@ -104,13 +114,13 @@ export const AutoDebitPanel: React.FC<AutoDebitPanelProps> = ({ rules, hideValue
 
                 <div className="flex items-center gap-2">
                   <div className="mr-1 text-sm font-bold text-cyan-300">{displayValue(rule.amount, hideValues)}</div>
-                  <button onClick={() => onEdit(rule)} className="rounded-lg p-2 text-slate-400 hover:bg-slate-800 hover:text-indigo-400">
+                  <button disabled={readOnly} title={readOnly ? 'Demo is read-only' : 'Edit rule'} onClick={() => onEdit(rule)} className="rounded-lg p-2 text-slate-400 hover:bg-slate-800 hover:text-indigo-400">
                     <Pencil className="h-4 w-4" />
                   </button>
-                  <button onClick={() => handleToggle(rule)} className="rounded-lg p-2 text-slate-400 hover:bg-slate-800 hover:text-emerald-400">
+                  <button disabled={readOnly} title={readOnly ? 'Demo is read-only' : rule.isActive ? 'Pause rule' : 'Resume rule'} onClick={() => handleToggle(rule)} className="rounded-lg p-2 text-slate-400 hover:bg-slate-800 hover:text-emerald-400">
                     {rule.isActive ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
                   </button>
-                  <button onClick={() => handleDelete(rule)} className="rounded-lg p-2 text-slate-400 hover:bg-slate-800 hover:text-rose-400">
+                  <button disabled={readOnly} title={readOnly ? 'Demo is read-only' : 'Delete rule'} onClick={() => handleDelete(rule)} className="rounded-lg p-2 text-slate-400 hover:bg-slate-800 hover:text-rose-400">
                     <Trash2 className="h-4 w-4" />
                   </button>
                 </div>

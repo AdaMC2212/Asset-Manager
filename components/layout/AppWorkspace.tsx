@@ -169,12 +169,13 @@ export const AppWorkspace: React.FC<AppWorkspaceProps> = ({
           : onOpenAddTrade
       }
     >
-      <TotalBalanceCard
+      {moneyData ? <TotalBalanceCard
         totalBalance={moneyData?.totalBalance || 0}
         accounts={moneyData?.accounts || []}
         hideValues={hideBalance}
         onTogglePrivacy={onToggleHideBalance}
-      />
+        syncFailed={Boolean(error)}
+      /> : null}
 
       {error ? (
         <div className="panel flex items-center gap-3 border-rose-500/30 bg-rose-500/10 p-4 text-rose-200">
@@ -194,7 +195,7 @@ export const AppWorkspace: React.FC<AppWorkspaceProps> = ({
         </div>
       ) : (
         <>
-          {activeModule === 'manager' ? (
+          {activeModule === 'manager' && moneyData ? (
             <MoneyManager
               data={moneyData}
               loading={loading}

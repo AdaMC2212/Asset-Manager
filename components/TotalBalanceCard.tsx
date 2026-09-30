@@ -10,9 +10,10 @@ interface TotalBalanceCardProps {
   accounts: MoneyAccount[];
   hideValues: boolean;
   onTogglePrivacy: () => void;
+  syncFailed?: boolean;
 }
 
-export const TotalBalanceCard: React.FC<TotalBalanceCardProps> = ({ totalBalance, accounts, hideValues, onTogglePrivacy }) => {
+export const TotalBalanceCard: React.FC<TotalBalanceCardProps> = ({ totalBalance, accounts, hideValues, onTogglePrivacy, syncFailed = false }) => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const activeAccounts = accounts.filter((account) => account.currentBalance !== 0);
 
@@ -89,9 +90,9 @@ export const TotalBalanceCard: React.FC<TotalBalanceCardProps> = ({ totalBalance
             >
               {hideValues ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
             </button>
-            <div className="hidden items-center gap-2 rounded-xl border border-emerald-500/20 bg-emerald-500/10 px-3 py-2 text-sm text-emerald-300 md:inline-flex">
-              <span className="h-2 w-2 rounded-full bg-emerald-300" />
-              Synced
+            <div role="status" className={`inline-flex items-center gap-2 rounded-xl border px-3 py-2 text-sm ${syncFailed ? 'border-amber-500/20 bg-amber-500/10 text-amber-300' : 'border-emerald-500/20 bg-emerald-500/10 text-emerald-300'}`}>
+              <span className={`h-2 w-2 rounded-full ${syncFailed ? 'bg-amber-300' : 'bg-emerald-300'}`} />
+              {syncFailed ? 'Sync incomplete' : 'Synced'}
             </div>
           </div>
         </div>
@@ -120,7 +121,7 @@ export const TotalBalanceCard: React.FC<TotalBalanceCardProps> = ({ totalBalance
                 activeAccounts.map((account) => (
                   <div key={account.name} className="flex items-center justify-between rounded-2xl border border-[var(--border-soft)] bg-black/20 p-4">
                     <div className="flex items-center gap-3">
-                      <div className="rounded-xl bg-white/5 p-2">{account.logoUrl ? <img src={account.logoUrl} className="h-6 w-6 object-contain" /> : getAccountIcon(account.category)}</div>
+                      <div className="rounded-xl bg-white/5 p-2">{account.logoUrl ? <img src={account.logoUrl} alt="" className="h-6 w-6 object-contain" /> : getAccountIcon(account.category)}</div>
                       <div>
                         <p className="text-sm font-semibold text-[var(--text-primary)]">{account.name}</p>
                         <p className="text-xs uppercase tracking-[0.12em] text-[var(--text-muted)]">{account.category}</p>

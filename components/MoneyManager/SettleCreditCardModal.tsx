@@ -1,9 +1,12 @@
 'use client';
 
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Loader2, X } from 'lucide-react';
 import { CreditCardSettlementScope, MoneyAccount } from '../../types';
 import { settleCreditCardBill } from '../../app/actions';
+import { localISODate } from '../../lib/dates';
+import { useReadOnly } from '../WorkspaceMode';
+import { useFormSession } from '../useFormSession';
 
 interface SettleCreditCardModalProps {
   isOpen: boolean;
@@ -30,8 +33,10 @@ export const SettleCreditCardModal: React.FC<SettleCreditCardModalProps> = ({
   onClose,
   onSuccess
 }) => {
+  const readOnly = useReadOnly();
+  const operationId = useRef('');
   const [payingAccount, setPayingAccount] = useState('');
-  const [settledAt, setSettledAt] = useState(new Date().toISOString().split('T')[0]);
+  const [settledAt, setSettledAt] = useState(localISODate());
   const [settlementScope, setSettlementScope] = useState<CreditCardSettlementScope>(initialScope);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -40,12 +45,12 @@ export const SettleCreditCardModal: React.FC<SettleCreditCardModalProps> = ({
     [accounts]
   );
 
-  useEffect(() => {
-    if (!isOpen) return;
-    setSettledAt(new Date().toISOString().split('T')[0]);
-    setPayingAccount((prev) => prev || payingAccounts[0]?.name || '');
+  useFormSession(isOpen, cardAccount?.name || '', () => {
+    operationId.current = crypto.randomUUID();
+    setSettledAt(localISODate());
+    setPayingAccount(payingAccounts[0]?.name || '');
     setSettlementScope(initialScope);
-  }, [initialScope, isOpen, payingAccounts]);
+  });
 
   useEffect(() => {
     if (!isOpen) return;
@@ -57,17 +62,18 @@ export const SettleCreditCardModal: React.FC<SettleCreditCardModalProps> = ({
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [isOpen, onClose]);
 
-  if (!isOpen || !cardAccount) return null;
+  if (!isOpen || !cardAccount || readOnly) return null;
   const selectedAmount = settlementScope === 'statement' ? statementAmount : outstandingAmount;
   const isDisabled = isSubmitting || selectedAmount <= 0;
 
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
+    if (readOnly || isSubmitting) return;
     if (!payingAccount || !settledAt || selectedAmount <= 0) return;
 
     setIsSubmitting(true);
     try {
-      const result = await settleCreditCardBill(cardAccount.name, payingAccount, settledAt, settlementScope);
+      const result = await settleCreditCardBill(cardAccount.name, payingAccount, settledAt, settlementScope, readOnly, operationId.current);
       if (!result.success) {
         alert(result.error || 'Failed to settle credit card bill.');
         return;

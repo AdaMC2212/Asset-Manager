@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { AddTradeModal } from '../../components/AddTradeModal';
+import { WorkspaceModeProvider } from '../../components/WorkspaceMode';
 import { CommandPalette } from '../../components/CommandPalette';
 import { AppWorkspace } from '../../components/layout/AppWorkspace';
 import { getCashFlowData, getMoneyManagerData, getPortfolioData } from '../actions';
@@ -45,7 +45,6 @@ export default function DemoPage() {
   const [moneyData, setMoneyData] = useState<MoneyManagerData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [isAddTradeOpen, setIsAddTradeOpen] = useState(false);
   const [isCommandOpen, setIsCommandOpen] = useState(false);
 
   const [activeModule, setActiveModule] = useState<AppModule>('manager');
@@ -58,8 +57,6 @@ export default function DemoPage() {
       { id: 'module-manager', name: 'Money Manager', type: 'module', module: 'manager', keywords: ['wallet', 'expenses'] },
       { id: 'module-investment', name: 'Investments', type: 'module', module: 'investment', keywords: ['portfolio', 'holdings'] },
       { id: 'module-funding', name: 'Cash Flow', type: 'module', module: 'investment', keywords: ['funding', 'conversion'] },
-      { id: 'action-add-trade', name: 'Add Trade', type: 'action', action: 'add_trade', module: 'investment' },
-      { id: 'action-add-transaction', name: 'Add Transaction', type: 'action', action: 'add_transaction', module: 'manager' },
       { id: 'action-refresh', name: 'Refresh Data', type: 'action', action: 'refresh' },
     ];
 
@@ -105,17 +102,6 @@ export default function DemoPage() {
     (action?: QuickActionType) => {
       if (!action) return;
 
-      if (action === 'add_trade') {
-        setActiveModule('investment');
-        setIsAddTradeOpen(true);
-        return;
-      }
-
-      if (action === 'add_transaction') {
-        setActiveModule('manager');
-        return;
-      }
-
       if (action === 'refresh') {
         fetchData();
       }
@@ -140,7 +126,7 @@ export default function DemoPage() {
   }, [fetchData]);
 
   return (
-    <>
+    <WorkspaceModeProvider value={true}>
       <AppWorkspace
         isDemo
         data={data}
@@ -157,11 +143,9 @@ export default function DemoPage() {
         onToggleHideBalance={() => setHideBalance((prev) => !prev)}
         onToggleHideInvestments={() => setHideInvestments((prev) => !prev)}
         onOpenSearch={() => setIsCommandOpen(true)}
-        onOpenAddTrade={() => setIsAddTradeOpen(true)}
+        onOpenAddTrade={() => {}}
         onRefresh={fetchData}
       />
-
-      <AddTradeModal isOpen={isAddTradeOpen} onClose={() => setIsAddTradeOpen(false)} onSuccess={fetchData} />
 
       <CommandPalette
         isOpen={isCommandOpen}
@@ -171,6 +155,6 @@ export default function DemoPage() {
         onRunAction={handleAction}
         searchItems={searchItems}
       />
-    </>
+    </WorkspaceModeProvider>
   );
 }

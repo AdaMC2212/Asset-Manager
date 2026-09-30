@@ -4,6 +4,9 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { Loader2, Repeat, X } from 'lucide-react';
 import { addAutoDebitRule, updateAutoDebitRule } from '../../app/actions';
 import { MoneyAccount, RecurringDebitRule } from '../../types';
+import { localISODate } from '../../lib/dates';
+import { useReadOnly } from '../WorkspaceMode';
+import { useFormSession } from '../useFormSession';
 
 interface AutoDebitModalProps {
   isOpen: boolean;
@@ -22,6 +25,7 @@ export const AutoDebitModal: React.FC<AutoDebitModalProps> = ({
   expenseCategories,
   initialRule
 }) => {
+  const readOnly = useReadOnly();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [formData, setFormData] = useState<Partial<RecurringDebitRule>>({
     name: '',
@@ -29,7 +33,7 @@ export const AutoDebitModal: React.FC<AutoDebitModalProps> = ({
     category: '',
     fromAccount: '',
     dayOfMonth: new Date().getDate(),
-    startDate: new Date().toISOString().split('T')[0],
+    startDate: localISODate(),
     endDate: '',
     notes: '',
     isActive: true,
@@ -44,8 +48,7 @@ export const AutoDebitModal: React.FC<AutoDebitModalProps> = ({
     [accounts]
   );
 
-  useEffect(() => {
-    if (!isOpen) return;
+  useFormSession(isOpen, initialRule?.id || 'new', () => {
     if (initialRule) {
       setFormData(initialRule);
       return;
@@ -57,12 +60,12 @@ export const AutoDebitModal: React.FC<AutoDebitModalProps> = ({
       category: expenseCategories[0] || '',
       fromAccount: validAccounts[0]?.name || '',
       dayOfMonth: new Date().getDate(),
-      startDate: new Date().toISOString().split('T')[0],
+      startDate: localISODate(),
       endDate: '',
       notes: '',
       isActive: true,
     });
-  }, [expenseCategories, initialRule, isOpen, validAccounts]);
+  });
 
   useEffect(() => {
     if (!isOpen) return;
@@ -73,10 +76,11 @@ export const AutoDebitModal: React.FC<AutoDebitModalProps> = ({
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [isOpen, onClose]);
 
-  if (!isOpen) return null;
+  if (!isOpen || readOnly) return null;
 
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
+    if (readOnly || isSubmitting) return;
     if (!formData.name || !formData.amount || !formData.category || !formData.fromAccount || !formData.startDate || !formData.dayOfMonth) {
       return;
     }
@@ -103,8 +107,8 @@ export const AutoDebitModal: React.FC<AutoDebitModalProps> = ({
     setIsSubmitting(true);
     try {
       const result = initialRule?.rowIndex
-        ? await updateAutoDebitRule(initialRule.rowIndex, payload)
-        : await addAutoDebitRule(payload);
+        ? await updateAutoDebitRule(initialRule.rowIndex, payload, readOnly)
+        : await addAutoDebitRule(payload, readOnly);
 
       if (!result.success) {
         alert(result.error || 'Failed to save auto-debit rule.');

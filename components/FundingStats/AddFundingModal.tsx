@@ -3,6 +3,9 @@
 import React, { useEffect, useState } from 'react';
 import { X, Loader2 } from 'lucide-react';
 import { addDeposit, addConversion } from '../../app/actions';
+import { localISODate } from '../../lib/dates';
+import { useReadOnly } from '../WorkspaceMode';
+import { useFormSession } from '../useFormSession';
 
 interface AddFundingModalProps {
   isOpen: boolean;
@@ -13,22 +16,28 @@ interface AddFundingModalProps {
 type Tab = 'deposit' | 'conversion';
 
 export const AddFundingModal: React.FC<AddFundingModalProps> = ({ isOpen, onClose, onSuccess }) => {
+  const readOnly = useReadOnly();
   const [activeTab, setActiveTab] = useState<Tab>('deposit');
   const [isSubmitting, setIsSubmitting] = useState(false);
   
   // Deposit State
   const [depositData, setDepositData] = useState({
-    date: new Date().toISOString().split('T')[0],
+    date: localISODate(),
     amount: '',
     reason: ''
   });
 
   // Conversion State
   const [conversionData, setConversionData] = useState({
-    date: new Date().toISOString().split('T')[0],
+    date: localISODate(),
     myr: '',
     usd: '',
     rate: ''
+  });
+
+  useFormSession(isOpen, 'new', () => {
+    setDepositData({ date: localISODate(), amount: '', reason: '' });
+    setConversionData({ date: localISODate(), myr: '', usd: '', rate: '' });
   });
 
   // Auto-calc rate
@@ -46,6 +55,7 @@ export const AddFundingModal: React.FC<AddFundingModalProps> = ({ isOpen, onClos
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (readOnly || isSubmitting) return;
     setIsSubmitting(true);
 
     try {
@@ -55,20 +65,20 @@ export const AddFundingModal: React.FC<AddFundingModalProps> = ({ isOpen, onClos
                 date: depositData.date,
                 amount: parseFloat(depositData.amount),
                 reason: depositData.reason
-            });
+            }, readOnly);
         } else {
             result = await addConversion({
                 date: conversionData.date,
                 myr: parseFloat(conversionData.myr),
                 usd: parseFloat(conversionData.usd),
                 rate: parseFloat(conversionData.rate)
-            });
+            }, readOnly);
         }
 
         if (result.success) {
             // Reset forms
-            setDepositData({ date: new Date().toISOString().split('T')[0], amount: '', reason: '' });
-            setConversionData({ date: new Date().toISOString().split('T')[0], myr: '', usd: '', rate: '' });
+            setDepositData({ date: localISODate(), amount: '', reason: '' });
+            setConversionData({ date: localISODate(), myr: '', usd: '', rate: '' });
             onSuccess();
             onClose();
         } else {
@@ -90,7 +100,7 @@ export const AddFundingModal: React.FC<AddFundingModalProps> = ({ isOpen, onClos
     return () => window.removeEventListener('keydown', handleKey);
   }, [isOpen, onClose]);
 
-  if (!isOpen) return null;
+  if (!isOpen || readOnly) return null;
 
   return (
     <div className="fixed inset-0 z-[110] flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm" onClick={onClose}>

@@ -2,6 +2,7 @@ import React, { useMemo, useState } from 'react';
 import { Banknote, Landmark, Plus, TrendingUp } from 'lucide-react';
 import { CashFlowSummary, PortfolioSummary } from '../types';
 import { AddFundingModal } from './FundingStats/AddFundingModal';
+import { useReadOnly } from './WorkspaceMode';
 
 interface FundingStatsProps {
   cashFlow: CashFlowSummary | null;
@@ -14,6 +15,7 @@ const displayValue = (value: number, prefix: string, hide?: boolean) =>
   hide ? `${prefix} ****` : `${prefix}${value.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
 export const FundingStats: React.FC<FundingStatsProps> = ({ cashFlow, portfolio, hideValues, onRefresh }) => {
+  const readOnly = useReadOnly();
   const [isModalOpen, setIsModalOpen] = useState(false);
 
   const metrics = useMemo(() => {
@@ -46,6 +48,8 @@ export const FundingStats: React.FC<FundingStatsProps> = ({ cashFlow, portfolio,
         <button
           type="button"
           onClick={() => setIsModalOpen(true)}
+          disabled={readOnly}
+          title={readOnly ? 'Demo is read-only' : 'Add cash flow'}
           className="focus-ring inline-flex items-center rounded-xl bg-[var(--accent-primary)] px-4 py-2 text-sm font-semibold text-white shadow-[var(--shadow-soft)] transition hover:bg-[var(--accent-secondary)]"
         >
           <Plus className="mr-2 h-4 w-4" />

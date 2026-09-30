@@ -2,6 +2,7 @@
 
 import React from 'react';
 import { Eye, EyeOff, Menu, Plus, RefreshCw, Search } from 'lucide-react';
+import { useReadOnly } from '../WorkspaceMode';
 
 interface AppTopbarProps {
   title: string;
@@ -30,6 +31,7 @@ export const AppTopbar: React.FC<AppTopbarProps> = ({
   onTogglePrivacy,
   onPrimaryAction,
 }) => {
+  const readOnly = useReadOnly();
   return (
     <header className="sticky top-0 z-40 border-b border-[var(--border-soft)] bg-[var(--bg-base)]/80 backdrop-blur-xl">
       <div className="flex items-center justify-between gap-4 px-4 py-4 sm:px-6 lg:px-8">
@@ -85,6 +87,8 @@ export const AppTopbar: React.FC<AppTopbarProps> = ({
           <button
             type="button"
             onClick={onPrimaryAction}
+            disabled={readOnly}
+            title={readOnly ? 'Demo is read-only' : primaryActionLabel}
             className="focus-ring hidden items-center rounded-xl bg-[var(--accent-primary)] px-4 py-2 text-sm font-semibold text-white shadow-[var(--shadow-soft)] transition hover:bg-[var(--accent-secondary)] sm:inline-flex"
           >
             <Plus className="mr-2 h-4 w-4" />
@@ -96,6 +100,8 @@ export const AppTopbar: React.FC<AppTopbarProps> = ({
         <button
           type="button"
           onClick={onPrimaryAction}
+          disabled={readOnly}
+          title={readOnly ? 'Demo is read-only' : primaryActionLabel}
           className="focus-ring inline-flex w-full items-center justify-center rounded-xl bg-[var(--accent-primary)] px-4 py-2.5 text-sm font-semibold text-white shadow-[var(--shadow-soft)] transition hover:bg-[var(--accent-secondary)]"
         >
           <Plus className="mr-2 h-4 w-4" />

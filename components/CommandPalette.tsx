@@ -147,7 +147,7 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({
 
         <div className="max-h-[60vh] overflow-y-auto p-2">
           {filtered.length === 0 ? (
-            <div className="p-10 text-center text-sm text-[var(--text-muted)]">No command found for "{query}".</div>
+            <div className="p-10 text-center text-sm text-[var(--text-muted)]">No command found for &quot;{query}&quot;.</div>
           ) : (
             Array.from(groupedRows.entries()).map(([groupLabel, items]) => (
               <div key={groupLabel} className="mb-2">
