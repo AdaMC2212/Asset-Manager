@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { Manrope, Space_Grotesk } from "next/font/google";
 import Script from "next/script";
 import "./globals.css";
+import "./overview.css";
 
 const manrope = Manrope({
   subsets: ["latin"],
@@ -16,7 +17,7 @@ const spaceGrotesk = Space_Grotesk({
 });
 
 export const viewport: Viewport = {
-  themeColor: "#020617",
+  themeColor: "#141618",
   width: "device-width",
   initialScale: 1,
   maximumScale: 1,

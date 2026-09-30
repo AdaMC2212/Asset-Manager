@@ -1,17 +1,20 @@
 'use client';
 
-import React, { useCallback, useMemo, useRef } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { AlertCircle, Beaker, Landmark, LayoutDashboard } from 'lucide-react';
 import { AllocationChart } from '../AllocationChart';
 import { FundingStats } from '../FundingStats';
 import { HoldingsTable } from '../HoldingsTable';
 import { MoneyManager } from '../MoneyManager';
+import { Overview } from '../Overview';
+import { AddMoneyModal } from '../MoneyManager/AddMoneyModal';
+import { useReadOnly } from '../WorkspaceMode';
 import { SummaryCards } from '../SummaryCards';
 import { TotalBalanceCard } from '../TotalBalanceCard';
 import { CardSkeleton, TableSkeleton } from '../ui/Skeleton';
 import { CashFlowSummary, MoneyManagerData, PortfolioSummary } from '../../types';
-import { AppModule, AppShellViewState, InvestmentTab } from '../../types/ui';
+import { AppModule, AppShellViewState, InvestmentTab, MoneyViewRequest } from '../../types/ui';
 import { AppShell } from './AppShell';
 
 interface AppWorkspaceProps {
@@ -34,6 +37,7 @@ interface AppWorkspaceProps {
   onRefresh: () => void;
   addTransactionRequested?: boolean;
   onAddTransactionHandled?: () => void;
+  lastSyncedAt?: Date | null;
 }
 
 export const AppWorkspace: React.FC<AppWorkspaceProps> = ({
@@ -56,8 +60,24 @@ export const AppWorkspace: React.FC<AppWorkspaceProps> = ({
   onRefresh,
   addTransactionRequested = false,
   onAddTransactionHandled,
+  lastSyncedAt,
 }) => {
+  const readOnly = useReadOnly();
+  const [overviewAddOpen, setOverviewAddOpen] = useState(false);
+  const [moneyViewRequest, setMoneyViewRequest] = useState<MoneyViewRequest | null>(null);
+  const handleMoneyViewHandled = useCallback(() => setMoneyViewRequest(null), []);
   const addTransactionHandlerRef = useRef<(() => void) | null>(null);
+  const openMoney = (request?: MoneyViewRequest) => {
+    setMoneyViewRequest(request ?? null);
+    onSelectModule('manager');
+  };
+  const openOverviewAdd = () => {
+    if (!readOnly && moneyData) setOverviewAddOpen(true);
+  };
+  useEffect(() => {
+    if (activeModule !== 'overview') setOverviewAddOpen(false);
+    if (activeModule !== 'manager') setMoneyViewRequest(null);
+  }, [activeModule]);
 
   const registerAddHandler = useCallback((handler: (() => void) | null) => {
     addTransactionHandlerRef.current = handler;
@@ -69,6 +89,9 @@ export const AppWorkspace: React.FC<AppWorkspaceProps> = ({
   }, [addTransactionRequested, isDemo, onAddTransactionHandled]);
 
   const viewState = useMemo<AppShellViewState>(() => {
+    if (activeModule === 'overview') {
+      return { title: 'Overview', subtitle: '', breadcrumbs: ['Overview'] };
+    }
     if (activeModule === 'manager') {
       return {
         title: 'Money Manager',
@@ -92,8 +115,20 @@ export const AppWorkspace: React.FC<AppWorkspaceProps> = ({
     };
   }, [activeInvTab, activeModule]);
 
-  const activeHideValue = activeModule === 'manager' ? hideBalance : hideInvestments;
-  const primaryActionLabel = activeModule === 'manager' ? 'Add Transaction' : 'Add Trade';
+  const activeHideValue = activeModule === 'overview' ? hideBalance && hideInvestments : activeModule === 'manager' ? hideBalance : hideInvestments;
+  const primaryActionLabel = activeModule === 'investment' ? 'Add Trade' : 'Add transaction';
+  const togglePrivacy = () => {
+    if (activeModule === 'overview') {
+      // A partially hidden overview becomes fully hidden with one action.
+      const nextHidden = !activeHideValue;
+      if (hideBalance !== nextHidden) onToggleHideBalance();
+      if (hideInvestments !== nextHidden) onToggleHideInvestments();
+    } else if (activeModule === 'manager') onToggleHideBalance();
+    else onToggleHideInvestments();
+  };
+  const periodLabel = new Date().toLocaleDateString('en-GB', { month: 'long', year: 'numeric' });
+  const syncLabel = error ? 'Sync incomplete' : loading ? 'Syncing...' : isDemo ? 'Demo / Read-only' :
+    lastSyncedAt ? `Synced ${lastSyncedAt.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}` : 'Not synced';
 
   const headerSlot = (
     <div className="space-y-4">
@@ -166,19 +201,23 @@ export const AppWorkspace: React.FC<AppWorkspaceProps> = ({
       loading={loading}
       isDemo={isDemo}
       primaryActionLabel={primaryActionLabel}
-      headerSlot={headerSlot}
+      primaryActionDisabled={activeModule !== 'investment' && !moneyData}
+      periodLabel={periodLabel}
+      syncLabel={syncLabel}
+      syncFailed={Boolean(error)}
+      headerSlot={activeModule === 'overview' ? undefined : headerSlot}
       onSelectModule={onSelectModule}
       onSelectInvTab={onSelectInvTab}
       onOpenSearch={onOpenSearch}
       onRefresh={onRefresh}
-      onTogglePrivacy={activeModule === 'manager' ? onToggleHideBalance : onToggleHideInvestments}
+      onTogglePrivacy={togglePrivacy}
       onPrimaryAction={
-        activeModule === 'manager'
+        activeModule === 'overview' ? openOverviewAdd : activeModule === 'manager'
           ? () => addTransactionHandlerRef.current?.()
           : onOpenAddTrade
       }
     >
-      {moneyData ? <TotalBalanceCard
+      {activeModule !== 'overview' && moneyData ? <TotalBalanceCard
         totalBalance={moneyData?.totalBalance || 0}
         accounts={moneyData?.accounts || []}
         hideValues={hideBalance}
@@ -204,6 +243,20 @@ export const AppWorkspace: React.FC<AppWorkspaceProps> = ({
         </div>
       ) : (
         <>
+          {activeModule === 'overview' ? (
+            <Overview
+              money={moneyData}
+              portfolio={data}
+              cashFlow={cashFlowData}
+              hideBalance={hideBalance}
+              hideInvestments={hideInvestments}
+              onOpenMoney={openMoney}
+              onOpenInvestments={() => { onSelectInvTab('dashboard'); onSelectModule('investment'); }}
+              onOpenFunding={() => { onSelectInvTab('funding'); onSelectModule('investment'); }}
+              onAddTransaction={openOverviewAdd}
+            />
+          ) : null}
+
           {activeModule === 'manager' && moneyData ? (
             <MoneyManager
               data={moneyData}
@@ -211,6 +264,8 @@ export const AppWorkspace: React.FC<AppWorkspaceProps> = ({
               onRefresh={onRefresh}
               hideValues={hideBalance}
               registerAddHandler={registerAddHandler}
+              viewRequest={moneyViewRequest}
+              onViewRequestHandled={handleMoneyViewHandled}
             />
           ) : null}
 
@@ -257,6 +312,16 @@ export const AppWorkspace: React.FC<AppWorkspaceProps> = ({
           ) : null}
         </>
       )}
+      {activeModule === 'overview' && moneyData ? (
+        <AddMoneyModal
+          isOpen={overviewAddOpen}
+          onClose={() => setOverviewAddOpen(false)}
+          onSuccess={onRefresh}
+          accounts={moneyData.accounts}
+          incomeCategories={moneyData.incomeCategories || []}
+          expenseCategories={moneyData.expenseCategories || []}
+        />
+      ) : null}
     </AppShell>
   );
 };

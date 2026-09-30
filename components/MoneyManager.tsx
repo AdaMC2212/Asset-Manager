@@ -16,6 +16,7 @@ import { deactivateAutoDebitRuleById, deleteMoneyTransaction, updateCreditCardBi
 import { getBillingDayOfMonth, getStatementCycle } from '../lib/creditCard';
 import { getRecognitionDate, isRecognizedExpense, isSettlementLocked } from '../lib/money';
 import { useReadOnly } from './WorkspaceMode';
+import { MoneyViewRequest } from '../types/ui';
 
 interface MoneyManagerProps {
   data: MoneyManagerData | null;
@@ -23,6 +24,8 @@ interface MoneyManagerProps {
   onRefresh: () => void;
   hideValues?: boolean;
   registerAddHandler?: (handler: (() => void) | null) => void;
+  viewRequest?: MoneyViewRequest | null;
+  onViewRequestHandled?: () => void;
 }
 
 const PIE_COLORS = ['#f43f5e', '#ec4899', '#d946ef', '#a855f7', '#8b5cf6', '#6366f1', '#3b82f6', '#0ea5e9'];
@@ -70,7 +73,7 @@ interface CreditCardDetail {
   billingDayOfMonth: number;
 }
 
-export const MoneyManager: React.FC<MoneyManagerProps> = ({ data, loading, onRefresh, hideValues, registerAddHandler }) => {
+export const MoneyManager: React.FC<MoneyManagerProps> = ({ data, loading, onRefresh, hideValues, registerAddHandler, viewRequest, onViewRequestHandled }) => {
   const readOnly = useReadOnly();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isHistoryModalOpen, setIsHistoryModalOpen] = useState(false);
@@ -309,6 +312,26 @@ export const MoneyManager: React.FC<MoneyManagerProps> = ({ data, loading, onRef
     });
     return () => registerAddHandler(null);
   }, [readOnly, registerAddHandler]);
+
+  useEffect(() => {
+    if (!viewRequest || !data || loading) return;
+    if (viewRequest.kind === 'cards') {
+      setCreditCardTileView('statement');
+      setIsOutstandingModalOpen(true);
+    } else if (viewRequest.kind === 'transaction' && !readOnly && !isSettlementLocked(viewRequest.transaction)) {
+      setEditingTransaction(viewRequest.transaction);
+      setIsModalOpen(true);
+    } else {
+      const dates = data.transactions.map((transaction) => transaction.date).sort();
+      setFilters({
+        type: 'All', account: 'All',
+        startDate: viewRequest.kind === 'transaction' ? viewRequest.transaction.date : dates[0] || '',
+        endDate: viewRequest.kind === 'transaction' ? viewRequest.transaction.date : dates[dates.length - 1] || '',
+      });
+      setIsHistoryModalOpen(true);
+    }
+    onViewRequestHandled?.();
+  }, [viewRequest, data, loading, readOnly, onViewRequestHandled]);
 
   useEffect(() => {
     setBillingDayDrafts((previous) => {

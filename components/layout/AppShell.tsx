@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React from 'react';
 import { AppContent } from './AppContent';
 import { AppSidebar } from './AppSidebar';
 import { AppTopbar } from './AppTopbar';
@@ -14,6 +14,10 @@ interface AppShellProps {
   loading: boolean;
   isDemo?: boolean;
   primaryActionLabel: string;
+  primaryActionDisabled?: boolean;
+  periodLabel: string;
+  syncLabel: string;
+  syncFailed?: boolean;
   headerSlot?: React.ReactNode;
   children: React.ReactNode;
   onSelectModule: (module: AppModule) => void;
@@ -32,6 +36,10 @@ export const AppShell: React.FC<AppShellProps> = ({
   loading,
   isDemo,
   primaryActionLabel,
+  primaryActionDisabled,
+  periodLabel,
+  syncLabel,
+  syncFailed,
   headerSlot,
   children,
   onSelectModule,
@@ -41,38 +49,33 @@ export const AppShell: React.FC<AppShellProps> = ({
   onTogglePrivacy,
   onPrimaryAction,
 }) => {
-  const [mobileOpen, setMobileOpen] = useState(false);
-
   return (
-    <div className="ambient-bg relative min-h-screen text-[var(--text-primary)]">
-      <div className="relative z-10 flex min-h-screen">
+    <div className="app-workspace">
         <AppSidebar
           activeModule={activeModule}
           activeInvTab={activeInvTab}
           onSelectModule={onSelectModule}
           onSelectInvTab={onSelectInvTab}
-          isDemo={isDemo}
-          mobileOpen={mobileOpen}
-          onCloseMobile={() => setMobileOpen(false)}
         />
 
-        <div className="flex min-w-0 flex-1 flex-col">
+        <div className="workspace-main">
           <AppTopbar
             title={viewState.title}
-            subtitle={viewState.subtitle}
-            breadcrumbs={viewState.breadcrumbs}
             hideValues={hideValues}
             loading={loading}
             primaryActionLabel={primaryActionLabel}
-            onToggleSidebar={() => setMobileOpen(true)}
+            primaryActionDisabled={primaryActionDisabled}
+            periodLabel={periodLabel}
+            syncLabel={syncLabel}
+            syncFailed={syncFailed}
+            overview={activeModule === 'overview'}
             onOpenSearch={onOpenSearch}
             onRefresh={onRefresh}
             onTogglePrivacy={onTogglePrivacy}
             onPrimaryAction={onPrimaryAction}
           />
-          <AppContent headerSlot={headerSlot}>{children}</AppContent>
+          <AppContent headerSlot={headerSlot} overview={activeModule === 'overview'}>{children}</AppContent>
         </div>
-      </div>
     </div>
   );
 };

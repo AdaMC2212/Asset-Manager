@@ -37,6 +37,7 @@ const { AddMoneyModal } = require('../components/MoneyManager/AddMoneyModal.tsx'
 const { AllocationChart } = require('../components/AllocationChart.tsx');
 const { TotalBalanceCard } = require('../components/TotalBalanceCard.tsx');
 const { WorkspaceModeProvider } = require('../components/WorkspaceMode.tsx');
+const { Overview } = require('../components/Overview.tsx');
 
 afterEach(() => {
   if (rendered) act(() => rendered.unmount());
@@ -160,6 +161,60 @@ test('a single ordinary transfer exposes editing, deletion and full history', as
 
 test('normal Add and command Add share the mounted manager form', async () => {
   await mountHome();
+  await act(async () => workspace().props.onSelectModule('manager'));
   await act(async () => rendered.root.findByType(AppShell).props.onPrimaryAction());
   assert.equal(rendered.root.findByType(AddMoneyModal).props.isOpen, true);
+});
+
+test('Overview is the default and its Add action opens the existing transaction form', async () => {
+  await mountHome();
+  assert.equal(workspace().props.activeModule, 'overview');
+  await act(async () => rendered.root.findByType(Overview).props.onAddTransaction());
+  assert.equal(workspace().props.activeModule, 'overview');
+  assert.equal(rendered.root.findByType(AddMoneyModal).props.isOpen, true);
+});
+
+test('overview privacy hides both modules including a partially hidden state', async () => {
+  await mountHome();
+  await act(async () => workspace().props.onToggleHideInvestments());
+  await act(async () => rendered.root.findByType(AppShell).props.onTogglePrivacy());
+  assert.equal(workspace().props.hideBalance, true);
+  assert.equal(workspace().props.hideInvestments, true);
+  await act(async () => rendered.root.findByType(AppShell).props.onTogglePrivacy());
+  assert.equal(workspace().props.hideBalance, false);
+  assert.equal(workspace().props.hideInvestments, false);
+});
+
+test('overview card and activity links open existing details and protected edit flows', async () => {
+  await mountHome();
+  await act(async () => rendered.root.findByType(Overview).props.onOpenMoney({ kind: 'cards' }));
+  assert.ok(rendered.root.findByProps({ 'aria-label': 'Unpaid card balances' }));
+  await act(async () => workspace().props.onSelectModule('overview'));
+  await act(async () => rendered.root.findByType(Overview).props.onOpenMoney({ kind: 'transaction', transaction: money.transactions[0] }));
+  assert.equal(rendered.root.findByType(AddMoneyModal).props.initialData.id, 'transfer');
+  assert.equal(rendered.root.findByType(AddMoneyModal).props.isOpen, true);
+});
+
+test('overview history opens the full transaction list', async () => {
+  await mountHome();
+  await act(async () => rendered.root.findByType(Overview).props.onOpenMoney({ kind: 'history' }));
+  assert.ok(rendered.root.findByProps({ 'aria-label': 'Full Transaction List' }));
+  assert.equal(rendered.root.findByType(MoneyActivityList).props.filteredTransactions.length, money.transactions.length);
+});
+
+test('an Overview history request includes older months in the manager', async () => {
+  const older = { ...money.transactions[0], id: 'older', date: '2000-01-01' };
+  await act(async () => { rendered = create(h(MoneyManager, {
+    data: { ...money, transactions: [...money.transactions, older] }, loading: false, onRefresh: noop,
+    viewRequest: { kind: 'history' }, onViewRequestHandled: noop,
+  })); });
+  assert.equal(rendered.root.findByType(MoneyActivityList).props.filteredTransactions.length, 4);
+});
+
+test('leaving Overview closes its form rather than reopening it on return', async () => {
+  await mountHome();
+  await act(async () => rendered.root.findByType(Overview).props.onAddTransaction());
+  await act(async () => workspace().props.onSelectModule('investment'));
+  await act(async () => workspace().props.onSelectModule('overview'));
+  assert.equal(rendered.root.findByType(AddMoneyModal).props.isOpen, false);
 });

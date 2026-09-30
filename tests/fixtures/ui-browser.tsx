@@ -10,8 +10,10 @@ import { SettleCreditCardModal } from '../../components/MoneyManager/SettleCredi
 import { AddTradeModal } from '../../components/AddTradeModal';
 import { AddFundingModal } from '../../components/FundingStats/AddFundingModal';
 import { money } from './ui-data';
+import { OverviewBrowser } from './overview-browser';
 
 const kind = new URLSearchParams(location.search).get('form');
+const overview = new URLSearchParams(location.search).get('overview');
 const props = {
   isOpen: true, accounts: money.accounts, onClose: () => location.assign('/'),
   onSuccess: () => { throw new Error('Test forms must not submit.'); },
@@ -25,7 +27,7 @@ const forms: Record<string, React.ReactNode> = {
 };
 
 createRoot(document.getElementById('root')!).render(
-  kind ? (
+  overview ? <OverviewBrowser variant={overview} /> : kind ? (
     <WorkspaceModeProvider value={false}>
       <AppContent><div style={{ height: 1800 }}>Background content</div>{forms[kind]}</AppContent>
     </WorkspaceModeProvider>

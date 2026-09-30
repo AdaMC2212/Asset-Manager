@@ -7,6 +7,7 @@ const { build } = require('esbuild');
 const postcss = require('postcss');
 const tailwind = require('tailwindcss');
 const { chromium } = require('playwright');
+const { checkOverview } = require('./check-overview.cjs');
 
 const root = path.resolve(__dirname, '..');
 const fixtures = path.join(__dirname, 'fixtures');
@@ -67,24 +68,33 @@ async function main() {
     ...require('../tailwind.config.js'),
     content: [path.join(root, 'app/**/*.{ts,tsx}'), path.join(root, 'components/**/*.{ts,tsx}')],
   })]).process(await fs.readFile(path.join(root, 'app/globals.css'), 'utf8'), { from: undefined });
+  const overviewCss = await fs.readFile(path.join(root, 'app/overview.css'), 'utf8');
+  const fontFile = process.env.UI_FONT_FILE;
+  const fontData = fontFile ? await fs.readFile(fontFile) : null;
+  const fontCss = fontFile ? '@font-face {font-family: Manrope; src: url(/font.woff2) format("woff2"); font-weight: 200 800; font-style: normal;}' : '';
   server = http.createServer(async (request, response) => {
     const pathname = new URL(request.url, 'http://localhost').pathname;
     response.setHeader('Cache-Control', 'no-store');
-    if (pathname === '/test.js') {
+    if (pathname === '/font.woff2' && fontFile) {
+      response.setHeader('Content-Type', 'font/woff2');
+      response.end(fontData);
+    } else if (pathname === '/test.js') {
       response.setHeader('Content-Type', 'application/javascript');
       response.end(bundle.outputFiles[0].text);
     } else if (pathname === '/test.css') {
       response.setHeader('Content-Type', 'text/css');
-      response.end(css.css);
+      response.end(css.css + '\n' + overviewCss + '\n' + fontCss);
     } else {
       response.setHeader('Content-Type', 'text/html');
-      response.end('<!doctype html><html><head><meta name="viewport" content="width=device-width,initial-scale=1"><link rel="stylesheet" href="/test.css"></head><body class="font-body" style="--font-body:Arial;--font-display:Arial"><div id="root"></div><script src="/test.js"></script></body></html>');
+      response.end(`<!doctype html><html><head><meta name="viewport" content="width=device-width,initial-scale=1"><link rel="stylesheet" href="/test.css"></head><body class="font-body" style="--font-body:${fontFile ? 'Manrope' : 'Arial'};--font-display:Arial"><div id="root"></div><script src="/test.js"></script></body></html>`);
     }
   });
   await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
   const base = `http://127.0.0.1:${server.address().port}`;
   browser = await chromium.launch({ executablePath: process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH });
   const errors = [];
+  await checkOverview(browser, base, output);
+  if (process.env.UI_OVERVIEW_ONLY) return;
 
   for (const viewport of [
     { width: 390, height: 844 }, { width: 375, height: 667 }, { width: 320, height: 568 },
@@ -117,6 +127,7 @@ async function main() {
 
       await page.locator('input[type="password"]').fill('ui-test');
       await page.getByRole('button', { name: 'Unlock Workspace' }).click();
+      await page.getByRole('navigation', { name: 'Primary navigation' }).getByRole('button', { name: 'Money', exact: true }).click();
       await page.getByRole('button', { name: 'View cards' }).click();
       let dialog = await checkOverlay(page, viewport);
       if (viewport.width === 390 && viewport.height === 844 && reducedMotion === 'reduce') {

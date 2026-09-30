@@ -7,8 +7,8 @@ export default function manifest(): MetadataRoute.Manifest {
     description: 'A high-performance investment and asset tracker with AI-powered insights.',
     start_url: '/',
     display: 'standalone',
-    background_color: '#020617',
-    theme_color: '#020617',
+    background_color: '#141618',
+    theme_color: '#141618',
     orientation: 'portrait',
     icons: [
       {

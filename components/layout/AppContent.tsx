@@ -5,13 +5,14 @@ import React from 'react';
 interface AppContentProps {
   children: React.ReactNode;
   headerSlot?: React.ReactNode;
+  overview?: boolean;
 }
 
-export const AppContent: React.FC<AppContentProps> = ({ children, headerSlot }) => {
+export const AppContent: React.FC<AppContentProps> = ({ children, headerSlot, overview }) => {
   return (
-    <main className="flex-1 overflow-x-hidden px-4 py-6 sm:px-6 lg:px-8">
-      {headerSlot ? <div className="motion-rise mb-6">{headerSlot}</div> : null}
-      <div className="motion-rise space-y-8">{children}</div>
+    <main className={overview ? 'workspace-content overview-content' : 'workspace-content'}>
+      {headerSlot ? <div className="mb-6">{headerSlot}</div> : null}
+      <div className={overview ? undefined : 'space-y-8'}>{children}</div>
     </main>
   );
 };

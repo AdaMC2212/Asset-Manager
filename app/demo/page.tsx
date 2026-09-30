@@ -47,13 +47,14 @@ export default function DemoPage() {
   const [error, setError] = useState<string | null>(null);
   const [isCommandOpen, setIsCommandOpen] = useState(false);
 
-  const [activeModule, setActiveModule] = useState<AppModule>('manager');
+  const [activeModule, setActiveModule] = useState<AppModule>('overview');
   const [activeInvTab, setActiveInvTab] = useState<InvestmentTab>('dashboard');
   const [hideBalance, setHideBalance] = useState(false);
   const [hideInvestments, setHideInvestments] = useState(false);
 
   const searchItems = useMemo<CommandSearchItem[]>(() => {
     const items: CommandSearchItem[] = [
+      { id: 'module-overview', name: 'Overview', type: 'module', module: 'overview', keywords: ['home', 'summary'] },
       { id: 'module-manager', name: 'Money Manager', type: 'module', module: 'manager', keywords: ['wallet', 'expenses'] },
       { id: 'module-investment', name: 'Investments', type: 'module', module: 'investment', keywords: ['portfolio', 'holdings'] },
       { id: 'module-funding', name: 'Cash Flow', type: 'module', module: 'investment', keywords: ['funding', 'conversion'] },

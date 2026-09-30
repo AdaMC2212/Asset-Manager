@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { ArrowRight, Command, LineChart, Plus, RefreshCw, Search, Wallet } from 'lucide-react';
+import { ArrowRight, Command, LayoutGrid, LineChart, Plus, RefreshCw, Search, Wallet } from 'lucide-react';
 import { AppModule, CommandSearchItem, InvestmentTab, QuickActionType } from '../types/ui';
 import { ModalPortal } from './ui/ModalPortal';
 
@@ -30,6 +30,7 @@ const getIcon = (item: CommandSearchItem) => {
     return <Plus className="h-4 w-4" />;
   }
   if (item.module === 'manager') return <Wallet className="h-4 w-4" />;
+  if (item.module === 'overview') return <LayoutGrid className="h-4 w-4" />;
   return <LineChart className="h-4 w-4" />;
 };
 

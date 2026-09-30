@@ -105,6 +105,7 @@ export default function Home() {
   const [moneyData, setMoneyData] = useState<MoneyManagerData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [lastSyncedAt, setLastSyncedAt] = useState<Date | null>(null);
   const [isAddTradeOpen, setIsAddTradeOpen] = useState(false);
   const [isCommandOpen, setIsCommandOpen] = useState(false);
   const [addTransactionRequested, setAddTransactionRequested] = useState(false);
@@ -114,13 +115,14 @@ export default function Home() {
   const hasLoaded = useRef(false);
   const readOnly = dbStatus?.isDemo !== false;
 
-  const [activeModule, setActiveModule] = useState<AppModule>('manager');
+  const [activeModule, setActiveModule] = useState<AppModule>('overview');
   const [activeInvTab, setActiveInvTab] = useState<InvestmentTab>('dashboard');
   const [hideBalance, setHideBalance] = useState(false);
   const [hideInvestments, setHideInvestments] = useState(false);
 
   const searchItems = useMemo<CommandSearchItem[]>(() => {
     const items: CommandSearchItem[] = [
+      { id: 'module-overview', name: 'Overview', type: 'module', module: 'overview', keywords: ['home', 'summary'] },
       { id: 'module-manager', name: 'Money Manager', type: 'module', module: 'manager', keywords: ['wallet', 'expenses'] },
       { id: 'module-investment', name: 'Investments', type: 'module', module: 'investment', keywords: ['portfolio', 'holdings'] },
       { id: 'module-funding', name: 'Cash Flow', type: 'module', module: 'investment', keywords: ['funding', 'conversion'] },
@@ -174,6 +176,7 @@ export default function Home() {
         moneyResult.status === 'rejected' ? 'money accounts' : '',
       ].filter(Boolean);
       setError(failed.length ? `Sync failed for ${failed.join(', ')}. Last available data is shown; refresh to retry.` : null);
+      if (failed.length === 0) setLastSyncedAt(new Date());
       hasLoaded.current = true;
     } catch (err) {
       setError('Sync failed. Last available data is shown; check the connection and refresh to retry.');
@@ -243,6 +246,7 @@ export default function Home() {
         moneyData={moneyData}
         loading={loading}
         error={error}
+        lastSyncedAt={lastSyncedAt}
         activeModule={activeModule}
         activeInvTab={activeInvTab}
         hideBalance={hideBalance}

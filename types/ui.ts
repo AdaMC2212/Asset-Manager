@@ -1,5 +1,12 @@
-export type AppModule = 'manager' | 'investment';
+import type { MoneyTransaction } from '../types';
+
+export type AppModule = 'overview' | 'manager' | 'investment';
 export type InvestmentTab = 'dashboard' | 'funding';
+
+export type MoneyViewRequest =
+  | { kind: 'cards' }
+  | { kind: 'history' }
+  | { kind: 'transaction'; transaction: MoneyTransaction };
 
 export type QuickActionType =
   | 'open_module'
