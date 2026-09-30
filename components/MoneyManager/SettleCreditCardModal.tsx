@@ -7,6 +7,7 @@ import { settleCreditCardBill } from '../../app/actions';
 import { localISODate } from '../../lib/dates';
 import { useReadOnly } from '../WorkspaceMode';
 import { useFormSession } from '../useFormSession';
+import { ModalPortal } from '../ui/ModalPortal';
 
 interface SettleCreditCardModalProps {
   isOpen: boolean;
@@ -88,14 +89,15 @@ export const SettleCreditCardModal: React.FC<SettleCreditCardModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-[120] flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm" onClick={onClose}>
+    <ModalPortal>
+    <div role="dialog" aria-modal="true" aria-label="Settle Credit Card Bill" className="dialog-overlay z-[120] bg-black/70 backdrop-blur-sm" onClick={onClose}>
       <div className="panel-elevated w-full max-w-lg rounded-3xl" onClick={(event) => event.stopPropagation()}>
         <div className="flex items-center justify-between border-b border-slate-800 p-6">
           <div>
             <h2 className="text-xl font-bold text-white">Settle Credit Card Bill</h2>
             <p className="mt-1 text-sm text-slate-400">Choose whether to pay the current statement or the full outstanding balance for {cardAccount.name}.</p>
           </div>
-          <button onClick={onClose} className="text-slate-400 transition-colors hover:text-white">
+          <button onClick={onClose} aria-label="Close settlement form" className="shrink-0 p-2 text-slate-400 transition-colors hover:text-white">
             <X className="h-6 w-6" />
           </button>
         </div>
@@ -170,5 +172,6 @@ export const SettleCreditCardModal: React.FC<SettleCreditCardModalProps> = ({
         </form>
       </div>
     </div>
+    </ModalPortal>
   );
 };

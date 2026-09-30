@@ -65,6 +65,7 @@ export const MoneyActivityList: React.FC<MoneyActivityListProps> = ({
 
         <button
           onClick={onToggleFilters}
+          aria-label="Filter transactions"
           className={`flex items-center gap-2 rounded-xl p-2 text-xs font-medium transition-all md:text-sm ${
             showFilters || hasActiveFilters ? 'bg-indigo-600 text-white' : 'bg-slate-800 text-slate-400 hover:text-white'
           }`}
@@ -92,14 +93,14 @@ export const MoneyActivityList: React.FC<MoneyActivityListProps> = ({
               <div className="flex gap-2">
                 <input
                   type="date"
-                  className="w-full rounded-lg border border-slate-700 bg-slate-950 px-2 py-1.5 text-xs text-white focus:border-indigo-500 focus:outline-none"
+                  className="min-w-0 w-full rounded-lg border border-slate-700 bg-slate-950 px-2 py-1.5 text-xs text-white focus:border-indigo-500 focus:outline-none"
                   value={filters.startDate}
                   onChange={(event) => onSetFilters({ ...filters, startDate: event.target.value })}
                 />
                 <span className="self-center text-slate-600">-</span>
                 <input
                   type="date"
-                  className="w-full rounded-lg border border-slate-700 bg-slate-950 px-2 py-1.5 text-xs text-white focus:border-indigo-500 focus:outline-none"
+                  className="min-w-0 w-full rounded-lg border border-slate-700 bg-slate-950 px-2 py-1.5 text-xs text-white focus:border-indigo-500 focus:outline-none"
                   value={filters.endDate}
                   onChange={(event) => onSetFilters({ ...filters, endDate: event.target.value })}
                 />
@@ -160,7 +161,7 @@ export const MoneyActivityList: React.FC<MoneyActivityListProps> = ({
           return (
             <div
               key={tx.id}
-              className="group flex items-center justify-between rounded-2xl border border-transparent p-2 transition-all hover:border-white/5 hover:bg-white/5 md:p-3"
+              className="group flex items-center justify-between gap-2 rounded-2xl border border-transparent p-2 transition-all hover:border-white/5 hover:bg-white/5 md:p-3"
             >
               <div className="flex min-w-0 items-center gap-2.5 md:gap-4">
                 <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl shadow-lg shadow-black/20 md:h-12 md:w-12 md:rounded-2xl ${style.color} ${style.text}`}>
@@ -177,9 +178,9 @@ export const MoneyActivityList: React.FC<MoneyActivityListProps> = ({
                 </div>
               </div>
 
-              <div className="flex shrink-0 items-center gap-2 text-right md:gap-4">
+              <div className="flex shrink-0 flex-col items-end gap-1 text-right md:flex-row md:items-center md:gap-4">
                 <div>
-                  <div className={`text-sm font-bold ${txDisplay.colorClass}`}>
+                  <div className={`max-w-[150px] break-words text-sm font-bold md:max-w-none ${txDisplay.colorClass}`}>
                     {txDisplay.prefix} {displayValue(tx.amount, 'RM ')}
                   </div>
                   <div className="max-w-[92px] truncate text-[10px] font-medium uppercase tracking-wide text-slate-500 md:max-w-none">
@@ -187,11 +188,11 @@ export const MoneyActivityList: React.FC<MoneyActivityListProps> = ({
                   </div>
                 </div>
 
-                <div className="hidden translate-x-2 gap-1 opacity-0 transition-opacity group-hover:translate-x-0 group-hover:opacity-100 md:flex">
-                  <button disabled={readOnly || isSettlementLocked(tx)} title={readOnly ? 'Demo is read-only' : isSettlementLocked(tx) ? 'Settlement record is protected' : 'Edit transaction'} onClick={() => onEdit(tx)} className="rounded-lg p-2 text-slate-400 hover:bg-slate-800 hover:text-indigo-400">
+                <div className="flex gap-1">
+                  <button aria-label="Edit transaction" disabled={readOnly || isSettlementLocked(tx)} title={readOnly ? 'Demo is read-only' : isSettlementLocked(tx) ? 'Settlement record is protected' : 'Edit transaction'} onClick={() => onEdit(tx)} className="focus-ring flex h-11 w-11 items-center justify-center rounded-lg text-slate-400 hover:bg-slate-800 hover:text-indigo-400 disabled:opacity-40">
                     <Pencil className="h-4 w-4" />
                   </button>
-                  <button disabled={readOnly || isSettlementLocked(tx)} title={readOnly ? 'Demo is read-only' : isSettlementLocked(tx) ? 'Settlement record is protected' : 'Delete transaction'} onClick={() => onDelete(tx)} className="rounded-lg p-2 text-slate-400 hover:bg-slate-800 hover:text-rose-400">
+                  <button aria-label="Delete transaction" disabled={readOnly || isSettlementLocked(tx)} title={readOnly ? 'Demo is read-only' : isSettlementLocked(tx) ? 'Settlement record is protected' : 'Delete transaction'} onClick={() => onDelete(tx)} className="focus-ring flex h-11 w-11 items-center justify-center rounded-lg text-slate-400 hover:bg-slate-800 hover:text-rose-400 disabled:opacity-40">
                     <Trash2 className="h-4 w-4" />
                   </button>
                 </div>
@@ -208,7 +209,7 @@ export const MoneyActivityList: React.FC<MoneyActivityListProps> = ({
         )}
       </div>
 
-      {filteredTransactions.length > 10 && (
+      {filteredTransactions.length > 0 && (
         <div className="mt-6 text-center">
           <button onClick={onViewAll} className="w-full rounded-xl py-2 text-sm font-medium text-indigo-400 transition-colors hover:bg-white/5 hover:text-indigo-300">
             View All {filteredTransactions.length} Records

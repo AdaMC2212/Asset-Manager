@@ -7,6 +7,7 @@ import { MoneyAccount, RecurringDebitRule } from '../../types';
 import { localISODate } from '../../lib/dates';
 import { useReadOnly } from '../WorkspaceMode';
 import { useFormSession } from '../useFormSession';
+import { ModalPortal } from '../ui/ModalPortal';
 
 interface AutoDebitModalProps {
   isOpen: boolean;
@@ -125,7 +126,8 @@ export const AutoDebitModal: React.FC<AutoDebitModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-[130] flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm" onClick={onClose}>
+    <ModalPortal>
+    <div role="dialog" aria-modal="true" aria-label={initialRule ? 'Edit Auto-Debit Rule' : 'Add Auto-Debit Rule'} className="dialog-overlay z-[130] bg-black/70 backdrop-blur-sm" onClick={onClose}>
       <div className="panel-elevated w-full max-w-2xl rounded-3xl" onClick={(event) => event.stopPropagation()}>
         <div className="flex items-center justify-between border-b border-slate-800 p-6">
           <div>
@@ -135,7 +137,7 @@ export const AutoDebitModal: React.FC<AutoDebitModalProps> = ({
             </div>
             <h2 className="text-xl font-bold text-white">{initialRule ? 'Edit Auto-Debit Rule' : 'Add Auto-Debit Rule'}</h2>
           </div>
-          <button onClick={onClose} className="text-slate-400 transition-colors hover:text-white">
+          <button onClick={onClose} aria-label="Close auto-debit form" className="shrink-0 p-2 text-slate-400 transition-colors hover:text-white">
             <X className="h-6 w-6" />
           </button>
         </div>
@@ -268,5 +270,6 @@ export const AutoDebitModal: React.FC<AutoDebitModalProps> = ({
         </form>
       </div>
     </div>
+    </ModalPortal>
   );
 };

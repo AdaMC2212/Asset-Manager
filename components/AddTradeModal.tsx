@@ -7,6 +7,7 @@ import { addTrade } from '../app/actions';
 import { localISODate } from '../lib/dates';
 import { useReadOnly } from './WorkspaceMode';
 import { useFormSession } from './useFormSession';
+import { ModalPortal } from './ui/ModalPortal';
 
 interface AddTradeModalProps {
   isOpen: boolean;
@@ -172,19 +173,20 @@ export const AddTradeModal: React.FC<AddTradeModalProps> = ({ isOpen, onClose, o
   if (!isOpen || readOnly) return null;
 
   return (
-    <div className="fixed inset-0 z-[110] flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm" onClick={onClose}>
+    <ModalPortal>
+    <div role="dialog" aria-modal="true" aria-label="Add Trade" className="dialog-overlay z-[110] bg-black/70 backdrop-blur-sm" onClick={onClose}>
       <div className="panel-elevated motion-zoom-in w-full max-w-2xl rounded-3xl" onClick={(event) => event.stopPropagation()}>
         <div className="flex items-center justify-between border-b border-[var(--border-soft)] px-6 py-5">
           <div>
             <h2 className="font-display text-2xl text-[var(--text-primary)]">Add Trade</h2>
             <p className="text-sm text-[var(--text-secondary)]">Record a buy or sell event with allocation metadata.</p>
           </div>
-          <button type="button" onClick={onClose} className="focus-ring rounded-lg p-2 text-[var(--text-muted)] transition hover:bg-white/5 hover:text-[var(--text-primary)]">
+          <button type="button" onClick={onClose} aria-label="Close trade form" className="focus-ring shrink-0 rounded-lg p-2 text-[var(--text-muted)] transition hover:bg-white/5 hover:text-[var(--text-primary)]">
             <X className="h-5 w-5" />
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="max-h-[75vh] space-y-4 overflow-y-auto p-6">
+        <form onSubmit={handleSubmit} className="space-y-4 p-6">
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div>
               <label className="mb-1 block text-xs font-semibold uppercase tracking-[0.16em] text-[var(--text-muted)]">Date</label>
@@ -298,5 +300,6 @@ export const AddTradeModal: React.FC<AddTradeModalProps> = ({ isOpen, onClose, o
         </form>
       </div>
     </div>
+    </ModalPortal>
   );
 };

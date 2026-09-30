@@ -43,6 +43,27 @@ npm run build
 Tests replace Google Sheets and Yahoo with local substitutes. They do not read or
 modify live records. The build downloads the existing Google Fonts if not cached.
 
+For viewport and touch regressions:
+
+```bash
+npx playwright install chromium
+npm run test:browser
+```
+
+The browser suite renders real UI components with fake data and rejects all
+financial writes. It checks phone, short-screen, landscape and desktop layouts
+with and without reduced motion. Screenshots go to the system temporary folder
+unless `UI_SCREENSHOT_DIR` is set. To use an installed Chromium-based browser,
+set `PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH` to its executable path.
+
+With a local Next.js server running, `npm run test:offline -- http://127.0.0.1:3000`
+verifies service-worker activation, offline navigation and reconnection using
+only the read-only `/demo` route.
+
+Offline navigation shows a dedicated disconnected page. The service worker
+caches only that page, the manifest and the favicon, never financial responses
+or workspace HTML. An online visit is required to install offline support.
+
 ## Data Integrity
 
 - `/demo` and the no-credentials workspace are read-only. Forms and server-side

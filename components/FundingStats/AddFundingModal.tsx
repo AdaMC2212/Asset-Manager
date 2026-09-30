@@ -6,6 +6,7 @@ import { addDeposit, addConversion } from '../../app/actions';
 import { localISODate } from '../../lib/dates';
 import { useReadOnly } from '../WorkspaceMode';
 import { useFormSession } from '../useFormSession';
+import { ModalPortal } from '../ui/ModalPortal';
 
 interface AddFundingModalProps {
   isOpen: boolean;
@@ -103,11 +104,12 @@ export const AddFundingModal: React.FC<AddFundingModalProps> = ({ isOpen, onClos
   if (!isOpen || readOnly) return null;
 
   return (
-    <div className="fixed inset-0 z-[110] flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm" onClick={onClose}>
+    <ModalPortal>
+    <div role="dialog" aria-modal="true" aria-label="Add Cash Flow" className="dialog-overlay z-[110] bg-black/70 backdrop-blur-sm" onClick={onClose}>
       <div className="panel-elevated w-full max-w-xl rounded-3xl" onClick={(event) => event.stopPropagation()}>
         <div className="flex justify-between items-center p-6 border-b border-slate-800">
           <h2 className="text-xl font-bold text-white">Add Cash Flow</h2>
-          <button onClick={onClose} className="text-slate-400 hover:text-white transition-colors">
+          <button onClick={onClose} aria-label="Close cash flow form" className="shrink-0 p-2 text-slate-400 hover:text-white transition-colors">
             <X className="w-6 h-6" />
           </button>
         </div>
@@ -224,5 +226,6 @@ export const AddFundingModal: React.FC<AddFundingModalProps> = ({ isOpen, onClos
         </form>
       </div>
     </div>
+    </ModalPortal>
   );
 };

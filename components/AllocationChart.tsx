@@ -6,6 +6,7 @@ import { PortfolioSummary } from '../types';
 
 interface AllocationChartProps {
   data: PortfolioSummary | null;
+  hideValues?: boolean;
 }
 
 const COLORS = {
@@ -16,7 +17,7 @@ const COLORS = {
   Other: '#7f8ba6',
 };
 
-export const AllocationChart: React.FC<AllocationChartProps> = ({ data }) => {
+export const AllocationChart: React.FC<AllocationChartProps> = ({ data, hideValues = false }) => {
   const chartData = React.useMemo(() => {
     if (!data) return [];
 
@@ -70,7 +71,7 @@ export const AllocationChart: React.FC<AllocationChartProps> = ({ data }) => {
                 ))}
               </Pie>
               <Tooltip
-                formatter={(value: number) => [
+                formatter={(value: number) => hideValues ? ['****', 'Allocation'] : [
                   `$${value.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
                   `${((value / totalValue) * 100).toFixed(1)}%`,
                 ]}
@@ -101,9 +102,9 @@ export const AllocationChart: React.FC<AllocationChartProps> = ({ data }) => {
             </div>
             <div className="text-right">
               <p className="text-sm font-semibold text-[var(--text-primary)]">
-                ${item.value.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
+                {hideValues ? '****' : `$${item.value.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`}
               </p>
-              <p className="text-[11px] text-[var(--text-muted)]">{((item.value / totalValue) * 100).toFixed(1)}%</p>
+              <p className="text-[11px] text-[var(--text-muted)]">{hideValues ? '****' : `${((item.value / totalValue) * 100).toFixed(1)}%`}</p>
             </div>
           </div>
         ))}

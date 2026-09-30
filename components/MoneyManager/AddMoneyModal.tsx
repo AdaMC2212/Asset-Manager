@@ -8,6 +8,7 @@ import { localISODate } from '../../lib/dates';
 import { getExpenseAccounts, isSettlementLocked } from '../../lib/money';
 import { useReadOnly } from '../WorkspaceMode';
 import { useFormSession } from '../useFormSession';
+import { ModalPortal } from '../ui/ModalPortal';
 
 interface AddMoneyModalProps {
   isOpen: boolean;
@@ -163,13 +164,14 @@ export const AddMoneyModal: React.FC<AddMoneyModalProps> = ({
   if (!isOpen || readOnly) return null;
 
   return (
-    <div className="fixed inset-0 z-[110] overflow-y-auto bg-black/70 px-4 pb-6 pt-4 backdrop-blur-sm sm:flex sm:items-center sm:justify-center sm:p-4" onClick={onClose}>
-      <div className="panel-elevated mx-auto w-full max-w-2xl rounded-3xl sm:max-h-[85vh] sm:overflow-y-auto" onClick={(event) => event.stopPropagation()}>
+    <ModalPortal>
+    <div role="dialog" aria-modal="true" aria-label={initialData ? 'Edit Transaction' : 'Add Transaction'} className="dialog-overlay z-[110] bg-black/70 backdrop-blur-sm" onClick={onClose}>
+      <div className="panel-elevated w-full max-w-2xl rounded-3xl" onClick={(event) => event.stopPropagation()}>
         <div className="sticky top-0 flex items-center justify-between rounded-t-3xl border-b border-slate-800 bg-[rgba(15,23,42,0.96)] p-5 backdrop-blur-sm sm:p-6">
           <h2 className="text-xl font-bold text-white">
             {initialData ? 'Edit Transaction' : 'New Transaction'}
           </h2>
-          <button onClick={onClose} className="text-slate-400 hover:text-white transition-colors">
+          <button onClick={onClose} aria-label="Close transaction form" className="shrink-0 p-2 text-slate-400 hover:text-white transition-colors">
             <X className="w-6 h-6" />
           </button>
         </div>
@@ -335,6 +337,7 @@ export const AddMoneyModal: React.FC<AddMoneyModalProps> = ({
         </form>
       </div>
     </div>
+    </ModalPortal>
   );
 };
 

@@ -53,12 +53,13 @@ export default function RootLayout({
           dangerouslySetInnerHTML={{
             __html: `
               if ('serviceWorker' in navigator) {
-                window.addEventListener('load', function() {
-                  navigator.serviceWorker.register('/sw.js').then(
-                    function() {},
-                    function() {}
-                  );
-                });
+                const registerWorker = function() {
+                  navigator.serviceWorker.register('/sw.js').catch(function(error) {
+                    console.warn('Offline support could not start:', error);
+                  });
+                };
+                if (document.readyState === 'complete') registerWorker();
+                else window.addEventListener('load', registerWorker, { once: true });
               }
             `,
           }}

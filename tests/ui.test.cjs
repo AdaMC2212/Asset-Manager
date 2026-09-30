@@ -43,6 +43,7 @@ stubModule('../app/actions.ts', actionStubs);
 stubModule('next/link', { __esModule: true, default: ({ children, ...props }) => h('a', props, children) });
 stubModule('../components/ui/DecryptedText.tsx', { DecryptedText: ({ text }) => text });
 stubModule('../components/CommandPalette.tsx', { CommandPalette: () => null });
+stubModule('../components/ui/ModalPortal.tsx', { ModalPortal: ({ children }) => children });
 const AppWorkspace = () => null;
 const MoneyStatsRow = () => null;
 const MoneyBreakdownPanel = () => null;

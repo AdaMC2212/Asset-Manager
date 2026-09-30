@@ -32,6 +32,8 @@ interface AppWorkspaceProps {
   onOpenSearch: () => void;
   onOpenAddTrade: () => void;
   onRefresh: () => void;
+  addTransactionRequested?: boolean;
+  onAddTransactionHandled?: () => void;
 }
 
 export const AppWorkspace: React.FC<AppWorkspaceProps> = ({
@@ -52,12 +54,19 @@ export const AppWorkspace: React.FC<AppWorkspaceProps> = ({
   onOpenSearch,
   onOpenAddTrade,
   onRefresh,
+  addTransactionRequested = false,
+  onAddTransactionHandled,
 }) => {
   const addTransactionHandlerRef = useRef<(() => void) | null>(null);
 
-  const registerAddHandler = useCallback((handler: () => void) => {
+  const registerAddHandler = useCallback((handler: (() => void) | null) => {
     addTransactionHandlerRef.current = handler;
-  }, []);
+    // A search command can arrive before MoneyManager has mounted or loaded.
+    if (handler && addTransactionRequested && !isDemo) {
+      handler();
+      onAddTransactionHandled?.();
+    }
+  }, [addTransactionRequested, isDemo, onAddTransactionHandled]);
 
   const viewState = useMemo<AppShellViewState>(() => {
     if (activeModule === 'manager') {
@@ -222,7 +231,7 @@ export const AppWorkspace: React.FC<AppWorkspaceProps> = ({
                   <HoldingsTable data={data} hideValues={hideInvestments} />
                 </div>
                 <div className="space-y-8">
-                  <AllocationChart data={data} />
+                  <AllocationChart data={data} hideValues={hideInvestments} />
                   <div className="kpi-card relative overflow-hidden p-6">
                     <div className="pointer-events-none absolute -right-16 -top-16 h-40 w-40 rounded-full bg-[var(--accent-primary)]/20 blur-3xl" />
                     <h3 className="text-lg font-semibold text-[var(--text-primary)]">Insight Story</h3>
@@ -233,12 +242,12 @@ export const AppWorkspace: React.FC<AppWorkspaceProps> = ({
                     </p>
                     {topHolding ? (
                       <p className="mt-3 text-sm leading-relaxed text-[var(--text-secondary)]">
-                        {`${topHolding.ticker} is your largest single position at ${topHolding.allocation.toFixed(1)}% allocation.`}
+                        {`${topHolding.ticker} is your largest single position at ${hideInvestments ? '****' : `${topHolding.allocation.toFixed(1)}%`} allocation.`}
                       </p>
                     ) : null}
                     {leadSector ? (
                       <p className="mt-3 text-sm leading-relaxed text-[var(--text-secondary)]">
-                        {`${leadSector[0]} is your dominant sector with approximately ${leadSectorWeight.toFixed(1)}% portfolio exposure.`}
+                        {`${leadSector[0]} is your dominant sector with approximately ${hideInvestments ? '****' : `${leadSectorWeight.toFixed(1)}%`} portfolio exposure.`}
                       </p>
                     ) : null}
                   </div>

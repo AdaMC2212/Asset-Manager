@@ -62,6 +62,26 @@ body {
 }
 
 @layer components {
+  .dialog-overlay {
+    position: fixed;
+    inset: 0;
+    display: flex;
+    align-items: flex-start;
+    justify-content: center;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    padding: 1rem;
+    padding-top: max(1rem, env(safe-area-inset-top));
+    padding-bottom: max(1rem, env(safe-area-inset-bottom));
+  }
+
+  /* Auto margins center short panels without pushing tall forms above the viewport. */
+  .dialog-overlay > :first-child {
+    flex-shrink: 0;
+    margin-block: auto;
+    min-width: 0;
+  }
+
   .ambient-bg {
     background-image:
       radial-gradient(55% 50% at 12% 5%, rgba(79, 123, 255, 0.26) 0%, transparent 65%),

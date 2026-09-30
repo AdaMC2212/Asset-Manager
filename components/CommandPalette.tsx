@@ -3,6 +3,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { ArrowRight, Command, LineChart, Plus, RefreshCw, Search, Wallet } from 'lucide-react';
 import { AppModule, CommandSearchItem, InvestmentTab, QuickActionType } from '../types/ui';
+import { ModalPortal } from './ui/ModalPortal';
 
 interface CommandPaletteProps {
   isOpen: boolean;
@@ -80,7 +81,7 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({
       if (item.id === 'module-funding') {
         onSelectInvestmentTab?.('funding');
       }
-      if (item.id === 'module-investment') {
+      if (item.id === 'module-investment' || item.type === 'asset') {
         onSelectInvestmentTab?.('dashboard');
       }
     }
@@ -104,7 +105,8 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-[120] flex items-start justify-center bg-black/70 px-4 pt-[12vh] backdrop-blur-sm">
+    <ModalPortal>
+    <div role="dialog" aria-modal="true" aria-label="Search" className="fixed inset-0 z-[120] flex items-start justify-center overflow-y-auto bg-black/70 px-4 py-4 backdrop-blur-sm sm:pt-[12vh]">
       <div className="panel-elevated motion-zoom-in w-full max-w-2xl overflow-hidden rounded-3xl">
         <div className="flex items-center border-b border-[var(--border-soft)] px-4 py-3">
           <Search className="mr-3 h-5 w-5 text-[var(--text-muted)]" />
@@ -196,5 +198,6 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({
       </div>
       <button type="button" className="absolute inset-0 -z-10 cursor-default" onClick={onClose} aria-label="Close command palette" />
     </div>
+    </ModalPortal>
   );
 };

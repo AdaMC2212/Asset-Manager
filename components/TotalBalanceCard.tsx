@@ -4,6 +4,7 @@ import React, { useEffect, useState } from 'react';
 import { Banknote, CreditCard, Eye, EyeOff, Smartphone, Wallet, X } from 'lucide-react';
 import { MoneyAccount } from '../types';
 import { CountUp } from './ui/CountUp';
+import { ModalPortal } from './ui/ModalPortal';
 
 interface TotalBalanceCardProps {
   totalBalance: number;
@@ -99,13 +100,15 @@ export const TotalBalanceCard: React.FC<TotalBalanceCardProps> = ({ totalBalance
       </section>
 
       {isModalOpen ? (
-        <div className="fixed inset-0 z-[110] overflow-y-auto bg-black/70 px-4 pb-6 pt-4 backdrop-blur-sm sm:flex sm:items-center sm:justify-center sm:p-4" onClick={() => setIsModalOpen(false)}>
+        <ModalPortal>
+        <div role="dialog" aria-modal="true" aria-label="Wallet Snapshot" className="dialog-overlay z-[110] bg-black/70 backdrop-blur-sm" onClick={() => setIsModalOpen(false)}>
           <div className="panel-elevated mx-auto w-full max-w-lg overflow-hidden rounded-3xl" onClick={(event) => event.stopPropagation()}>
             <div className="flex items-center justify-between border-b border-[var(--border-soft)] px-6 py-5">
               <h3 className="font-display text-2xl text-[var(--text-primary)]">Wallet Snapshot</h3>
               <button
                 type="button"
                 onClick={() => setIsModalOpen(false)}
+                aria-label="Close wallet snapshot"
                 className="focus-ring rounded-lg p-2 text-[var(--text-muted)] transition hover:bg-white/5 hover:text-[var(--text-primary)]"
               >
                 <X className="h-5 w-5" />
@@ -141,6 +144,7 @@ export const TotalBalanceCard: React.FC<TotalBalanceCardProps> = ({ totalBalance
             </div>
           </div>
         </div>
+        </ModalPortal>
       ) : null}
     </>
   );

@@ -11,6 +11,7 @@ import { MoneyBreakdownPanel } from './MoneyManager/MoneyBreakdownPanel';
 import { MoneyHeader } from './MoneyManager/MoneyHeader';
 import { MoneyStatsRow } from './MoneyManager/MoneyStatsRow';
 import { SettleCreditCardModal } from './MoneyManager/SettleCreditCardModal';
+import { ModalPortal } from './ui/ModalPortal';
 import { deactivateAutoDebitRuleById, deleteMoneyTransaction, updateCreditCardBillingDay } from '../app/actions';
 import { getBillingDayOfMonth, getStatementCycle } from '../lib/creditCard';
 import { getRecognitionDate, isRecognizedExpense, isSettlementLocked } from '../lib/money';
@@ -21,7 +22,7 @@ interface MoneyManagerProps {
   loading: boolean;
   onRefresh: () => void;
   hideValues?: boolean;
-  registerAddHandler?: (handler: () => void) => void;
+  registerAddHandler?: (handler: (() => void) | null) => void;
 }
 
 const PIE_COLORS = ['#f43f5e', '#ec4899', '#d946ef', '#a855f7', '#8b5cf6', '#6366f1', '#3b82f6', '#0ea5e9'];
@@ -306,6 +307,7 @@ export const MoneyManager: React.FC<MoneyManagerProps> = ({ data, loading, onRef
       setEditingTransaction(null);
       setIsModalOpen(true);
     });
+    return () => registerAddHandler(null);
   }, [readOnly, registerAddHandler]);
 
   useEffect(() => {
@@ -502,8 +504,9 @@ export const MoneyManager: React.FC<MoneyManagerProps> = ({ data, loading, onRef
       </div>
 
       {isOutstandingModalOpen ? (
-        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/80 p-4 backdrop-blur-md animate-in fade-in duration-300">
-          <div className="flex max-h-[85vh] w-full max-w-4xl flex-col overflow-hidden rounded-3xl border border-slate-800 bg-slate-900 shadow-2xl animate-in zoom-in-95 duration-200">
+        <ModalPortal>
+        <div role="dialog" aria-modal="true" aria-label="Unpaid card balances" className="dialog-overlay z-[110] bg-black/80 backdrop-blur-md">
+          <div className="flex w-full max-w-4xl flex-col overflow-hidden rounded-3xl border border-slate-800 bg-slate-900 shadow-2xl">
             <div className="flex items-start justify-between border-b border-slate-800 bg-slate-900/80 p-6">
               <div>
                 <div className="mb-2 inline-flex items-center gap-2 rounded-full bg-cyan-500/10 px-3 py-1 text-[11px] font-bold uppercase tracking-[0.18em] text-cyan-300">
@@ -513,7 +516,7 @@ export const MoneyManager: React.FC<MoneyManagerProps> = ({ data, loading, onRef
                 <h2 className="text-2xl font-bold text-white">Unpaid card balances</h2>
                 <p className="mt-1 text-sm text-slate-400">Review each card’s outstanding balance, what’s been billed, and what’s still unbilled.</p>
               </div>
-              <button onClick={() => setIsOutstandingModalOpen(false)} className="rounded-full p-2 text-slate-400 transition-all hover:bg-slate-800 hover:text-white">
+              <button onClick={() => setIsOutstandingModalOpen(false)} aria-label="Close card details" className="shrink-0 rounded-full p-2 text-slate-400 transition-all hover:bg-slate-800 hover:text-white">
                 <X className="h-6 w-6" />
               </button>
             </div>
@@ -633,11 +636,13 @@ export const MoneyManager: React.FC<MoneyManagerProps> = ({ data, loading, onRef
             </div>
           </div>
         </div>
+        </ModalPortal>
       ) : null}
 
       {selectedCategory ? (
-        <div className="fixed inset-0 z-[60] overflow-y-auto bg-black/80 px-4 pb-6 pt-4 backdrop-blur-md animate-in fade-in duration-300 sm:flex sm:items-center sm:justify-center sm:p-4">
-          <div className="mx-auto flex w-full max-w-2xl flex-col overflow-hidden rounded-3xl border border-slate-800 bg-slate-900 shadow-2xl animate-in zoom-in-95 duration-200 sm:max-h-[85vh]">
+        <ModalPortal>
+        <div role="dialog" aria-modal="true" aria-label={`${selectedCategory} transactions`} className="dialog-overlay z-[110] bg-black/80 backdrop-blur-md">
+          <div className="flex w-full max-w-2xl flex-col overflow-hidden rounded-3xl border border-slate-800 bg-slate-900 shadow-2xl">
             <div className="flex items-start justify-between border-b border-slate-800 bg-slate-900/50 p-6">
               <div>
                 <div className="mb-1 flex items-center gap-3">
@@ -649,7 +654,7 @@ export const MoneyManager: React.FC<MoneyManagerProps> = ({ data, loading, onRef
                 </div>
                 <p className="ml-11 text-sm text-slate-500">{isCustomDateMode ? 'Selected Range' : monthLabel}</p>
               </div>
-              <button onClick={() => setSelectedCategory(null)} className="rounded-full p-2 text-slate-400 transition-all hover:bg-slate-800 hover:text-white">
+              <button onClick={() => setSelectedCategory(null)} aria-label="Close category details" className="shrink-0 rounded-full p-2 text-slate-400 transition-all hover:bg-slate-800 hover:text-white">
                 <X className="h-6 w-6" />
               </button>
             </div>
@@ -681,31 +686,31 @@ export const MoneyManager: React.FC<MoneyManagerProps> = ({ data, loading, onRef
                 categoryTransactions.map((tx) => {
                   const badges = getTransactionBadge(tx);
                   return (
-                    <div key={tx.id} className="group flex items-center justify-between rounded-2xl border border-transparent p-3.5 transition-all hover:border-white/5 hover:bg-white/5">
-                      <div className="flex items-center gap-4">
+                    <div key={tx.id} className="grid gap-3 rounded-2xl border border-transparent p-3.5 transition-all hover:border-white/5 hover:bg-white/5 md:grid-cols-[minmax(0,1fr)_auto]">
+                      <div className="flex min-w-0 items-center gap-3">
                         <div className={`rounded-lg bg-slate-800/50 p-2 ${tx.type === 'Income' ? 'text-emerald-400' : isUnsettledCardCharge(tx) ? 'text-amber-400' : 'text-rose-400'}`}>
                           {tx.type === 'Income' ? <TrendingUp className="h-4 w-4" /> : <TrendingDown className="h-4 w-4" />}
                         </div>
-                        <div className="flex flex-col">
-                          <div className="flex items-center gap-2">
-                            <span className="text-sm font-semibold text-white">{tx.note || tx.category}</span>
+                        <div className="flex min-w-0 flex-col">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <span className="break-words text-sm font-semibold text-white">{tx.note || tx.category}</span>
                             {badges.map((badge) => <span key={badge.label} className={`rounded-full px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider ${badge.className}`}>{badge.label}</span>)}
                           </div>
                           <span className="text-xs text-slate-500">{tx.date} - {tx.fromAccount || tx.toAccount}</span>
                         </div>
                       </div>
-                      <div className="flex items-center gap-4 text-right">
+                      <div className="flex items-center justify-between gap-3 text-right">
                         <div className="flex flex-col items-end">
                           <span className={`text-sm font-bold ${tx.type === 'Income' ? 'text-emerald-400' : isUnsettledCardCharge(tx) ? 'text-amber-300' : 'text-slate-100'}`}>
                             {tx.type === 'Income' ? '+' : '-'} {displayValue(tx.amount, 'RM ')}
                           </span>
                           <span className="text-[10px] font-medium uppercase text-slate-600">{badges[0]?.label || tx.type}</span>
                         </div>
-                        <div className="flex translate-x-1 gap-1 opacity-0 transition-opacity group-hover:translate-x-0 group-hover:opacity-100">
-                          <button disabled={readOnly || isSettlementLocked(tx)} title={readOnly ? 'Demo is read-only' : isSettlementLocked(tx) ? 'Settlement record is protected' : 'Edit transaction'} onClick={() => { setSelectedCategory(null); handleEdit(tx); }} className="rounded-lg bg-slate-800/50 p-2 text-slate-500 hover:bg-slate-800 hover:text-indigo-400">
+                        <div className="flex shrink-0 gap-1">
+                          <button aria-label="Edit transaction" disabled={readOnly || isSettlementLocked(tx)} title={readOnly ? 'Demo is read-only' : isSettlementLocked(tx) ? 'Settlement record is protected' : 'Edit transaction'} onClick={() => { setSelectedCategory(null); handleEdit(tx); }} className="focus-ring flex h-11 w-11 items-center justify-center rounded-lg bg-slate-800/50 text-slate-400 hover:bg-slate-800 hover:text-indigo-400 disabled:opacity-40">
                             <Pencil className="h-4 w-4" />
                           </button>
-                          <button disabled={readOnly || isSettlementLocked(tx)} title={readOnly ? 'Demo is read-only' : isSettlementLocked(tx) ? 'Settlement record is protected' : 'Delete transaction'} onClick={() => handleDelete(tx)} className="rounded-lg bg-slate-800/50 p-2 text-slate-500 hover:bg-slate-800 hover:text-rose-400">
+                          <button aria-label="Delete transaction" disabled={readOnly || isSettlementLocked(tx)} title={readOnly ? 'Demo is read-only' : isSettlementLocked(tx) ? 'Settlement record is protected' : 'Delete transaction'} onClick={() => handleDelete(tx)} className="focus-ring flex h-11 w-11 items-center justify-center rounded-lg bg-slate-800/50 text-slate-400 hover:bg-slate-800 hover:text-rose-400 disabled:opacity-40">
                             <Trash2 className="h-4 w-4" />
                           </button>
                         </div>
@@ -728,17 +733,19 @@ export const MoneyManager: React.FC<MoneyManagerProps> = ({ data, loading, onRef
             </div>
           </div>
         </div>
+        </ModalPortal>
       ) : null}
 
       {isHistoryModalOpen ? (
-        <div className="fixed inset-0 z-50 overflow-y-auto bg-black/80 px-4 pb-6 pt-4 backdrop-blur-md sm:flex sm:items-center sm:justify-center sm:p-4">
-          <div className="mx-auto flex w-full max-w-2xl flex-col overflow-hidden rounded-3xl border border-slate-800 bg-slate-900 shadow-2xl sm:max-h-[85vh]">
+        <ModalPortal>
+        <div role="dialog" aria-modal="true" aria-label="Full Transaction List" className="dialog-overlay z-[110] bg-black/80 backdrop-blur-md">
+          <div className="flex w-full max-w-2xl flex-col overflow-hidden rounded-3xl border border-slate-800 bg-slate-900 shadow-2xl">
             <div className="flex items-center justify-between border-b border-slate-800 bg-slate-900 p-6">
               <div>
                 <h2 className="text-xl font-bold text-white">Full Transaction List</h2>
                 <p className="text-sm text-slate-500">{isCustomDateMode ? 'Custom Range' : monthLabel}</p>
               </div>
-              <button onClick={() => setIsHistoryModalOpen(false)} className="rounded-full p-2 text-slate-400 hover:bg-slate-800 hover:text-white">
+              <button onClick={() => setIsHistoryModalOpen(false)} aria-label="Close transaction history" className="shrink-0 rounded-full p-2 text-slate-400 hover:bg-slate-800 hover:text-white">
                 <X className="h-6 w-6" />
               </button>
             </div>
@@ -747,23 +754,23 @@ export const MoneyManager: React.FC<MoneyManagerProps> = ({ data, loading, onRef
                 const badges = getTransactionBadge(tx);
                 const txDisplay = getTransactionDisplay(tx);
                 return (
-                  <div key={tx.id} className="group flex items-center justify-between rounded-xl border border-transparent p-3 hover:border-white/5 hover:bg-white/5">
-                    <div className="flex flex-col">
-                      <div className="flex items-center gap-2">
+                  <div key={tx.id} className="grid gap-3 rounded-xl border border-transparent p-3 hover:border-white/5 hover:bg-white/5 md:grid-cols-[minmax(0,1fr)_auto]">
+                    <div className="flex min-w-0 flex-col break-words">
+                      <div className="flex flex-wrap items-center gap-2">
                         <span className="font-medium text-white">{tx.category}</span>
                         {badges.map((badge) => <span key={badge.label} className={`rounded-full px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider ${badge.className}`}>{badge.label}</span>)}
                       </div>
                       <span className="text-xs text-slate-500">{tx.date} - {tx.note}</span>
                     </div>
-                    <div className="flex items-center gap-4 text-right">
+                    <div className="flex items-center justify-between gap-3 text-right">
                       <span className={`font-bold ${txDisplay.colorClass}`}>
                         {txDisplay.prefix} {displayValue(tx.amount, 'RM ')}
                       </span>
-                      <div className="flex gap-1 opacity-0 transition-opacity group-hover:opacity-100">
-                        <button disabled={readOnly || isSettlementLocked(tx)} title={readOnly ? 'Demo is read-only' : isSettlementLocked(tx) ? 'Settlement record is protected' : 'Edit transaction'} onClick={() => { setIsHistoryModalOpen(false); handleEdit(tx); }} className="p-2 text-slate-500 hover:text-indigo-400">
+                      <div className="flex shrink-0 gap-1">
+                        <button aria-label="Edit transaction" disabled={readOnly || isSettlementLocked(tx)} title={readOnly ? 'Demo is read-only' : isSettlementLocked(tx) ? 'Settlement record is protected' : 'Edit transaction'} onClick={() => { setIsHistoryModalOpen(false); handleEdit(tx); }} className="focus-ring flex h-11 w-11 items-center justify-center rounded-lg text-slate-400 hover:text-indigo-400 disabled:opacity-40">
                           <Pencil className="h-4 w-4" />
                         </button>
-                        <button disabled={readOnly || isSettlementLocked(tx)} title={readOnly ? 'Demo is read-only' : isSettlementLocked(tx) ? 'Settlement record is protected' : 'Delete transaction'} onClick={() => handleDelete(tx)} className="p-2 text-slate-500 hover:text-rose-400">
+                        <button aria-label="Delete transaction" disabled={readOnly || isSettlementLocked(tx)} title={readOnly ? 'Demo is read-only' : isSettlementLocked(tx) ? 'Settlement record is protected' : 'Delete transaction'} onClick={() => handleDelete(tx)} className="focus-ring flex h-11 w-11 items-center justify-center rounded-lg text-slate-400 hover:text-rose-400 disabled:opacity-40">
                           <Trash2 className="h-4 w-4" />
                         </button>
                       </div>
@@ -774,6 +781,7 @@ export const MoneyManager: React.FC<MoneyManagerProps> = ({ data, loading, onRef
             </div>
           </div>
         </div>
+        </ModalPortal>
       ) : null}
 
       <AddMoneyModal

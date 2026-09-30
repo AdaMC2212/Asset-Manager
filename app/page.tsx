@@ -107,6 +107,8 @@ export default function Home() {
   const [error, setError] = useState<string | null>(null);
   const [isAddTradeOpen, setIsAddTradeOpen] = useState(false);
   const [isCommandOpen, setIsCommandOpen] = useState(false);
+  const [addTransactionRequested, setAddTransactionRequested] = useState(false);
+  const handleAddTransactionHandled = useCallback(() => setAddTransactionRequested(false), []);
   const [dbStatus, setDbStatus] = useState<{ configured: boolean; initialized: boolean; isDemo?: boolean } | null>(null);
   const fetchInFlight = useRef(false);
   const hasLoaded = useRef(false);
@@ -194,6 +196,7 @@ export default function Home() {
 
       if (action === 'add_transaction') {
         if (readOnly) return;
+        setAddTransactionRequested(true);
         setActiveModule('manager');
         return;
       }
@@ -251,6 +254,8 @@ export default function Home() {
         onOpenSearch={() => setIsCommandOpen(true)}
         onOpenAddTrade={() => { if (!readOnly) setIsAddTradeOpen(true); }}
         onRefresh={fetchData}
+        addTransactionRequested={addTransactionRequested}
+        onAddTransactionHandled={handleAddTransactionHandled}
       />
 
       <AddTradeModal isOpen={isAddTradeOpen} onClose={() => setIsAddTradeOpen(false)} onSuccess={fetchData} />
