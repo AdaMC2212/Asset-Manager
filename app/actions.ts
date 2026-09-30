@@ -9,6 +9,7 @@ import { headers } from 'next/headers';
 import { isCalendarDate, localISODate } from '../lib/dates';
 import { getRecognitionDate, isRecognizedExpense, isSettlementLocked } from '../lib/money';
 import { withSpreadsheetLock } from '../lib/spreadsheetLock';
+import { cashFlowAppendRange, getCashFlowLayout, parseCashFlowRows, parsePortfolioRows } from '../lib/investments';
 
 const readOnlyResult = { success: false, error: 'This workspace is read-only.' };
 const isReadOnlyRequest = (forceDemo: boolean) => {
@@ -661,83 +662,17 @@ export async function getPortfolioData(forceDemo: boolean = false): Promise<Port
     const { googleSheets } = await getSheetClient();
     const response = await googleSheets.spreadsheets.values.get({
       spreadsheetId: SPREADSHEET_ID,
-      range: `${PORTFOLIO_SHEET_NAME}!A:N`, 
+      range: `${PORTFOLIO_SHEET_NAME}!A:N`,
+      valueRenderOption: 'UNFORMATTED_VALUE',
     });
 
-    const rows = response.data.values;
-    if (!rows || rows.length === 0) {
-      return { netWorth: 0, totalCost: 0, totalPL: 0, totalPLPercent: 0, cashBalance: 0, holdings: [] };
-    }
-
-    const holdings: Holding[] = [];
-    let netWorth = 0;
-    let totalCost = 0;
-    let cashBalance = 0;
-
-    if (rows[24] && rows[24][5]) {
-        cashBalance = parseMoney(rows[24][5]);
-    }
-
-    const rowPromises = [];
-
-    for (let i = 1; i < rows.length; i++) {
-      const row = rows[i];
-      if (row[4]) {
-        const label = row[4].toString().trim();
-        const val = parseMoney(row[5]);
-        if (label === 'Total Invested') totalCost = val;
-        else if (label === 'Net Asset') netWorth = val;
-      }
-
-      const status = row[3]?.toString().trim();
-      if (status === 'Active') {
-        const ticker = row[1]?.toString().toUpperCase().trim();
-        if (ticker && ticker !== 'SYMBOL') {
-          rowPromises.push(
-             (async () => {
-                const quantity = parseMoney(row[2]);
-                const avgCost = parseMoney(row[4]);
-                const currentPrice = parseMoney(row[5]);
-                const currentValue = parseMoney(row[8]);
-                const unrealizedPL = parseMoney(row[7]);
-                
-                const sector = await getSector(ticker);
-                const assetClass = getAssetClass(ticker);
-                
-                return {
-                    ticker, quantity, avgCost, currentPrice, currentValue,
-                    totalCost: quantity * avgCost, 
-                    unrealizedPL,
-                    unrealizedPLPercent: (quantity * avgCost) > 0 ? (unrealizedPL / (quantity * avgCost)) * 100 : 0,
-                    allocation: 0, sector, assetClass
-                };
-             })()
-          );
-        }
-      }
-    }
-
-    const resolvedHoldings = await Promise.all(rowPromises);
-    holdings.push(...resolvedHoldings);
-
-    if (netWorth === 0 && holdings.length > 0) {
-       netWorth = holdings.reduce((sum, h) => sum + h.currentValue, 0) + cashBalance;
-    }
-    if (totalCost === 0 && holdings.length > 0) {
-       totalCost = holdings.reduce((sum, h) => sum + h.totalCost, 0);
-    }
-
-    holdings.forEach(h => {
-      h.allocation = netWorth > 0 ? (h.currentValue / netWorth) * 100 : 0;
-    });
-
-    const totalPL = netWorth - totalCost;
-    const totalPLPercent = totalCost > 0 ? (totalPL / totalCost) * 100 : 0;
-
-    return {
-      netWorth, totalCost, totalPL, totalPLPercent, cashBalance,
-      holdings: holdings.sort((a, b) => b.currentValue - a.currentValue)
-    };
+    const portfolio = parsePortfolioRows(response.data.values || []);
+    portfolio.holdings = await Promise.all(portfolio.holdings.map(async (holding) => ({
+      ...holding,
+      sector: await getSector(holding.ticker),
+      assetClass: holding.assetClass === 'Other' ? getAssetClass(holding.ticker) : holding.assetClass,
+    })));
+    return portfolio;
   } catch (error: any) {
     throw error;
   }
@@ -769,28 +704,11 @@ export async function getCashFlowData(forceDemo: boolean = false): Promise<CashF
     const { googleSheets } = await getSheetClient();
     const response = await googleSheets.spreadsheets.values.get({
       spreadsheetId: SPREADSHEET_ID,
-      range: `${CASH_FLOW_SHEET_NAME}!A:H`, 
+      range: `${CASH_FLOW_SHEET_NAME}!A:J`,
+      valueRenderOption: 'UNFORMATTED_VALUE',
+      dateTimeRenderOption: 'FORMATTED_STRING',
     });
-    const rows = response.data.values || [];
-    const deposits: Deposit[] = [];
-    const conversions: Conversion[] = [];
-    rows.forEach((row, index) => {
-      if (index === 0) return;
-      if (row[0] && row[1]) {
-          const amount = parseMoney(row[1]);
-          if (!isNaN(amount) && row[0].match(/\d/)) deposits.push({ date: row[0], amountMYR: amount, reason: row[2] });
-      }
-      if (row[4] && row[5] && row[6]) {
-          const myr = parseMoney(row[5]);
-          const usd = parseMoney(row[6]);
-          const rate = parseMoney(row[7]);
-          if (!isNaN(usd) && row[4].match(/\d/)) conversions.push({ date: row[4], amountMYR: myr, amountUSD: usd, rate: rate });
-      }
-    });
-    const totalDepositedMYR = deposits.reduce((sum, d) => sum + d.amountMYR, 0);
-    const totalConvertedMYR = conversions.reduce((sum, c) => sum + c.amountMYR, 0);
-    const totalConvertedUSD = conversions.reduce((sum, c) => sum + c.amountUSD, 0);
-    return { totalDepositedMYR, totalConvertedMYR, totalConvertedUSD, avgRate: totalConvertedUSD > 0 ? totalConvertedMYR / totalConvertedUSD : 0, deposits: deposits.reverse(), conversions: conversions.reverse() };
+    return parseCashFlowRows(response.data.values || []);
   } catch (error) {
     throw error;
   }
@@ -1462,7 +1380,18 @@ export async function addDeposit(data: { date: string, amount: number, reason: s
   if (isReadOnlyRequest(forceDemo)) return readOnlyResult;
   try {
     const { googleSheets } = await getSheetClient();
-    await googleSheets.spreadsheets.values.append({ spreadsheetId: SPREADSHEET_ID, range: `${CASH_FLOW_SHEET_NAME}!A:C`, valueInputOption: 'USER_ENTERED', requestBody: { values: [[data.date, data.amount, data.reason]] } });
+    const response = await googleSheets.spreadsheets.values.get({
+      spreadsheetId: SPREADSHEET_ID, range: `${CASH_FLOW_SHEET_NAME}!A1:J20`,
+    });
+    const { headerRow, deposit } = getCashFlowLayout(response.data.values || []);
+    await googleSheets.spreadsheets.values.append({
+      spreadsheetId: SPREADSHEET_ID,
+      range: `${CASH_FLOW_SHEET_NAME}!${cashFlowAppendRange(headerRow, deposit.date, deposit.reason)}`,
+      valueInputOption: 'USER_ENTERED',
+      requestBody: { values: [deposit.type >= 0
+        ? [data.date, data.amount, 'Deposit', data.reason]
+        : [data.date, data.amount, data.reason]] },
+    });
     return { success: true };
   } catch (error) { return { success: false, error: 'Failed' }; }
 }
@@ -1472,7 +1401,18 @@ export async function addConversion(data: { date: string, myr: number, usd: numb
   if (isReadOnlyRequest(forceDemo)) return readOnlyResult;
   try {
     const { googleSheets } = await getSheetClient();
-    await googleSheets.spreadsheets.values.append({ spreadsheetId: SPREADSHEET_ID, range: `${CASH_FLOW_SHEET_NAME}!E:H`, valueInputOption: 'USER_ENTERED', requestBody: { values: [[data.date, data.myr, data.usd, data.rate]] } });
+    const response = await googleSheets.spreadsheets.values.get({
+      spreadsheetId: SPREADSHEET_ID, range: `${CASH_FLOW_SHEET_NAME}!A1:J20`,
+    });
+    const { headerRow, conversion } = getCashFlowLayout(response.data.values || []);
+    const values: (string | number)[] = [data.date, data.myr, data.usd, data.rate];
+    if (conversion.flow >= 0) values.push('MYR to USD');
+    await googleSheets.spreadsheets.values.append({
+      spreadsheetId: SPREADSHEET_ID,
+      range: `${CASH_FLOW_SHEET_NAME}!${cashFlowAppendRange(headerRow, conversion.date, conversion.flow >= 0 ? conversion.flow : conversion.rate)}`,
+      valueInputOption: 'USER_ENTERED',
+      requestBody: { values: [values] },
+    });
     return { success: true };
   } catch (error) { return { success: false, error: 'Failed' }; }
 }

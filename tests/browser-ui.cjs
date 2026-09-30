@@ -146,6 +146,14 @@ async function main() {
 
       await search(page, 'Cash Flow');
       await page.getByRole('heading', { name: 'Funding Intelligence' }).waitFor();
+      const converted = page.locator('.kpi-card').filter({ has: page.getByText('Net Converted USD', { exact: true }) });
+      assert.match(await converted.innerText(), /\$7,000\.00/);
+      assert.match(await page.locator('.kpi-card').filter({ has: page.getByText('Real Cash Balance', { exact: true }) }).innerText(), /\$5,000\.00/);
+      await page.getByRole('heading', { name: 'Deposit / Withdrawal History (MYR)' }).waitFor();
+      if (reducedMotion === 'reduce' && (viewport.width === 390 || viewport.width === 1440) && viewport.height > 800) {
+        await page.evaluate(() => window.scrollTo(0, 0));
+        await page.screenshot({ path: path.join(output, `funding-${viewport.width}.png`), fullPage: true });
+      }
       await search(page, 'AAPL');
       await page.getByRole('heading', { name: 'Active Holdings' }).waitFor();
       await page.getByRole('button', { name: 'Hide values', exact: true }).click();

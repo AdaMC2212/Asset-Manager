@@ -36,7 +36,7 @@ export interface PortfolioSummary {
   totalCost: number;
   totalPL: number;
   totalPLPercent: number;
-  cashBalance: number; // This is "Net Spend" if not linked to deposits
+  cashBalance: number; // Portfolio "Total Cash" in USD
   holdings: Holding[];
 }
 

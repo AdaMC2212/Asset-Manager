@@ -66,6 +66,16 @@ or workspace HTML. An online visit is required to install offline support.
 
 ## Data Integrity
 
+- Investment reads match the `Investment.xlsx` source layout without importing
+  the download. Active holdings use `Portfolio!A:J`; USD summary values are
+  found by their `Total Invested`, `Total Cash`, and `Net Asset` labels (currently
+  `H22`, `H28`, and `H31`). Missing values or formula errors fail the refresh
+  instead of being silently displayed as zero.
+- Funding uses `Cash Flow!A:D` for deposits/withdrawals and `F:J` for currency
+  exchanges, with headers on row 2. Withdrawals and USD-to-MYR exchanges are
+  negative in the app's net funding totals and history. New deposits include
+  `Deposit` in column C; conversions include `MYR to USD` in column J. The older
+  single-header `A:C`/`E:H` layout remains supported through header detection.
 - `/demo` and the no-credentials workspace are read-only. Forms and server-side
   mutation guards both enforce this for normal app requests.
 - Credit-card settlement updates the charges and appends the payment in one

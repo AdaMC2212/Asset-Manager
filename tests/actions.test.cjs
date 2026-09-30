@@ -2,6 +2,7 @@ const { stubModule } = require('./register.cjs');
 const { test, beforeEach, afterEach, mock } = require('node:test');
 const assert = require('node:assert/strict');
 const { FakeSheets } = require('./fakeSheets.cjs');
+const { portfolioRows, cashFlowRows, legacyCashFlowRows } = require('./fixtures/investment-sheets.cjs');
 
 process.env.TZ = 'Asia/Kuala_Lumpur';
 let sheets;
@@ -216,6 +217,55 @@ test('all financial reads propagate failure instead of returning zeros', async (
   for (const read of [actions.getMoneyManagerData, actions.getPortfolioData, actions.getCashFlowData]) {
     await assert.rejects(read(), /Injected Sheets read failure/);
   }
+});
+
+test('investment actions request unformatted numbers and map the downloaded layout without writes', async () => {
+  sheets.tables.Portfolio = portfolioRows();
+  sheets.tables['Cash Flow'] = cashFlowRows();
+  const portfolio = await actions.getPortfolioData();
+  const funding = await actions.getCashFlowData();
+  assert.equal(portfolio.cashBalance, 40);
+  assert.equal(portfolio.totalPL, 200);
+  assert.equal(funding.totalConvertedUSD, 280);
+  assert.equal(sheets.calls.length, 0);
+  assert.deepEqual(sheets.readCalls, [
+    { spreadsheetId: 'test-only', range: 'Portfolio!A:N', valueRenderOption: 'UNFORMATTED_VALUE' },
+    { spreadsheetId: 'test-only', range: 'Cash Flow!A:J', valueRenderOption: 'UNFORMATTED_VALUE', dateTimeRenderOption: 'FORMATTED_STRING' },
+  ]);
+});
+
+test('funding writes use A:D and F:J with the type and direction required by sheet formulas', async () => {
+  sheets.tables['Cash Flow'] = cashFlowRows();
+  const before = structuredClone(sheets.tables['Cash Flow']);
+  assert.equal((await actions.addDeposit({ date: '2026-09-30', amount: 500, reason: 'Savings' })).success, true);
+  assert.equal((await actions.addConversion({ date: '2026-09-30', myr: 200, usd: 50, rate: 4 })).success, true);
+  const appends = sheets.calls.filter((call) => call.type === 'append').map((call) => call.request);
+  assert.equal(appends[0].range, 'Cash Flow!A2:D');
+  assert.deepEqual(appends[0].requestBody.values, [['2026-09-30', 500, 'Deposit', 'Savings']]);
+  assert.equal(appends[1].range, 'Cash Flow!F2:J');
+  assert.deepEqual(appends[1].requestBody.values, [['2026-09-30', 200, 50, 4, 'MYR to USD']]);
+  assert.deepEqual(sheets.tables['Cash Flow'].slice(0, before.length), before);
+  const data = await actions.getCashFlowData();
+  assert.equal(data.totalDepositedMYR, 1900);
+  assert.equal(data.totalConvertedUSD, 330);
+});
+
+test('legacy funding writes preserve the original layout', async () => {
+  sheets.tables['Cash Flow'] = legacyCashFlowRows();
+  assert.equal((await actions.addDeposit({ date: '2026-09-30', amount: 500, reason: 'Savings' })).success, true);
+  assert.equal((await actions.addConversion({ date: '2026-09-30', myr: 200, usd: 50, rate: 4 })).success, true);
+  const appends = sheets.calls.filter((call) => call.type === 'append').map((call) => call.request);
+  assert.equal(appends[0].range, 'Cash Flow!A1:C');
+  assert.deepEqual(appends[0].requestBody.values, [['2026-09-30', 500, 'Savings']]);
+  assert.equal(appends[1].range, 'Cash Flow!E1:H');
+  assert.deepEqual(appends[1].requestBody.values, [['2026-09-30', 200, 50, 4]]);
+});
+
+test('funding writes reject an unrecognized sheet layout without appending', async () => {
+  sheets.tables['Cash Flow'] = [['Unexpected columns']];
+  assert.equal((await actions.addDeposit({ date: '2026-09-30', amount: 500, reason: 'Savings' })).success, false);
+  assert.equal((await actions.addConversion({ date: '2026-09-30', myr: 200, usd: 50, rate: 4 })).success, false);
+  assert.equal(sheets.calls.length, 0);
 });
 
 test('settled card expenses are recognized in payment month on the server', async () => {

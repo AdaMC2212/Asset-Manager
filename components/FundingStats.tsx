@@ -60,7 +60,7 @@ export const FundingStats: React.FC<FundingStatsProps> = ({ cashFlow, portfolio,
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
         <div className="kpi-card p-5">
           <div className="mb-3 flex items-center justify-between">
-            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--text-muted)]">Deposited MYR</p>
+            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--text-muted)]">Net Deposited MYR</p>
             <Landmark className="h-4 w-4 text-emerald-300" />
           </div>
           <p className="font-display text-2xl text-[var(--text-primary)]">{displayValue(cashFlow.totalDepositedMYR, 'RM ', hideValues)}</p>
@@ -68,7 +68,7 @@ export const FundingStats: React.FC<FundingStatsProps> = ({ cashFlow, portfolio,
 
         <div className="kpi-card p-5">
           <div className="mb-3 flex items-center justify-between">
-            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--text-muted)]">Converted USD</p>
+            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--text-muted)]">Net Converted USD</p>
             <Banknote className="h-4 w-4 text-cyan-300" />
           </div>
           <p className="font-display text-2xl text-[var(--text-primary)]">{displayValue(cashFlow.totalConvertedUSD, '$', hideValues)}</p>
@@ -101,7 +101,7 @@ export const FundingStats: React.FC<FundingStatsProps> = ({ cashFlow, portfolio,
       <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
         <section className="panel overflow-hidden rounded-3xl">
           <div className="border-b border-[var(--border-soft)] px-5 py-4">
-            <h3 className="text-sm font-semibold text-[var(--text-primary)]">Deposit History (MYR)</h3>
+            <h3 className="text-sm font-semibold text-[var(--text-primary)]">Deposit / Withdrawal History (MYR)</h3>
           </div>
           <div className="max-h-[420px] overflow-y-auto">
             <table className="w-full text-left text-sm">

@@ -17,6 +17,7 @@ class FakeSheets {
       Transaction: [['Date', 'Ticker']],
     };
     this.calls = [];
+    this.readCalls = [];
     this.failRead = false;
     this.failBatch = false;
     this.loseBatchResponse = false;
@@ -52,8 +53,10 @@ class FakeSheets {
         return { data: {} };
       },
       values: {
-        get: async ({ range }) => {
+        get: async (request) => {
+          this.readCalls.push(clone(request));
           if (this.failRead) throw new Error('Injected Sheets read failure');
+          const { range } = request;
           const { name, start, end, first, last } = this.parseRange(range);
           return { data: { values: clone(this.tables[name].slice(first, last + 1).map((row) => row.slice(start, end + 1))) } };
         },
@@ -68,10 +71,18 @@ class FakeSheets {
         },
         append: async (request) => {
           this.calls.push({ type: 'append', request: clone(request) });
-          const { name } = this.parseRange(request.range);
+          const { name, start, end, first } = this.parseRange(request.range);
           // Yield so concurrent requests would observe the same snapshot without the lock.
           await new Promise((resolve) => setImmediate(resolve));
-          this.tables[name].push(...clone(request.requestBody.values));
+          const table = this.tables[name];
+          let nextRow = first;
+          table.forEach((row, index) => {
+            if (index >= first && row.slice(start, end + 1).some((value) => value != null && value !== '')) nextRow = index + 1;
+          });
+          request.requestBody.values.forEach((row, offset) => {
+            const target = table[nextRow + offset] ||= [];
+            row.forEach((value, index) => { target[start + index] = clone(value); });
+          });
           return { data: {} };
         },
         clear: async (request) => {
