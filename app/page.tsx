@@ -33,8 +33,6 @@ const LockScreen = ({ onUnlock }: { onUnlock: () => void }) => {
   return (
     <div className="ambient-bg relative flex min-h-screen items-center justify-center p-4">
       <div className="panel-elevated relative w-full max-w-md overflow-hidden rounded-3xl p-8 sm:p-10">
-        <div className="pointer-events-none absolute -left-12 -top-12 h-32 w-32 rounded-full bg-[var(--accent-primary)]/30 blur-3xl" />
-        <div className="pointer-events-none absolute -bottom-12 -right-12 h-40 w-40 rounded-full bg-emerald-400/20 blur-3xl" />
 
         <div className="relative z-10">
           <div className="mb-8 flex flex-col items-center text-center">

@@ -17,7 +17,8 @@ async function main() {
     const errors = [];
     page.on('pageerror', (error) => errors.push(error.message));
     await page.goto(`${base}/demo`);
-    await page.getByRole('heading', { name: 'Money Manager', exact: true }).waitFor();
+    await page.getByRole('heading', { level: 1, name: /Overview/ }).waitFor();
+    await page.getByRole('navigation', { name: 'Primary navigation' }).getByRole('button', { name: 'Money', exact: true }).click();
     await page.waitForFunction(() => navigator.serviceWorker.controller?.state === 'activated');
     const registration = await page.evaluate(async () => {
       const worker = await navigator.serviceWorker.ready;
@@ -46,7 +47,7 @@ async function main() {
     await page.screenshot({ path: path.join(output, 'offline-mobile.png') });
     await context.setOffline(false);
     await page.goto(`${base}/demo`);
-    await page.getByRole('heading', { name: 'Money Manager', exact: true }).waitFor();
+    await page.getByRole('heading', { level: 1, name: /Overview/ }).waitFor();
     assert.deepEqual(errors, []);
     console.log('PASS real Next.js demo: viewport dialog, worker install/activation, static-only cache, offline fallback, online recovery');
   } finally {

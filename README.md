@@ -4,11 +4,18 @@ AssetManager is a Next.js + TypeScript web app for tracking investments, cash fl
 
 ## Features
 
+- Dark, purpose-led workspace with Overview, Money, Invest, and Funding
+- Money Activity, Accounts, and Auto-debits tabs with monthly cash flow and card balances
 - Portfolio dashboard with holdings, allocation, and P/L insights
 - Cash flow tracking for MYR deposits and USD conversions
 - Money manager for account balances and transactions
 - Command palette (`Ctrl/Cmd + K`) for fast navigation and actions
 - PWA support with service worker registration
+
+The same dark theme is used for entry forms, card settlement, search, and account
+details. MYR money and USD investments remain separate; privacy hides amounts,
+rates, and chart proportions. The read-only `/demo` route previews every screen
+without modifying Google Sheets.
 
 ## Stack
 

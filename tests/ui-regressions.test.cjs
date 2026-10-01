@@ -38,6 +38,11 @@ const { AllocationChart } = require('../components/AllocationChart.tsx');
 const { TotalBalanceCard } = require('../components/TotalBalanceCard.tsx');
 const { WorkspaceModeProvider } = require('../components/WorkspaceMode.tsx');
 const { Overview } = require('../components/Overview.tsx');
+const { FundingStats } = require('../components/FundingStats.tsx');
+const { AddFundingModal } = require('../components/FundingStats/AddFundingModal.tsx');
+const { WorkspaceTabs } = require('../components/ui/WorkspaceTabs.tsx');
+const { AccountList } = require('../components/MoneyManager/AccountList.tsx');
+const { AutoDebitPanel } = require('../components/MoneyManager/AutoDebitPanel.tsx');
 
 afterEach(() => {
   if (rendered) act(() => rendered.unmount());
@@ -115,7 +120,7 @@ test('asset search selects Portfolio even when the current tab is Cash Flow', as
   assert.equal(rendered.root.findByType(CommandPalette).props.isOpen, false);
 });
 
-test('investment privacy masks allocation legend, percentages, tooltip, and narrative independently of wallet privacy', async () => {
+test('investment privacy masks allocation values, chart proportions and concentration independently of money', async () => {
   await mountHome();
   await act(async () => {
     workspace().props.onSelectModule('investment');
@@ -124,14 +129,103 @@ test('investment privacy masks allocation legend, percentages, tooltip, and narr
   const chart = rendered.root.findByType(AllocationChart);
   assert.equal(chart.props.hideValues, true);
   assert.doesNotMatch(text(chart), /\$5,000|\$2,500|66\.7%|33\.3%/);
-  const tooltip = chart.findByType(chartStubs.Tooltip);
-  assert.deepEqual(tooltip.props.formatter(5000), ['****', 'Allocation']);
-  const story = rendered.root.findAllByType('div').find((node) => node.props.className === 'kpi-card relative overflow-hidden p-6');
+  assert.equal(chart.findAllByProps({ className: 'workspace-allocation-bar' }).length, 0);
+  const story = rendered.root.findByProps({ className: 'workspace-concentration' });
   assert.doesNotMatch(text(story), /\d+\.\d+%/);
-  assert.equal(rendered.root.findByType(TotalBalanceCard).props.hideValues, false);
+  assert.equal(workspace().props.hideBalance, false);
+  assert.equal(rendered.root.findAllByType(TotalBalanceCard).length, 0, 'Invest does not show the MYR money balance');
   await act(async () => workspace().props.onToggleHideInvestments());
   assert.match(text(rendered.root.findByType(AllocationChart)), /\$5,000/);
   assert.match(text(story), /33\.3%/);
+  assert.equal(chart.findAllByProps({ className: 'workspace-allocation-bar' }).length, 1);
+});
+
+test('Money tabs retain filters and expose accounts and recurring rule controls', async () => {
+  await mountHome();
+  await act(async () => workspace().props.onSelectModule('manager'));
+  const activity = () => rendered.root.findByType(MoneyActivityList);
+  await act(async () => activity().props.onSetFilters({ type: 'Expense', account: 'Bank', startDate: '', endDate: '' }));
+  const tabs = () => rendered.root.findByType(WorkspaceTabs);
+  await act(async () => tabs().props.onChange('accounts'));
+  assert.equal(rendered.root.findByType(AccountList).props.accounts, money.accounts);
+  assert.equal(rendered.root.findAllByType(MoneyActivityList).length, 0);
+  await act(async () => workspace().props.onToggleHideBalance());
+  assert.equal(rendered.root.findByType(AccountList).props.hideValues, true);
+  await act(async () => tabs().props.onChange('auto'));
+  assert.equal(rendered.root.findByType(AutoDebitPanel).props.hideValues, true);
+  await act(async () => tabs().props.onChange('activity'));
+  assert.equal(activity().props.filters.type, 'Expense');
+  assert.equal(activity().props.filters.account, 'Bank');
+});
+
+test('Funding primary action opens cash flow, and leaving the page closes it', async () => {
+  await mountHome();
+  const selectFunding = async () => act(async () => {
+    workspace().props.onSelectModule('investment');
+    workspace().props.onSelectInvTab('funding');
+  });
+  await selectFunding();
+  assert.equal(rendered.root.findByType(AppShell).props.primaryActionLabel, 'Add cash flow');
+  await act(async () => rendered.root.findByType(AppShell).props.onPrimaryAction());
+  assert.equal(rendered.root.findByType(AddFundingModal).props.isOpen, true);
+  await act(async () => workspace().props.onSelectInvTab('dashboard'));
+  assert.equal(rendered.root.findAllByType(AddFundingModal).length, 0);
+  await selectFunding();
+  assert.equal(rendered.root.findByType(AddFundingModal).props.isOpen, false);
+});
+
+test('Funding primary action remains read-only in demo mode', async () => {
+  isDemo = true;
+  await mountHome();
+  await act(async () => {
+    workspace().props.onSelectModule('investment');
+    workspace().props.onSelectInvTab('funding');
+  });
+  await act(async () => rendered.root.findByType(AppShell).props.onPrimaryAction());
+  assert.equal(rendered.root.findByType(AddFundingModal).props.isOpen, false);
+});
+
+test('Funding retains reverse conversion direction and masks amounts and rates in both history tabs', async () => {
+  const funding = { ...cashFlow, deposits: [{ date: '2026-09-01', amountMYR: -650, reason: 'Withdrawal' }],
+    conversions: [{ date: '2026-09-02', amountMYR: -4300, amountUSD: -1000, rate: 4.3 }] };
+  await act(async () => { rendered = create(h(FundingStats, { cashFlow: funding, portfolio, hideValues: false })); });
+  assert.match(text(rendered.root.findByProps({ className: 'workspace-conversion' })), /USD 1,000\.00.*MYR 4,300\.00/);
+  assert.match(text(rendered.root), /RM -650\.00/);
+  await act(async () => rendered.root.findByType(WorkspaceTabs).props.onChange('conversions'));
+  assert.match(text(rendered.root), /-4,300\.00/);
+  await act(async () => rendered.update(h(FundingStats, { cashFlow: funding, portfolio, hideValues: true })));
+  assert.doesNotMatch(text(rendered.root), /4\.3000|4,300|1,000|7,000|650/);
+  await act(async () => rendered.root.findByType(WorkspaceTabs).props.onChange('deposits'));
+  assert.doesNotMatch(text(rendered.root), /650/);
+});
+
+test('Funding unavailable data is not rendered as a zero balance or a perpetual loader', async () => {
+  await act(async () => { rendered = create(h(FundingStats, { cashFlow, portfolio: null })); });
+  const metrics = rendered.root.findAllByProps({ className: 'workspace-metric' });
+  assert.match(text(metrics[2]), /Unavailable/);
+  assert.match(text(metrics[3]), /Unavailable/);
+  await act(async () => rendered.update(h(FundingStats, { cashFlow: null, portfolio: null })));
+  assert.match(text(rendered.root), /unavailable/);
+  assert.doesNotMatch(text(rendered.root), /Loading|\$0/);
+});
+
+test('workspace tabs support arrow keys, Home and End with one keyboard tab stop', async () => {
+  let selected;
+  let focused;
+  const items = [{ value: 'first', label: 'First' }, { value: 'second', label: 'Second' }];
+  await act(async () => { rendered = create(h(WorkspaceTabs, { id: 'test', label: 'Views', value: 'first', items, onChange: (value) => { selected = value; } })); });
+  const buttons = rendered.root.findAllByType('button');
+  assert.deepEqual(buttons.map((button) => button.props.tabIndex), [0, -1]);
+  const press = (index, key) => buttons[index].props.onKeyDown({
+    key, preventDefault: noop, currentTarget: { parentElement: { children: items.map((_, i) => ({ focus: () => { focused = i; } })) } },
+  });
+  press(0, 'ArrowLeft');
+  assert.equal(selected, 'second');
+  assert.equal(focused, 1);
+  press(1, 'Home');
+  assert.equal(selected, 'first');
+  press(0, 'End');
+  assert.equal(selected, 'second');
 });
 
 test('a single ordinary transfer exposes editing, deletion and full history', async () => {

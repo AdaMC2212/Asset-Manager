@@ -45,14 +45,22 @@ export function OverviewBrowser({ variant }: { variant: string }) {
   const long = variant === 'long';
   const currentMoney = empty ? { ...money, accounts: [], transactions: [], totalBalance: 0 } : long ? {
     ...money,
-    accounts: money.accounts.map((account) => ({ ...account, name: 'AccountWithAnExceptionallyLongNameThatMustWrap', currentBalance: 1234567890.12 })),
+    accounts: money.accounts.map((account, index) => ({ ...account, name: `AccountWithAnExceptionallyLongNameThatMustWrap${index}`, currentBalance: 1234567890.12 })),
     transactions: money.transactions.map((transaction) => ({ ...transaction, category: 'VeryLongTransactionCategoryWithoutSpaces', fromAccount: 'VeryLongAccountNameWithoutSpaces', amount: 1234567890.12 })),
   } : money;
   return <WorkspaceModeProvider value={variant === 'demo'}>
     <AppWorkspace
-      data={missing ? null : empty ? { ...portfolio, holdings: [], netWorth: 0 } : portfolio}
+      data={missing ? null : empty ? { ...portfolio, holdings: [], netWorth: 0 } : long ? {
+        ...portfolio, netWorth: 1234567890.12, totalPL: -123456789.12, cashBalance: 123456789.12,
+        holdings: portfolio.holdings.map((holding) => ({ ...holding, ticker: 'LONGTICKERSYMBOL', sector: 'SectorWithAnExceptionallyLongNameThatMustWrap',
+          quantity: 123456789, currentValue: 1234567890.12, unrealizedPL: -123456789.12 })),
+      } : portfolio}
       moneyData={missing ? null : currentMoney}
-      cashFlowData={missing ? null : empty ? { ...cashFlow, conversions: [] } : cashFlow}
+      cashFlowData={missing ? null : empty ? { ...cashFlow, conversions: [] } : long ? {
+        ...cashFlow, totalDepositedMYR: 1234567890.12, totalConvertedUSD: 123456789.12,
+        deposits: [{ date: '2026-09-30', amountMYR: 1234567890.12, reason: 'DepositWithAnExceptionallyLongDescriptionWithoutSpaces' }],
+        conversions: [{ date: '2026-09-30', amountMYR: -1234567890.12, amountUSD: -123456789.12, rate: 10 }],
+      } : cashFlow}
       loading={variant === 'loading'}
       error={missing ? 'Sync failed. Refresh to retry.' : syncError}
       lastSyncedAt={new Date('2026-09-30T09:41:00')}

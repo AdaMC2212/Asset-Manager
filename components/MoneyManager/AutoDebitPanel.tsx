@@ -69,33 +69,30 @@ export const AutoDebitPanel: React.FC<AutoDebitPanelProps> = ({ rules, hideValue
   };
 
   return (
-    <div className="rounded-3xl border border-white/5 bg-slate-900/40 p-4 shadow-xl backdrop-blur-md md:p-6">
-      <div className="mb-4 flex items-center justify-between gap-3">
+    <section className="workspace-section">
+      <div className="workspace-section-heading">
         <div className="flex items-center gap-3">
-          <div className="rounded-2xl bg-cyan-500/10 p-3 text-cyan-300">
-            <Repeat className="h-5 w-5" />
-          </div>
+          <Repeat className="h-4 w-4 text-cyan-300" />
           <div>
-            <h3 className="text-lg font-bold text-white">Auto-Debits</h3>
-            <p className="text-xs text-slate-400">Monthly rules that auto-post when the due date arrives.</p>
+            <h3>Auto-Debits</h3>
           </div>
         </div>
 
-        <button disabled={readOnly} title={readOnly ? 'Demo is read-only' : 'Add rule'} onClick={onAdd} className="inline-flex items-center gap-2 rounded-xl bg-cyan-600 px-3 py-2 text-xs font-bold text-white transition-colors hover:bg-cyan-500">
+        <button disabled={readOnly} title={readOnly ? 'Demo is read-only' : 'Add rule'} onClick={onAdd} className="workspace-secondary-button">
           <Plus className="h-4 w-4" />
           Add Rule
         </button>
       </div>
 
-      <div className="space-y-3">
+      <div>
         {sortedRules.length === 0 ? (
-          <div className="rounded-2xl border border-dashed border-slate-700 bg-slate-950/40 p-5 text-center text-sm text-slate-500">
+          <div className="workspace-empty">
             No auto-debit rules yet.
           </div>
         ) : (
           sortedRules.map((rule) => (
-            <div key={rule.id} className="rounded-2xl border border-white/5 bg-slate-950/50 p-4">
-              <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+            <div key={rule.id} className="workspace-recurring-row">
+              <div className="flex flex-col gap-3">
                 <div className="min-w-0">
                   <div className="flex items-center gap-2">
                     <div className="truncate text-sm font-bold text-white">{rule.name}</div>
@@ -112,15 +109,15 @@ export const AutoDebitPanel: React.FC<AutoDebitPanelProps> = ({ rules, hideValue
                   </div>
                 </div>
 
-                <div className="flex items-center gap-2">
+                <div className="workspace-recurring-actions">
                   <div className="mr-1 text-sm font-bold text-cyan-300">{displayValue(rule.amount, hideValues)}</div>
-                  <button disabled={readOnly} title={readOnly ? 'Demo is read-only' : 'Edit rule'} onClick={() => onEdit(rule)} className="rounded-lg p-2 text-slate-400 hover:bg-slate-800 hover:text-indigo-400">
+                  <button aria-label={`Edit ${rule.name}`} disabled={readOnly} title={readOnly ? 'Demo is read-only' : 'Edit rule'} onClick={() => onEdit(rule)} className="rounded-lg p-2 text-slate-400 hover:bg-slate-800 hover:text-indigo-400">
                     <Pencil className="h-4 w-4" />
                   </button>
-                  <button disabled={readOnly} title={readOnly ? 'Demo is read-only' : rule.isActive ? 'Pause rule' : 'Resume rule'} onClick={() => handleToggle(rule)} className="rounded-lg p-2 text-slate-400 hover:bg-slate-800 hover:text-emerald-400">
+                  <button aria-label={`${rule.isActive ? 'Pause' : 'Resume'} ${rule.name}`} disabled={readOnly} title={readOnly ? 'Demo is read-only' : rule.isActive ? 'Pause rule' : 'Resume rule'} onClick={() => handleToggle(rule)} className="rounded-lg p-2 text-slate-400 hover:bg-slate-800 hover:text-emerald-400">
                     {rule.isActive ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
                   </button>
-                  <button disabled={readOnly} title={readOnly ? 'Demo is read-only' : 'Delete rule'} onClick={() => handleDelete(rule)} className="rounded-lg p-2 text-slate-400 hover:bg-slate-800 hover:text-rose-400">
+                  <button aria-label={`Delete ${rule.name}`} disabled={readOnly} title={readOnly ? 'Demo is read-only' : 'Delete rule'} onClick={() => handleDelete(rule)} className="rounded-lg p-2 text-slate-400 hover:bg-slate-800 hover:text-rose-400">
                     <Trash2 className="h-4 w-4" />
                   </button>
                 </div>
@@ -129,6 +126,6 @@ export const AutoDebitPanel: React.FC<AutoDebitPanelProps> = ({ rules, hideValue
           ))
         )}
       </div>
-    </div>
+    </section>
   );
 };

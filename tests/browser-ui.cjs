@@ -69,6 +69,7 @@ async function main() {
     content: [path.join(root, 'app/**/*.{ts,tsx}'), path.join(root, 'components/**/*.{ts,tsx}')],
   })]).process(await fs.readFile(path.join(root, 'app/globals.css'), 'utf8'), { from: undefined });
   const overviewCss = await fs.readFile(path.join(root, 'app/overview.css'), 'utf8');
+  const workspaceCss = await fs.readFile(path.join(root, 'app/workspace.css'), 'utf8');
   const fontFile = process.env.UI_FONT_FILE;
   const fontData = fontFile ? await fs.readFile(fontFile) : null;
   const fontCss = fontFile ? '@font-face {font-family: Manrope; src: url(/font.woff2) format("woff2"); font-weight: 200 800; font-style: normal;}' : '';
@@ -83,7 +84,7 @@ async function main() {
       response.end(bundle.outputFiles[0].text);
     } else if (pathname === '/test.css') {
       response.setHeader('Content-Type', 'text/css');
-      response.end(css.css + '\n' + overviewCss + '\n' + fontCss);
+      response.end(css.css + '\n' + overviewCss + '\n' + workspaceCss + '\n' + fontCss);
     } else {
       response.setHeader('Content-Type', 'text/html');
       response.end(`<!doctype html><html><head><meta name="viewport" content="width=device-width,initial-scale=1"><link rel="stylesheet" href="/test.css"></head><body class="font-body" style="--font-body:${fontFile ? 'Manrope' : 'Arial'};--font-display:Arial"><div id="root"></div><script src="/test.js"></script></body></html>`);
@@ -138,6 +139,18 @@ async function main() {
       dialog = await checkOverlay(page, viewport);
       await dialog.getByRole('button', { name: 'Close wallet snapshot' }).click();
 
+      await page.getByRole('tab', { name: 'Accounts', exact: true }).click();
+      assert.match(await page.getByRole('tabpanel').innerText(), /Bank/);
+      await page.getByRole('tab', { name: 'Auto-debits', exact: true }).click();
+      await page.getByRole('button', { name: 'Add Rule', exact: true }).click();
+      await checkOverlay(page, viewport);
+      await page.getByRole('button', { name: 'Close auto-debit form' }).click();
+      await page.getByRole('tab', { name: 'Activity', exact: true }).click();
+      assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true, 'Money fits viewport');
+      if (reducedMotion === 'reduce' && [390, 1440].includes(viewport.width) && viewport.height > 800) {
+        await page.evaluate(() => window.scrollTo(0, 0));
+        await page.screenshot({ path: path.join(output, `money-${viewport.width}.png`), fullPage: true });
+      }
       const edit = page.getByRole('button', { name: 'Edit transaction', exact: true }).first();
       await edit.scrollIntoViewIfNeeded();
       const editBox = await visibleBox(edit, viewport);
@@ -156,28 +169,37 @@ async function main() {
       await page.getByRole('button', { name: 'Close transaction form' }).click();
 
       await search(page, 'Cash Flow');
-      await page.getByRole('heading', { name: 'Funding Intelligence' }).waitFor();
-      const converted = page.locator('.kpi-card').filter({ has: page.getByText('Net Converted USD', { exact: true }) });
+      await page.getByRole('heading', { level: 1, name: /Funding/ }).waitFor();
+      const converted = page.locator('.workspace-metric').filter({ has: page.getByText('Net Converted USD', { exact: true }) });
       assert.match(await converted.innerText(), /\$7,000\.00/);
-      assert.match(await page.locator('.kpi-card').filter({ has: page.getByText('Real Cash Balance', { exact: true }) }).innerText(), /\$5,000\.00/);
+      assert.match(await page.locator('.workspace-metric').filter({ has: page.getByText('Available cash USD', { exact: true }) }).innerText(), /\$5,000\.00/);
       await page.getByRole('heading', { name: 'Deposit / Withdrawal History (MYR)' }).waitFor();
+      await page.getByRole('tab', { name: 'Conversions', exact: true }).click();
+      await page.getByRole('heading', { name: 'USD Conversions', exact: true }).waitFor();
+      await page.getByRole('button', { name: 'Add cash flow', exact: true }).click();
+      await checkOverlay(page, viewport);
+      await page.getByRole('button', { name: 'Close cash flow form' }).click();
+      assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true, 'Funding fits viewport');
       if (reducedMotion === 'reduce' && (viewport.width === 390 || viewport.width === 1440) && viewport.height > 800) {
         await page.evaluate(() => window.scrollTo(0, 0));
         await page.screenshot({ path: path.join(output, `funding-${viewport.width}.png`), fullPage: true });
       }
       await search(page, 'AAPL');
       await page.getByRole('heading', { name: 'Active Holdings' }).waitFor();
+      await page.getByRole('button', { name: 'AAPL holding details', exact: true }).click();
+      assert.match(await page.locator('.holding-details').innerText(), /Current price.*\n.*\$250\.00/s);
+      assert.match(await page.locator('.holding-details').innerText(), /Average cost/);
+      assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true, 'Holding details fit viewport');
       await page.getByRole('button', { name: 'Hide values', exact: true }).click();
+      assert.doesNotMatch(await page.locator('.holding-details').innerText(), /\$200\.00|\$2,000|33\.3%/);
       const allocation = page.locator('section').filter({ has: page.getByRole('heading', { name: 'Allocation Mix' }) });
       assert.doesNotMatch(await allocation.innerText(), /\$5,000|\$2,500|\d+\.\d+%/);
-      const chart = allocation.locator('.recharts-surface');
-      await chart.scrollIntoViewIfNeeded();
-      const chartBox = await chart.boundingBox();
-      await chart.hover({ position: { x: chartBox.width / 2 + 50, y: chartBox.height / 2 - 50 } });
-      await allocation.locator('.recharts-tooltip-wrapper').waitFor({ state: 'visible' });
-      assert.doesNotMatch(await allocation.innerText(), /\$5,000|\$2,500|\d+\.\d+%/);
-      const story = page.locator('.kpi-card').filter({ has: page.getByRole('heading', { name: 'Insight Story' }) });
+      assert.equal(await allocation.locator('.workspace-allocation-bar').count(), 0, 'Privacy also removes allocation proportions');
+      const story = page.locator('.workspace-concentration');
       assert.doesNotMatch(await story.innerText(), /\d+\.\d+%/);
+      assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true, 'Invest fits viewport');
+      await page.getByRole('button', { name: 'Show values', exact: true }).click();
+      await page.getByRole('button', { name: 'AAPL holding details', exact: true }).click();
       if (reducedMotion === 'reduce' && (viewport.width === 390 || viewport.width === 1440) && viewport.height > 800) {
         await page.evaluate(() => window.scrollTo(0, 0));
         await page.screenshot({ path: path.join(output, `portfolio-${viewport.width}.png`), fullPage: true });

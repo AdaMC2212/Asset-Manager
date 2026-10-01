@@ -167,7 +167,7 @@ export const AddMoneyModal: React.FC<AddMoneyModalProps> = ({
     <ModalPortal>
     <div role="dialog" aria-modal="true" aria-label={initialData ? 'Edit Transaction' : 'Add Transaction'} className="dialog-overlay z-[110] bg-black/70 backdrop-blur-sm" onClick={onClose}>
       <div className="panel-elevated w-full max-w-2xl rounded-3xl" onClick={(event) => event.stopPropagation()}>
-        <div className="sticky top-0 flex items-center justify-between rounded-t-3xl border-b border-slate-800 bg-[rgba(15,23,42,0.96)] p-5 backdrop-blur-sm sm:p-6">
+        <div className="sticky top-0 flex items-center justify-between rounded-t-3xl border-b border-slate-800 bg-[var(--bg-surface)] p-5 sm:p-6">
           <h2 className="text-xl font-bold text-white">
             {initialData ? 'Edit Transaction' : 'New Transaction'}
           </h2>

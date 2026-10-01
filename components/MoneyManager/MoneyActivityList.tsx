@@ -54,10 +54,10 @@ export const MoneyActivityList: React.FC<MoneyActivityListProps> = ({
 }) => {
   const readOnly = useReadOnly();
   return (
-    <div className="rounded-3xl border border-white/5 bg-slate-900/40 p-3 shadow-xl backdrop-blur-md md:p-6">
-      <div className="mb-3 flex items-center justify-between px-1 md:mb-6">
+    <section className="workspace-section">
+      <div className="workspace-section-heading">
         <div className="flex items-center gap-2 md:gap-3">
-          <h3 className="text-lg font-bold text-white md:text-xl">Activity</h3>
+          <h3>Activity</h3>
           <span className="rounded-full bg-slate-800/50 px-2 py-0.5 text-[10px] font-medium text-slate-500 md:px-3 md:py-1 md:text-xs">
             {filteredTransactions.length}
           </span>
@@ -77,7 +77,7 @@ export const MoneyActivityList: React.FC<MoneyActivityListProps> = ({
       </div>
 
       {(showFilters || hasActiveFilters) && (
-        <div className="animate-in slide-in-from-top-2 fade-in mb-4 space-y-3 rounded-2xl border border-white/5 bg-slate-900/60 p-3 md:mb-6 md:space-y-4 md:p-4">
+        <div className="mb-4 space-y-3 border-b border-[var(--border-soft)] pb-4">
           <div className="flex items-center justify-between">
             <h4 className="text-xs font-bold uppercase tracking-widest text-slate-500">Filter Options</h4>
             {hasActiveFilters ? (
@@ -87,12 +87,13 @@ export const MoneyActivityList: React.FC<MoneyActivityListProps> = ({
             ) : null}
           </div>
 
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+          <div className="grid grid-cols-1 gap-4">
             <div>
               <label className="mb-1.5 block text-xs text-slate-400">Date Range</label>
               <div className="flex gap-2">
                 <input
                   type="date"
+                  aria-label="Start date"
                   className="min-w-0 w-full rounded-lg border border-slate-700 bg-slate-950 px-2 py-1.5 text-xs text-white focus:border-indigo-500 focus:outline-none"
                   value={filters.startDate}
                   onChange={(event) => onSetFilters({ ...filters, startDate: event.target.value })}
@@ -100,6 +101,7 @@ export const MoneyActivityList: React.FC<MoneyActivityListProps> = ({
                 <span className="self-center text-slate-600">-</span>
                 <input
                   type="date"
+                  aria-label="End date"
                   className="min-w-0 w-full rounded-lg border border-slate-700 bg-slate-950 px-2 py-1.5 text-xs text-white focus:border-indigo-500 focus:outline-none"
                   value={filters.endDate}
                   onChange={(event) => onSetFilters({ ...filters, endDate: event.target.value })}
@@ -129,6 +131,7 @@ export const MoneyActivityList: React.FC<MoneyActivityListProps> = ({
               <select
                 className="w-full rounded-lg border border-slate-700 bg-slate-950 px-2 py-1.5 text-xs text-white focus:border-indigo-500 focus:outline-none"
                 value={filters.account}
+                aria-label="Account filter"
                 onChange={(event) => onSetFilters({ ...filters, account: event.target.value })}
               >
                 <option value="All">All Accounts</option>
@@ -143,7 +146,7 @@ export const MoneyActivityList: React.FC<MoneyActivityListProps> = ({
         </div>
       )}
 
-      <div className="space-y-1.5 md:space-y-3">
+      <div>
         {filteredTransactions.slice(0, 10).map((tx) => {
           const style = getCategoryStyles(tx.category);
           const txDisplay = getTransactionDisplay(tx);
@@ -161,10 +164,10 @@ export const MoneyActivityList: React.FC<MoneyActivityListProps> = ({
           return (
             <div
               key={tx.id}
-              className="group flex items-center justify-between gap-2 rounded-2xl border border-transparent p-2 transition-all hover:border-white/5 hover:bg-white/5 md:p-3"
+              className="workspace-activity-row group flex items-center justify-between gap-2 py-3 hover:bg-white/[0.02]"
             >
               <div className="flex min-w-0 items-center gap-2.5 md:gap-4">
-                <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl shadow-lg shadow-black/20 md:h-12 md:w-12 md:rounded-2xl ${style.color} ${style.text}`}>
+                <div className="workspace-mark-small">
                   {style.icon}
                 </div>
                 <div className="min-w-0">
@@ -216,6 +219,6 @@ export const MoneyActivityList: React.FC<MoneyActivityListProps> = ({
           </button>
         </div>
       )}
-    </div>
+    </section>
   );
 };

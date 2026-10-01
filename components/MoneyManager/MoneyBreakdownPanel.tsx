@@ -1,13 +1,8 @@
 'use client';
 
 import React from 'react';
-import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts';
 
-interface BreakdownEntry {
-  name: string;
-  value: number;
-}
-
+interface BreakdownEntry { name: string; value: number; }
 interface MoneyBreakdownPanelProps {
   pieData: BreakdownEntry[];
   fullBreakdown: BreakdownEntry[];
@@ -18,82 +13,26 @@ interface MoneyBreakdownPanelProps {
 }
 
 export const MoneyBreakdownPanel: React.FC<MoneyBreakdownPanelProps> = ({
-  pieData,
-  fullBreakdown,
-  hideValues,
-  colors,
-  onSelectCategory,
-  displayValue,
+  fullBreakdown, hideValues, colors, onSelectCategory, displayValue,
 }) => {
+  const max = Math.max(1, ...fullBreakdown.map((entry) => Math.abs(entry.value)));
   return (
-    <div className="flex min-h-[300px] flex-col rounded-3xl border border-white/5 bg-slate-900/40 p-4 shadow-xl backdrop-blur-md md:min-h-[400px] md:p-6">
-      <h3 className="mb-4 text-lg font-bold text-white md:mb-6 md:text-xl">Net Spending Breakdown</h3>
-      <div className="relative flex-grow">
-        {pieData.length > 0 && !hideValues ? (
-          <ResponsiveContainer width="100%" height={220}>
-            <PieChart>
-              <Pie
-                data={pieData}
-                cx="50%"
-                cy="50%"
-                innerRadius={52}
-                outerRadius={72}
-                paddingAngle={5}
-                dataKey="value"
-                stroke="none"
-                cornerRadius={4}
-                onClick={(payload) => onSelectCategory(payload.name)}
-                className="cursor-pointer focus:outline-none"
-              >
-                {pieData.map((entry, index) => (
-                  <Cell key={`cell-${index}`} fill={colors[index % colors.length]} className="cursor-pointer transition-opacity hover:opacity-80" />
-                ))}
-              </Pie>
-              <Tooltip
-                formatter={(value: number) => `RM ${value.toLocaleString()}`}
-                contentStyle={{
-                  backgroundColor: '#0f172a',
-                  borderColor: 'rgba(255,255,255,0.1)',
-                  color: '#f8fafc',
-                  borderRadius: '12px',
-                }}
-                itemStyle={{ color: '#e2e8f0' }}
-              />
-            </PieChart>
-          </ResponsiveContainer>
-        ) : (
-          <div className="absolute inset-0 flex items-center justify-center text-sm text-slate-500">{hideValues ? 'Hidden' : 'No Data'}</div>
-        )}
-
-        {!hideValues && pieData.length > 0 ? (
-          <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
-            <span className="text-center text-xs font-bold uppercase tracking-widest text-slate-500">
-              NET
-              <br />
-              SPEND
-            </span>
-          </div>
-        ) : null}
-      </div>
-
-      <div className="custom-scrollbar mt-4 max-h-[220px] space-y-1.5 overflow-y-auto pr-1 md:mt-6 md:max-h-[300px] md:space-y-2 md:pr-2">
+    <section className="workspace-section">
+      <div className="workspace-section-heading"><h3>Net Spending Breakdown</h3><span>MYR</span></div>
+      <div className="workspace-breakdown">
         {fullBreakdown.map((entry, index) => (
-          <button
-            key={entry.name}
-            onClick={() => onSelectCategory(entry.name)}
-            className="group flex w-full items-center justify-between rounded-xl border border-transparent p-2 text-left transition-all hover:border-white/5 hover:bg-white/5 md:p-2.5"
-          >
-            <div className="flex items-center gap-3">
-              <div className="h-3 w-3 rounded-full shadow-[0_0_8px_rgba(0,0,0,0.3)]" style={{ backgroundColor: colors[index % colors.length] || '#64748b' }} />
-              <span className="text-sm font-semibold text-slate-300 transition-colors group-hover:text-white">{entry.name}</span>
-            </div>
-            <span className={`text-xs font-bold md:text-sm ${entry.value < 0 ? 'text-emerald-400' : 'text-slate-100'}`}>
-              {entry.value < 0 ? '+' : ''}
-              {displayValue(Math.abs(entry.value))}
+          <button key={entry.name} type="button" className="workspace-bar-row py-2" onClick={() => onSelectCategory(entry.name)}>
+            <span className="workspace-bar-label">
+              <span>{entry.name}</span>
+              <strong className={entry.value < 0 ? 'overview-positive' : ''}>{entry.value < 0 ? '+' : ''}{displayValue(Math.abs(entry.value))}</strong>
             </span>
+            {!hideValues ? <span className="workspace-bar-track" aria-hidden="true">
+              <span className="workspace-bar-fill" style={{ width: `${Math.abs(entry.value) / max * 100}%`, background: colors[index % colors.length] }} />
+            </span> : null}
           </button>
         ))}
+        {!fullBreakdown.length ? <p className="workspace-empty">No spending for this period.</p> : null}
       </div>
-    </div>
+    </section>
   );
 };

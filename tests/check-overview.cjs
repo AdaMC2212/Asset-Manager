@@ -51,7 +51,7 @@ exports.checkOverview = async (browser, base, output) => {
     const nav = page.getByRole('navigation', { name: 'Primary navigation' });
     await nav.getByRole('button', { name: 'Overview', exact: true }).click();
     await page.getByRole('button', { name: 'History', exact: true }).click();
-    await page.getByRole('heading', { name: /Funding Intelligence/ }).waitFor();
+    await page.getByRole('heading', { level: 1, name: /Funding/ }).waitFor();
     await nav.getByRole('button', { name: 'Invest', exact: true }).click();
     await page.getByRole('heading', { name: 'Active Holdings' }).waitFor();
     await nav.getByRole('button', { name: 'Overview', exact: true }).click();
@@ -69,6 +69,30 @@ exports.checkOverview = async (browser, base, output) => {
       await checkGeometry();
       if (variant === 'missing') assert.match(await overview.innerText(), /Unavailable/);
       if (variant === 'demo') assert.equal(await page.getByRole('button', { name: 'Add transaction', exact: true }).isDisabled(), true);
+      for (const module of ['Money', 'Invest', 'Funding']) {
+        await nav.getByRole('button', { name: module, exact: true }).click();
+        const geometry = await page.evaluate(() => ({
+          page: document.documentElement.scrollWidth > innerWidth,
+          elements: [...document.querySelectorAll('.workspace-metric, .workspace-table, .workspace-tabs, .workspace-credit-row, .workspace-account-row')]
+            .filter((element) => element.getBoundingClientRect().width > 0 && element.scrollWidth > element.clientWidth + 2)
+            .map((element) => element.className),
+        }));
+        assert.deepEqual(geometry, { page: false, elements: [] }, `${module} ${variant} fits ${viewport.width}px`);
+        if (variant === 'missing' || variant === 'demo') {
+          assert.equal(await page.locator('.workspace-header-action').isDisabled(), true);
+        }
+        if (module === 'Money' && variant !== 'missing') {
+          await page.getByRole('tab', { name: 'Accounts', exact: true }).click();
+          assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true, 'Account names and balances fit');
+          await page.getByRole('tab', { name: 'Auto-debits', exact: true }).click();
+          if (variant === 'demo') assert.equal(await page.getByRole('button', { name: 'Add Rule' }).isDisabled(), true);
+          await page.getByRole('tab', { name: 'Activity', exact: true }).click();
+        }
+        if (module === 'Funding' && variant !== 'missing') {
+          await page.getByRole('tab', { name: 'Conversions', exact: true }).click();
+          assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true, 'Conversion history fits');
+        }
+      }
     }
     await page.goto(`${base}/?overview=loading`);
     await page.getByRole('heading', { level: 1, name: /Overview/ }).waitFor();

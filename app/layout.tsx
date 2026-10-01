@@ -3,6 +3,7 @@ import { Manrope, Space_Grotesk } from "next/font/google";
 import Script from "next/script";
 import "./globals.css";
 import "./overview.css";
+import "./workspace.css";
 
 const manrope = Manrope({
   subsets: ["latin"],

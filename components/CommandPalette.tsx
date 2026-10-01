@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { ArrowRight, Command, LayoutGrid, LineChart, Plus, RefreshCw, Search, Wallet } from 'lucide-react';
+import { ArrowRight, X, LayoutGrid, LineChart, Plus, RefreshCw, Search, Wallet } from 'lucide-react';
 import { AppModule, CommandSearchItem, InvestmentTab, QuickActionType } from '../types/ui';
 import { ModalPortal } from './ui/ModalPortal';
 
@@ -143,9 +143,7 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({
               }
             }}
           />
-          <span className="rounded-md border border-[var(--border-soft)] bg-black/20 px-2 py-1 text-[10px] font-bold text-[var(--text-muted)]">
-            ESC
-          </span>
+          <button type="button" onClick={onClose} className="workspace-icon-button" aria-label="Close search" title="Close search"><X size={18} /></button>
         </div>
 
         <div className="max-h-[60vh] overflow-y-auto p-2">
@@ -186,16 +184,6 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({
           )}
         </div>
 
-        <div className="flex items-center justify-between border-t border-[var(--border-soft)] bg-black/20 px-4 py-3 text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--text-muted)]">
-          <div className="flex items-center gap-4">
-            <span>Up/Down to navigate</span>
-            <span>Enter to select</span>
-          </div>
-          <div className="inline-flex items-center gap-1.5">
-            <Command className="h-3 w-3" />
-            Command Palette
-          </div>
-        </div>
       </div>
       <button type="button" className="absolute inset-0 -z-10 cursor-default" onClick={onClose} aria-label="Close command palette" />
     </div>

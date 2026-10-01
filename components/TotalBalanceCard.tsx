@@ -1,10 +1,10 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
-import { Banknote, CreditCard, Eye, EyeOff, Smartphone, Wallet, X } from 'lucide-react';
+import { ArrowUpRight, Eye, EyeOff, X } from 'lucide-react';
 import { MoneyAccount } from '../types';
-import { CountUp } from './ui/CountUp';
 import { ModalPortal } from './ui/ModalPortal';
+import { AccountList } from './MoneyManager/AccountList';
 
 interface TotalBalanceCardProps {
   totalBalance: number;
@@ -16,136 +16,40 @@ interface TotalBalanceCardProps {
 
 export const TotalBalanceCard: React.FC<TotalBalanceCardProps> = ({ totalBalance, accounts, hideValues, onTogglePrivacy, syncFailed = false }) => {
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const activeAccounts = accounts.filter((account) => account.currentBalance !== 0);
-
-  const displayValue = (value: number) =>
-    hideValues ? 'RM ****' : `RM ${value.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-
   useEffect(() => {
     if (!isModalOpen) return;
-    const handleKey = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') setIsModalOpen(false);
-    };
-    window.addEventListener('keydown', handleKey);
-    return () => window.removeEventListener('keydown', handleKey);
+    const close = (event: KeyboardEvent) => { if (event.key === 'Escape') setIsModalOpen(false); };
+    window.addEventListener('keydown', close);
+    return () => window.removeEventListener('keydown', close);
   }, [isModalOpen]);
-
-  const getAccountIcon = (category: string) => {
-    const normalized = category.toLowerCase();
-    if (normalized.includes('bank')) return <Smartphone className="h-5 w-5 text-indigo-200" />;
-    if (normalized.includes('wallet') || normalized.includes('pay')) return <Smartphone className="h-5 w-5 text-blue-200" />;
-    if (normalized.includes('card')) return <CreditCard className="h-5 w-5 text-emerald-200" />;
-    if (normalized.includes('cash')) return <Banknote className="h-5 w-5 text-amber-200" />;
-    return <Wallet className="h-5 w-5 text-slate-200" />;
-  };
 
   return (
     <>
-      <section
-        onClick={() => setIsModalOpen(true)}
-        className="panel-elevated relative mb-2 cursor-pointer overflow-hidden rounded-3xl p-4 transition hover:-translate-y-0.5 sm:p-8"
-      >
-        <div className="pointer-events-none absolute -right-12 -top-14 h-44 w-44 rounded-full bg-[var(--accent-primary)]/25 blur-3xl" />
-        <div className="pointer-events-none absolute -bottom-16 -left-14 h-44 w-44 rounded-full bg-cyan-500/15 blur-3xl" />
-
-        <div className="relative z-10 flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
-          <div className="space-y-3 sm:space-y-4">
-            <div className="inline-flex items-center gap-2 rounded-full border border-[var(--border-soft)] bg-black/25 px-3 py-1">
-              <Wallet className="h-4 w-4 text-[var(--text-secondary)]" />
-              <span className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--text-muted)]">Total Balance</span>
-            </div>
-
-            <h2 className="font-display text-2xl text-[var(--text-primary)] sm:text-4xl md:text-5xl">
-              {hideValues ? 'RM *******' : <CountUp end={totalBalance} prefix="RM " />}
-            </h2>
-
-            <div className="flex items-center gap-2 sm:gap-3">
-              <div className="flex -space-x-2">
-                {activeAccounts.slice(0, 4).map((account) => (
-                  <div
-                    key={account.name}
-                    className="flex h-7 w-7 items-center justify-center overflow-hidden rounded-full border-2 border-[var(--bg-elevated)] bg-black/30 text-[10px] font-bold text-[var(--text-secondary)] sm:h-8 sm:w-8"
-                    title={account.name}
-                  >
-                    {account.name.charAt(0)}
-                  </div>
-                ))}
-                {activeAccounts.length > 4 ? (
-                  <div className="flex h-7 w-7 items-center justify-center rounded-full border-2 border-[var(--bg-elevated)] bg-black/30 text-[10px] font-bold text-[var(--text-secondary)] sm:h-8 sm:w-8">
-                    +{activeAccounts.length - 4}
-                  </div>
-                ) : null}
-              </div>
-              <span className="text-xs text-[var(--text-secondary)] sm:text-sm">{activeAccounts.length} active accounts</span>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-3">
-            <button
-              type="button"
-              onClick={(event) => {
-                event.stopPropagation();
-                onTogglePrivacy();
-              }}
-              className="focus-ring rounded-xl border border-[var(--border-soft)] bg-black/20 p-2.5 text-[var(--text-secondary)] transition hover:text-[var(--text-primary)] sm:p-3"
-            >
-              {hideValues ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
-            </button>
-            <div role="status" className={`inline-flex items-center gap-2 rounded-xl border px-3 py-2 text-sm ${syncFailed ? 'border-amber-500/20 bg-amber-500/10 text-amber-300' : 'border-emerald-500/20 bg-emerald-500/10 text-emerald-300'}`}>
-              <span className={`h-2 w-2 rounded-full ${syncFailed ? 'bg-amber-300' : 'bg-emerald-300'}`} />
-              {syncFailed ? 'Sync incomplete' : 'Synced'}
-            </div>
-          </div>
+      <section className="money-balance">
+        <button type="button" className="text-left focus-ring" onClick={() => setIsModalOpen(true)}>
+          <span className="workspace-metric-label">Total Balance <ArrowUpRight size={14} /></span>
+          <span className="workspace-metric-value">{hideValues ? 'RM ****' : `RM ${totalBalance.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}</span>
+        </button>
+        <div className="money-balance-actions">
+          <span>{accounts.length} accounts / MYR</span>
+          {syncFailed ? <span role="status" className="overview-negative">Sync incomplete</span> : null}
+          <button type="button" onClick={onTogglePrivacy} title={hideValues ? 'Show money balances' : 'Hide money balances'}
+            aria-label={hideValues ? 'Show money balances' : 'Hide money balances'} className="workspace-icon-button focus-ring">
+            {hideValues ? <EyeOff size={18} /> : <Eye size={18} />}
+          </button>
         </div>
       </section>
-
-      {isModalOpen ? (
-        <ModalPortal>
+      {isModalOpen ? <ModalPortal>
         <div role="dialog" aria-modal="true" aria-label="Wallet Snapshot" className="dialog-overlay z-[110] bg-black/70 backdrop-blur-sm" onClick={() => setIsModalOpen(false)}>
-          <div className="panel-elevated mx-auto w-full max-w-lg overflow-hidden rounded-3xl" onClick={(event) => event.stopPropagation()}>
-            <div className="flex items-center justify-between border-b border-[var(--border-soft)] px-6 py-5">
-              <h3 className="font-display text-2xl text-[var(--text-primary)]">Wallet Snapshot</h3>
-              <button
-                type="button"
-                onClick={() => setIsModalOpen(false)}
-                aria-label="Close wallet snapshot"
-                className="focus-ring rounded-lg p-2 text-[var(--text-muted)] transition hover:bg-white/5 hover:text-[var(--text-primary)]"
-              >
-                <X className="h-5 w-5" />
-              </button>
+          <div className="panel-elevated w-full max-w-lg" onClick={(event) => event.stopPropagation()}>
+            <div className="flex items-center justify-between border-b border-[var(--border-soft)] px-6 py-4">
+              <h2>Wallet Snapshot</h2>
+              <button type="button" aria-label="Close wallet snapshot" onClick={() => setIsModalOpen(false)} className="workspace-icon-button"><X size={20} /></button>
             </div>
-
-            <div className="max-h-[58vh] space-y-3 overflow-y-auto p-5">
-              {activeAccounts.length === 0 ? (
-                <div className="rounded-2xl border border-[var(--border-soft)] bg-black/20 p-8 text-center text-sm text-[var(--text-muted)]">
-                  No active accounts found.
-                </div>
-              ) : (
-                activeAccounts.map((account) => (
-                  <div key={account.name} className="flex items-center justify-between rounded-2xl border border-[var(--border-soft)] bg-black/20 p-4">
-                    <div className="flex items-center gap-3">
-                      <div className="rounded-xl bg-white/5 p-2">{account.logoUrl ? <img src={account.logoUrl} alt="" className="h-6 w-6 object-contain" /> : getAccountIcon(account.category)}</div>
-                      <div>
-                        <p className="text-sm font-semibold text-[var(--text-primary)]">{account.name}</p>
-                        <p className="text-xs uppercase tracking-[0.12em] text-[var(--text-muted)]">{account.category}</p>
-                      </div>
-                    </div>
-                    <p className={`text-sm font-semibold ${account.currentBalance < 0 ? 'text-rose-300' : 'text-emerald-300'}`}>
-                      {displayValue(account.currentBalance)}
-                    </p>
-                  </div>
-                ))
-              )}
-            </div>
-
-            <div className="flex items-center justify-between border-t border-[var(--border-soft)] bg-black/20 px-6 py-4">
-              <span className="text-sm text-[var(--text-secondary)]">Net Total</span>
-              <span className="font-display text-xl text-[var(--text-primary)]">{displayValue(totalBalance)}</span>
-            </div>
+            <div className="px-6 pb-6"><AccountList accounts={accounts} hideValues={hideValues} /></div>
           </div>
         </div>
-        </ModalPortal>
-      ) : null}
+      </ModalPortal> : null}
     </>
   );
 };

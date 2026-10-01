@@ -17,6 +17,8 @@ import { getBillingDayOfMonth, getStatementCycle } from '../lib/creditCard';
 import { getRecognitionDate, isRecognizedExpense, isSettlementLocked } from '../lib/money';
 import { useReadOnly } from './WorkspaceMode';
 import { MoneyViewRequest } from '../types/ui';
+import { AccountList } from './MoneyManager/AccountList';
+import { WorkspaceTabs } from './ui/WorkspaceTabs';
 
 interface MoneyManagerProps {
   data: MoneyManagerData | null;
@@ -28,7 +30,7 @@ interface MoneyManagerProps {
   onViewRequestHandled?: () => void;
 }
 
-const PIE_COLORS = ['#f43f5e', '#ec4899', '#d946ef', '#a855f7', '#8b5cf6', '#6366f1', '#3b82f6', '#0ea5e9'];
+const PIE_COLORS = ['#7ca6ff', '#e6b66d', '#6ed4a6', '#ff969c', '#b2a4de', '#a5adb8'];
 
 const getCategoryStyles = (cat: string) => {
   const c = cat.toLowerCase();
@@ -75,6 +77,7 @@ interface CreditCardDetail {
 
 export const MoneyManager: React.FC<MoneyManagerProps> = ({ data, loading, onRefresh, hideValues, registerAddHandler, viewRequest, onViewRequestHandled }) => {
   const readOnly = useReadOnly();
+  const [activeView, setActiveView] = useState<'activity' | 'accounts' | 'auto'>('activity');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isHistoryModalOpen, setIsHistoryModalOpen] = useState(false);
   const [isOutstandingModalOpen, setIsOutstandingModalOpen] = useState(false);
@@ -380,18 +383,12 @@ export const MoneyManager: React.FC<MoneyManagerProps> = ({ data, loading, onRef
   };
 
   return (
-    <div className="grid grid-cols-1 gap-5 md:gap-8 xl:grid-cols-3">
-      <div className="space-y-3 md:space-y-8 xl:col-span-2">
+    <div>
         <MoneyHeader
           monthLabel={monthLabel}
           isCustomDateMode={isCustomDateMode}
           onPrevMonth={prevMonth}
           onNextMonth={nextMonth}
-          onAddNew={() => {
-            if (readOnly) return;
-            setEditingTransaction(null);
-            setIsModalOpen(true);
-          }}
         />
 
         <MoneyStatsRow
@@ -407,7 +404,12 @@ export const MoneyManager: React.FC<MoneyManagerProps> = ({ data, loading, onRef
           onOpenOutstandingDetails={() => setIsOutstandingModalOpen(true)}
         />
 
-        <MoneyActivityList
+      <div className="workspace-columns money-content">
+      <div className="workspace-section">
+        <WorkspaceTabs id="money" label="Money views" value={activeView} onChange={setActiveView}
+          items={[{ value: 'activity', label: 'Activity' }, { value: 'accounts', label: 'Accounts' }, { value: 'auto', label: 'Auto-debits' }]} />
+        <div role="tabpanel" id={`money-panel-${activeView}`} aria-labelledby={`money-tab-${activeView}`}>
+        {activeView === 'activity' ? <MoneyActivityList
           filteredTransactions={filteredTransactions}
           filters={filters}
           accounts={data.accounts}
@@ -422,20 +424,12 @@ export const MoneyManager: React.FC<MoneyManagerProps> = ({ data, loading, onRef
           displayValue={displayValue}
           getCategoryStyles={getCategoryStyles}
           getTransactionDisplay={getTransactionDisplay}
-        />
-      </div>
-
-      <div className="space-y-4 md:space-y-6">
-        <MoneyBreakdownPanel
-          pieData={pieData}
-          fullBreakdown={fullBreakdown}
-          hideValues={hideValues}
-          colors={PIE_COLORS}
-          onSelectCategory={setSelectedCategory}
-          displayValue={displayValue}
-        />
-
-        <AutoDebitPanel
+        /> : null}
+        {activeView === 'accounts' ? <section>
+          <div className="workspace-section-heading"><h3>Accounts</h3><span>{data.accounts.length} accounts / MYR</span></div>
+          <AccountList accounts={data.accounts} hideValues={hideValues} />
+        </section> : null}
+        {activeView === 'auto' ? <AutoDebitPanel
           rules={data.autoDebitRules || []}
           hideValues={hideValues}
           onAdd={() => {
@@ -449,18 +443,25 @@ export const MoneyManager: React.FC<MoneyManagerProps> = ({ data, loading, onRef
             setIsAutoDebitModalOpen(true);
           }}
           onRefresh={onRefresh}
+        /> : null}
+        </div>
+      </div>
+
+      <div className="workspace-stack">
+        <MoneyBreakdownPanel
+          pieData={pieData}
+          fullBreakdown={fullBreakdown}
+          hideValues={hideValues}
+          colors={PIE_COLORS}
+          onSelectCategory={setSelectedCategory}
+          displayValue={displayValue}
         />
 
         {creditCardAccounts.length > 0 ? (
-          <div className="rounded-3xl border border-white/5 bg-slate-900/40 p-4 shadow-xl backdrop-blur-md md:p-6">
-            <div className="mb-4 flex items-center gap-3">
-              <div className="rounded-2xl bg-amber-500/10 p-3 text-amber-300">
-                <CreditCard className="h-5 w-5" />
-              </div>
-              <div>
-                <h3 className="text-lg font-bold text-white">Credit Cards</h3>
-                <p className="text-xs text-slate-400">Statement is what&apos;s already been billed and is still unpaid. Outstanding adds charges made since the last statement.</p>
-              </div>
+          <section className="workspace-section">
+            <div className="workspace-section-heading">
+              <h3>Credit Cards</h3>
+              <CreditCard size={18} className="overview-negative" />
             </div>
 
             <div className="space-y-3">
@@ -469,7 +470,7 @@ export const MoneyManager: React.FC<MoneyManagerProps> = ({ data, loading, onRef
                 const outstanding = detail?.outstandingTotal || 0;
                 const statement = detail?.statementTotal || 0;
                 return (
-                  <div key={account.name} className="rounded-2xl border border-white/5 bg-slate-950/50 p-4">
+                  <div key={account.name} className="workspace-credit-row">
                     <div className="flex flex-col gap-4">
                       <div>
                         <div className="text-sm font-bold text-white">{account.name}</div>
@@ -477,12 +478,13 @@ export const MoneyManager: React.FC<MoneyManagerProps> = ({ data, loading, onRef
                         <div className="mt-1 text-xs text-slate-500">Statement {displayValue(statement)}{detail ? ` • closed ${detail.closeDate.toLocaleString('default', { day: 'numeric', month: 'short' })} • due ${detail.dueLabel}` : ''}</div>
                         <div className="mt-1 text-xs text-slate-500">Unbilled {displayValue(detail?.unbilledTotal || 0)}</div>
                       </div>
-                      <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
+                      <div className="flex flex-col gap-3">
                         <div>
-                          <label className="mb-1 block text-[11px] font-bold uppercase tracking-[0.18em] text-slate-500">Billing day</label>
+                          <label htmlFor={`billing-day-${account.name}`}>Billing day</label>
                           <div className="flex items-center gap-2">
                             <input
                               type="number"
+                              id={`billing-day-${account.name}`}
                               disabled={readOnly}
                               min={1}
                               max={31}
@@ -511,7 +513,7 @@ export const MoneyManager: React.FC<MoneyManagerProps> = ({ data, loading, onRef
                           <button
                             onClick={() => openSettleModal(account, 'outstanding')}
                             disabled={readOnly || outstanding <= 0}
-                            className="rounded-xl bg-emerald-600 px-3 py-2 text-xs font-bold text-white transition-colors hover:bg-emerald-500 disabled:cursor-not-allowed disabled:bg-slate-800 disabled:text-slate-500"
+                            className="workspace-secondary-button disabled:opacity-50"
                           >
                             Settle Outstanding
                           </button>
@@ -522,8 +524,9 @@ export const MoneyManager: React.FC<MoneyManagerProps> = ({ data, loading, onRef
                 );
               })}
             </div>
-          </div>
+          </section>
         ) : null}
+      </div>
       </div>
 
       {isOutstandingModalOpen ? (

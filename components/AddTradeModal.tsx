@@ -179,7 +179,6 @@ export const AddTradeModal: React.FC<AddTradeModalProps> = ({ isOpen, onClose, o
         <div className="flex items-center justify-between border-b border-[var(--border-soft)] px-6 py-5">
           <div>
             <h2 className="font-display text-2xl text-[var(--text-primary)]">Add Trade</h2>
-            <p className="text-sm text-[var(--text-secondary)]">Record a buy or sell event with allocation metadata.</p>
           </div>
           <button type="button" onClick={onClose} aria-label="Close trade form" className="focus-ring shrink-0 rounded-lg p-2 text-[var(--text-muted)] transition hover:bg-white/5 hover:text-[var(--text-primary)]">
             <X className="h-5 w-5" />

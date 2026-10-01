@@ -2,13 +2,14 @@
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
-import { AlertCircle, Beaker, Landmark, LayoutDashboard } from 'lucide-react';
+import { AlertCircle, Beaker } from 'lucide-react';
 import { AllocationChart } from '../AllocationChart';
 import { FundingStats } from '../FundingStats';
 import { HoldingsTable } from '../HoldingsTable';
 import { MoneyManager } from '../MoneyManager';
 import { Overview } from '../Overview';
 import { AddMoneyModal } from '../MoneyManager/AddMoneyModal';
+import { AddFundingModal } from '../FundingStats/AddFundingModal';
 import { useReadOnly } from '../WorkspaceMode';
 import { SummaryCards } from '../SummaryCards';
 import { TotalBalanceCard } from '../TotalBalanceCard';
@@ -64,6 +65,7 @@ export const AppWorkspace: React.FC<AppWorkspaceProps> = ({
 }) => {
   const readOnly = useReadOnly();
   const [overviewAddOpen, setOverviewAddOpen] = useState(false);
+  const [fundingAddOpen, setFundingAddOpen] = useState(false);
   const [moneyViewRequest, setMoneyViewRequest] = useState<MoneyViewRequest | null>(null);
   const handleMoneyViewHandled = useCallback(() => setMoneyViewRequest(null), []);
   const addTransactionHandlerRef = useRef<(() => void) | null>(null);
@@ -77,7 +79,8 @@ export const AppWorkspace: React.FC<AppWorkspaceProps> = ({
   useEffect(() => {
     if (activeModule !== 'overview') setOverviewAddOpen(false);
     if (activeModule !== 'manager') setMoneyViewRequest(null);
-  }, [activeModule]);
+    if (activeModule !== 'investment' || activeInvTab !== 'funding') setFundingAddOpen(false);
+  }, [activeModule, activeInvTab]);
 
   const registerAddHandler = useCallback((handler: (() => void) | null) => {
     addTransactionHandlerRef.current = handler;
@@ -94,29 +97,30 @@ export const AppWorkspace: React.FC<AppWorkspaceProps> = ({
     }
     if (activeModule === 'manager') {
       return {
-        title: 'Money Manager',
-        subtitle: 'Track balances, spending, and recurring outflows in one flow.',
-        breadcrumbs: ['Workspace', 'Money Manager'],
+        title: 'Money',
+        subtitle: '',
+        breadcrumbs: ['Money'],
       };
     }
 
     if (activeInvTab === 'funding') {
       return {
-        title: 'Funding Intelligence',
-        subtitle: 'Analyze capital inflows, conversions, and lifecycle return quality.',
-        breadcrumbs: ['Workspace', 'Investments', 'Cash Flow'],
+        title: 'Funding',
+        subtitle: '',
+        breadcrumbs: ['Funding'],
       };
     }
 
     return {
-      title: 'Portfolio Command',
-      subtitle: 'Monitor concentration risk, allocation quality, and return momentum.',
-      breadcrumbs: ['Workspace', 'Investments', 'Portfolio'],
+      title: 'Invest',
+      subtitle: '',
+      breadcrumbs: ['Invest'],
     };
   }, [activeInvTab, activeModule]);
 
   const activeHideValue = activeModule === 'overview' ? hideBalance && hideInvestments : activeModule === 'manager' ? hideBalance : hideInvestments;
-  const primaryActionLabel = activeModule === 'investment' ? 'Add Trade' : 'Add transaction';
+  const isFunding = activeModule === 'investment' && activeInvTab === 'funding';
+  const primaryActionLabel = isFunding ? 'Add cash flow' : activeModule === 'investment' ? 'Add Trade' : 'Add transaction';
   const togglePrivacy = () => {
     if (activeModule === 'overview') {
       // A partially hidden overview becomes fully hidden with one action.
@@ -130,58 +134,12 @@ export const AppWorkspace: React.FC<AppWorkspaceProps> = ({
   const syncLabel = error ? 'Sync incomplete' : loading ? 'Syncing...' : isDemo ? 'Demo / Read-only' :
     lastSyncedAt ? `Synced ${lastSyncedAt.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}` : 'Not synced';
 
-  const headerSlot = (
-    <div className="space-y-4">
-      {isDemo ? (
-        <div className="panel-elevated flex flex-col items-start justify-between gap-4 p-4 sm:flex-row sm:items-center">
-          <div className="flex items-center gap-3">
-            <div className="rounded-xl bg-amber-500/20 p-2 text-amber-300">
-              <Beaker className="h-4 w-4" />
-            </div>
-            <div>
-              <p className="text-sm font-semibold text-[var(--text-primary)]">Demo Dataset Active</p>
-              <p className="text-xs text-[var(--text-secondary)]">This workspace is read-only simulation data.</p>
-            </div>
-          </div>
-          <Link
-            href="/"
-            className="focus-ring inline-flex items-center rounded-xl border border-[var(--border-soft)] bg-white/[0.03] px-3 py-2 text-xs font-semibold text-[var(--text-primary)] transition hover:bg-white/[0.08]"
-          >
-            Go to Real App
-          </Link>
-        </div>
-      ) : null}
-
-      {activeModule === 'investment' ? (
-        <div className="panel inline-flex w-full flex-wrap items-center gap-2 p-2 sm:w-auto">
-          <button
-            type="button"
-            onClick={() => onSelectInvTab('dashboard')}
-            className={`focus-ring inline-flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-semibold transition ${
-              activeInvTab === 'dashboard'
-                ? 'bg-white/10 text-[var(--text-primary)]'
-                : 'text-[var(--text-secondary)] hover:bg-white/5 hover:text-[var(--text-primary)]'
-            }`}
-          >
-            <LayoutDashboard className="h-4 w-4" />
-            Portfolio
-          </button>
-          <button
-            type="button"
-            onClick={() => onSelectInvTab('funding')}
-            className={`focus-ring inline-flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-semibold transition ${
-              activeInvTab === 'funding'
-                ? 'bg-white/10 text-[var(--text-primary)]'
-                : 'text-[var(--text-secondary)] hover:bg-white/5 hover:text-[var(--text-primary)]'
-            }`}
-          >
-            <Landmark className="h-4 w-4" />
-            Cash Flow
-          </button>
-        </div>
-      ) : null}
+  const headerSlot = isDemo ? (
+    <div className="workspace-demo-banner">
+      <div><Beaker size={16} /><span>Demo dataset / Read-only</span></div>
+      <Link href="/" className="focus-ring overview-accent">Go to Real App</Link>
     </div>
-  );
+  ) : undefined;
 
   const holdings = data?.holdings ?? [];
   const topHolding = holdings.length > 0 ? [...holdings].sort((a, b) => b.allocation - a.allocation)[0] : null;
@@ -201,7 +159,7 @@ export const AppWorkspace: React.FC<AppWorkspaceProps> = ({
       loading={loading}
       isDemo={isDemo}
       primaryActionLabel={primaryActionLabel}
-      primaryActionDisabled={activeModule !== 'investment' && !moneyData}
+      primaryActionDisabled={activeModule !== 'investment' ? !moneyData : isFunding ? !cashFlowData : !data}
       periodLabel={periodLabel}
       syncLabel={syncLabel}
       syncFailed={Boolean(error)}
@@ -214,10 +172,10 @@ export const AppWorkspace: React.FC<AppWorkspaceProps> = ({
       onPrimaryAction={
         activeModule === 'overview' ? openOverviewAdd : activeModule === 'manager'
           ? () => addTransactionHandlerRef.current?.()
-          : onOpenAddTrade
+          : isFunding ? () => { if (!readOnly) setFundingAddOpen(true); } : onOpenAddTrade
       }
     >
-      {activeModule !== 'overview' && moneyData ? <TotalBalanceCard
+      {activeModule === 'manager' && moneyData ? <TotalBalanceCard
         totalBalance={moneyData?.totalBalance || 0}
         accounts={moneyData?.accounts || []}
         hideValues={hideBalance}
@@ -268,40 +226,39 @@ export const AppWorkspace: React.FC<AppWorkspaceProps> = ({
               onViewRequestHandled={handleMoneyViewHandled}
             />
           ) : null}
+          {activeModule === 'manager' && !moneyData ? <p className="workspace-empty" role="status">Money data is unavailable.</p> : null}
 
           {activeModule === 'investment' && activeInvTab === 'funding' ? (
             <FundingStats
               cashFlow={cashFlowData}
               portfolio={data}
               hideValues={hideInvestments}
-              onRefresh={onRefresh}
             />
           ) : null}
 
           {activeModule === 'investment' && activeInvTab === 'dashboard' ? (
             <>
               <SummaryCards data={data} loading={loading} hideValues={hideInvestments} />
-              <div className="grid grid-cols-1 gap-8 xl:grid-cols-3">
-                <div className="space-y-8 xl:col-span-2">
+              <div className="workspace-columns">
+                <div className="workspace-section">
                   <HoldingsTable data={data} hideValues={hideInvestments} />
                 </div>
-                <div className="space-y-8">
+                <div className="workspace-stack">
                   <AllocationChart data={data} hideValues={hideInvestments} />
-                  <div className="kpi-card relative overflow-hidden p-6">
-                    <div className="pointer-events-none absolute -right-16 -top-16 h-40 w-40 rounded-full bg-[var(--accent-primary)]/20 blur-3xl" />
-                    <h3 className="text-lg font-semibold text-[var(--text-primary)]">Insight Story</h3>
-                    <p className="mt-3 text-sm leading-relaxed text-[var(--text-secondary)]">
-                      {holdings.length === 0
-                        ? 'No active holdings yet. Add your first trade to unlock concentration and sector analysis.'
+                  <div className="workspace-concentration">
+                    <h3>Concentration</h3>
+                    <p>
+                      {!data ? 'Portfolio data is unavailable.' : holdings.length === 0
+                        ? 'No active holdings.'
                         : `You currently hold ${holdings.length} assets across ${Object.keys(sectors).length} sectors.`}
                     </p>
                     {topHolding ? (
-                      <p className="mt-3 text-sm leading-relaxed text-[var(--text-secondary)]">
+                      <p className="mt-3">
                         {`${topHolding.ticker} is your largest single position at ${hideInvestments ? '****' : `${topHolding.allocation.toFixed(1)}%`} allocation.`}
                       </p>
                     ) : null}
                     {leadSector ? (
-                      <p className="mt-3 text-sm leading-relaxed text-[var(--text-secondary)]">
+                      <p className="mt-3">
                         {`${leadSector[0]} is your dominant sector with approximately ${hideInvestments ? '****' : `${leadSectorWeight.toFixed(1)}%`} portfolio exposure.`}
                       </p>
                     ) : null}
@@ -312,6 +269,8 @@ export const AppWorkspace: React.FC<AppWorkspaceProps> = ({
           ) : null}
         </>
       )}
+      {isFunding ? <AddFundingModal isOpen={fundingAddOpen} onClose={() => setFundingAddOpen(false)}
+        onSuccess={() => { setFundingAddOpen(false); onRefresh(); }} /> : null}
       {activeModule === 'overview' && moneyData ? (
         <AddMoneyModal
           isOpen={overviewAddOpen}
